@@ -108,22 +108,55 @@ export function maskAll(surfaces: SurfaceStore, maskId: SurfaceId, width: number
 	g.destroy();
 }
 
+/** Appends the geometry of the positive selection shape to a Graphics path.
+ * Rect/ellipse draw from their bounding rect; lasso draws the closed polygon. */
+function addShapePath(g: Graphics, kind: SelectionKind, rect: Rect | null, points: Point[] | null): void {
+	if (kind === 'lasso') {
+		if (points && points.length >= 3) g.poly(points, true);
+		return;
+	}
+	if (!rect || rect.width <= 0 || rect.height <= 0) return;
+	if (kind === 'ellipse') {
+		g.ellipse(rect.x + rect.width / 2, rect.y + rect.height / 2, Math.abs(rect.width) / 2, Math.abs(rect.height) / 2);
+	} else {
+		g.rect(rect.x, rect.y, rect.width, rect.height);
+	}
+}
+
 /**
- * Returns a NEW mask surface that is the complement of `maskId`'s current
- * content: fill a fresh surface white, then erase the old selection region
- * (destination-out). The caller swaps the model's maskId and disposes the old
- * surface.
+ * Writes the complement of the POSITIVE selection shape (`kind`/`rect`/`points`)
+ * into the (already-doc-sized) `maskId` surface: the whole document is filled
+ * white, then the original shape region is reset to fully transparent with a
+ * `'none'` (replace) blend — which zeroes BOTH RGB and alpha, so no premultiplied
+ * residue remains inside the punched hole (unlike an 'erase' pass). Works for
+ * holes / donut-like selections (inverting a small shape selects everything
+ * except that shape).
  */
 export function invertSelectionMask(
 	surfaces: SurfaceStore,
 	maskId: SurfaceId,
 	width: number,
-	height: number
-): SurfaceId {
-	const outId = surfaces.create(width, height);
-	surfaces.fill(outId, WHITE);
-	surfaces.blitRegion(maskId, outId, 0, 0, 'erase', 1);
-	return outId;
+	height: number,
+	kind: SelectionKind,
+	rect: Rect | null,
+	points: Point[] | null
+): void {
+	// 1) clear, 2) fill the whole document white
+	wipeMask(surfaces, maskId);
+	const full = new Graphics();
+	full.rect(0, 0, width, height).fill(WHITE);
+	surfaces.renderInto(surfaces.getTexture(maskId), full, false);
+	full.destroy();
+
+	// 3) punch the original shape region to transparent (replace, not erase).
+	const hole = new Graphics();
+	addShapePath(hole, kind, rect, points);
+	if (hole) {
+		hole.fill({ color: 0x000000, alpha: 0 });
+		hole.blendMode = 'none';
+		surfaces.renderInto(surfaces.getTexture(maskId), hole, false);
+		hole.destroy();
+	}
 }
 
 /**

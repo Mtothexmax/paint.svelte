@@ -133,11 +133,10 @@ export function deselect(): void {
 }
 
 /**
- * Inverts the selection mask (complement). The mask remains the authority;
- * `rect`/`points` keep describing the ORIGINAL shape and `inverted` flips so
- * the ants outline (doc border ∪ shape border) still matches the mask.
- * Inverting a whole-document selection produces an empty selection, which is
- * reported as a deselect (nothing to show).
+ * Inverts the current selection (mask complement). The pooled mask surface is
+ * rewritten in place; `rect`/`points` always describe the POSITIVE shape, and
+ * `inverted` flips so the mask matches (positive vs complement). Inverting
+ * again restores the original positive selection.
  */
 export function invertSelection(): boolean {
 	const doc = activeDoc();
@@ -145,9 +144,15 @@ export function invertSelection(): boolean {
 	const sel = doc.selection;
 	if (!sel.active || !sel.maskId) return false;
 
-	// Exact whole-doc rectangle inverted → empty selection (Paint.NET clears it).
-	if (!sel.inverted && sel.rect && sel.bounds) {
+	const renderer = getEditorRenderer();
+	const surfaces = renderer.surfaces;
+
+	if (!sel.inverted) {
+		// Positive -> complement (doc minus shape). A shape that covers the
+		// whole document inverts to nothing.
 		const coversAll =
+			sel.kind === 'rect' &&
+			!!sel.rect &&
 			sel.rect.x <= 0 &&
 			sel.rect.y <= 0 &&
 			sel.rect.x + sel.rect.width >= doc.width &&
@@ -156,18 +161,17 @@ export function invertSelection(): boolean {
 			deselect();
 			return true;
 		}
+		invertSelectionMask(surfaces, sel.maskId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
+		sel.inverted = true;
+		sel.bounds = { x: 0, y: 0, width: doc.width, height: doc.height };
+	} else {
+		// Complement -> restore the positive shape.
+		fillShapeMask(surfaces, sel.maskId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
+		sel.inverted = false;
+		sel.bounds = sel.rect && sel.rect.width > 0 ? { ...sel.rect } : null;
 	}
 
-	const renderer = getEditorRenderer();
-	const oldId = sel.maskId;
-	const newId = invertSelectionMask(renderer.surfaces, oldId, doc.width, doc.height);
-	sel.maskId = newId;
-	sel.inverted = !sel.inverted;
-	sel.bounds = { x: 0, y: 0, width: doc.width, height: doc.height };
-	// Refresh FIRST (the scene clip must re-bind the new mask texture) …
 	touch(doc);
-	// … then the old mask surface can be released.
-	renderer.surfaces.dispose(oldId);
 	return true;
 }
 
