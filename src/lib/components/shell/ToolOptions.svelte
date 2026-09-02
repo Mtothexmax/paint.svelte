@@ -10,7 +10,8 @@
 		brushHardness,
 		brushSpacing,
 		antiAliasMode,
-		selectionMode
+		selectionMode,
+		selectionRatio
 	} from '../../state/ui';
 	import { get } from 'svelte/store';
 	import { requestPolygonFinish } from '../../state/polygon';
@@ -42,12 +43,41 @@
 		}
 	];
 
+	const RATIO_OPTIONS = [
+		{
+			id: 'normal',
+			icon: '⛶',
+			label: 'Free Ratio',
+			description: 'Unconstrained rectangle size'
+		},
+		{
+			id: 'fixedRatio',
+			icon: '⬚',
+			label: 'Fixed Ratio',
+			description: 'Keep a fixed width-to-height ratio'
+		},
+		{
+			id: 'fixedSize',
+			icon: '▣',
+			label: 'Fixed Size',
+			description: 'Always select the same size'
+		}
+	];
+
 	let aa = $state<string>('pixel');
 	$effect(() => {
 		aa = get(antiAliasMode);
 	});
 	$effect(() => {
 		antiAliasMode.set(aa as 'pixel' | 'smooth');
+	});
+
+	let ratio = $state<string>('normal');
+	$effect(() => {
+		ratio = get(selectionRatio);
+	});
+	$effect(() => {
+		selectionRatio.set(ratio as 'normal' | 'fixedRatio' | 'fixedSize');
 	});
 </script>
 
@@ -87,6 +117,15 @@
 				− Subtract
 			</button>
 		</div>
+		{#if $activeToolId === 'select-rect'}
+			<span class="aa-label">Ratio:</span>
+			<IconSplitButton
+				options={RATIO_OPTIONS}
+				titleInButton
+				bind:value={ratio}
+				title="Rectangle aspect ratio"
+			/>
+		{/if}
 		{#if isLasso}
 			<span class="aa-label">Tool:</span>
 			<div class="seg">

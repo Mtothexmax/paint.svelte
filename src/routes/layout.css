@@ -1263,6 +1263,14 @@ body {
 	background: rgba(255, 255, 255, 0.08);
 	color: var(--text);
 }
+.isp-label-inline {
+	display: flex;
+	align-items: center;
+	padding: 0 8px 0 4px;
+	font-size: 12px;
+	color: var(--text);
+	white-space: nowrap;
+}
 .isp-menu {
 	position: fixed;
 	z-index: 1300;

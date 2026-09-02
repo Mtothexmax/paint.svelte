@@ -79,6 +79,10 @@ export const antiAliasMode = writable<'pixel' | 'smooth'>('smooth');
 export type SelectionMode = 'replace' | 'add' | 'subtract';
 export const selectionMode = writable<SelectionMode>('replace');
 
+/** Rectangle-select sizing: normal (free), fixed aspect ratio, or fixed size. */
+export type SelectionRatio = 'normal' | 'fixedRatio' | 'fixedSize';
+export const selectionRatio = writable<SelectionRatio>('normal');
+
 export function cycleBrushSize(delta: number): void {
 	brushSize.update((v) => clamp(Math.round(v + delta), 1, 400));
 }

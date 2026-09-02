@@ -12,8 +12,11 @@
 		options: Option[];
 		value: string;
 		title?: string;
+		/** when true, the current option's label is shown as text in the button
+		 * (in addition to its icon) — e.g. for selection ratio modes. */
+		titleInButton?: boolean;
 	}
-	let { options, value = $bindable(), title = '' }: Props = $props();
+	let { options, value = $bindable(), title = '', titleInButton = false }: Props = $props();
 
 	let btn: HTMLButtonElement;
 	let menuEl = $state<HTMLDivElement>();
@@ -68,6 +71,7 @@
 	title={title || (current?.label ?? '')}
 >
 	<span class="isp-icon" onclick={cycle}>{current?.icon ?? ''}</span>
+	{#if titleInButton}<span class="isp-label-inline">{current?.label ?? ''}</span>{/if}
 	<span class="isp-arrow" onclick={toggleMenu}>▾</span>
 </button>
 
