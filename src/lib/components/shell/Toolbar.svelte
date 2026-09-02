@@ -40,7 +40,10 @@
 	}));
 </script>
 
-<div class="grid w-full grid-cols-2 content-start justify-items-center gap-1 py-1">
+<div
+	class="grid w-full content-start"
+	style="grid-template-columns:repeat(2, 40px); justify-content:center; gap:4px; padding:4px;"
+>
 	{#each rendered as { tool, sep } (tool.id)}
 		{#if sep}<div class="tool-sep col-span-2"></div>{/if}
 		<button
