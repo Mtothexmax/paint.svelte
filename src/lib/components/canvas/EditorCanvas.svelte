@@ -19,6 +19,7 @@
 		invertSelection,
 		selectAll,
 		applySelectionMode,
+		applySelectionRect,
 		setLassoSelection
 	} from '../../services/selectionService';
 	import {
@@ -321,6 +322,12 @@
 		return { x: start.x + dirX * Math.max(1, Math.round(w)), y: start.y + dirY * Math.max(1, Math.round(h)) };
 	}
 
+	/** The free-floating Fixed-Size rectangle whose top-left follows the pointer. */
+	function fixedRectAt(cur: Point): { x: number; y: number; width: number; height: number } {
+		const s = get(selectionFixedSize);
+		return { x: Math.round(cur.x), y: Math.round(cur.y), width: Math.max(1, s.width), height: Math.max(1, s.height) };
+	}
+
 	/** Live draft outline (solid) for the drag in progress. `cur` is the
 	 * current pointer position in image px. */
 	function showSelectDraft(cur: Point): void {		if (!ready) return;
@@ -332,14 +339,20 @@
 			return;
 		}
 		// rect/ellipse: outline follows the current pointer position (rectangle
-		// tool honours the Free/Fixed-Ratio/Fixed-Size mode).
-		const eff = kind === 'rect' ? constrainRectCorner(start, cur) : cur;
-		const rect = {
-			x: Math.min(start.x, eff.x),
-			y: Math.min(start.y, eff.y),
-			width: Math.abs(eff.x - start.x),
-			height: Math.abs(eff.y - start.y)
-		};
+		// tool honours the Free/Fixed-Ratio/Fixed-Size mode; Fixed Size moves a
+		// free-floating box with its top-left under the pointer).
+		let rect: { x: number; y: number; width: number; height: number };
+		if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {
+			rect = fixedRectAt(cur);
+		} else {
+			const eff = kind === 'rect' ? constrainRectCorner(start, cur) : cur;
+			rect = {
+				x: Math.min(start.x, eff.x),
+				y: Math.min(start.y, eff.y),
+				width: Math.abs(eff.x - start.x),
+				height: Math.abs(eff.y - start.y)
+			};
+		}
 		const loop = selectionOutlinePoints(kind, rect, null);
 		getEditorRenderer().previewSelectionOutline(loop.length ? [loop] : null, false);
 	}
@@ -552,8 +565,12 @@
 			return;
 		}
 		const upRaw = imageFromScreen(screenPoint(e));
-		const up = kind === 'rect' ? constrainRectCorner(start, upRaw) : upRaw;
-		if (kind === 'lasso') {
+		const up =
+			kind === 'rect' && get(selectionRatio) !== 'fixedSize' ? constrainRectCorner(start, upRaw) : upRaw;
+		if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {
+			// Fixed Size: freely place the fixed box at the release point.
+			applySelectionRect(dragMode, 'rect', fixedRectAt(upRaw));
+		} else if (kind === 'lasso') {
 			const last = lassoPts[lassoPts.length - 1];
 			if (!last || Math.hypot(upRaw.x - last.x, upRaw.y - last.y) >= 1) lassoPts.push(upRaw);
 			if (lassoPts.length >= 2) applySelectionMode(dragMode, 'lasso', start, start, lassoPts);

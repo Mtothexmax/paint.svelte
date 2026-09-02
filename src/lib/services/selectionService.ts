@@ -247,6 +247,64 @@ export function applySelectionMode(
 }
 
 /**
+ * Applies a selection given an already-normalized `rect` (used by the Fixed-Size
+ * rectangle mode, where the box is freely placed rather than anchored to a
+ * drag corner). `mode` behaves exactly as in `applySelectionMode`.
+ */
+export function applySelectionRect(mode: 'replace' | 'add' | 'subtract', kind: 'rect' | 'ellipse', rect: Rect): boolean {
+	const doc = activeDoc();
+	if (!doc || !hasEditorRenderer()) return false;
+	if (!rect || rect.width < 1 || rect.height < 1) return false;
+	const renderer = getEditorRenderer();
+	const surfaces = renderer.surfaces;
+
+	const setPositive = (): boolean => {
+		const maskId = renderer.ensureSelectionMask(doc);
+		const bounds = fillShapeMask(surfaces, maskId, doc.width, doc.height, kind, rect, null);
+		if (!bounds) return false;
+		const sel = doc.selection;
+		sel.active = true;
+		sel.kind = kind;
+		sel.rect = rect;
+		sel.points = null;
+		sel.bounds = bounds;
+		sel.inverted = false;
+		sel.composite = false;
+		touch(doc);
+		return true;
+	};
+
+	if (mode === 'replace') return setPositive();
+
+	const sel = doc.selection;
+	if (!sel.active || !sel.maskId || !surfaces.has(sel.maskId)) {
+		if (mode === 'subtract') {
+			showNotice('Nothing to subtract from.');
+			return false;
+		}
+		return setPositive();
+	}
+
+	const cur = sel.maskId;
+	const newMask =
+		mode === 'add'
+			? unionSelection(surfaces, cur, doc.width, doc.height, kind, rect, null)
+			: subtractSelection(surfaces, cur, doc.width, doc.height, kind, rect, null);
+
+	sel.maskId = newMask;
+	sel.composite = true;
+	sel.inverted = false;
+	sel.active = true;
+	sel.rect = rect;
+	sel.points = null;
+	sel.bounds = { x: 0, y: 0, width: doc.width, height: doc.height };
+
+	touch(doc);
+	if (cur !== newMask && surfaces.has(cur)) surfaces.dispose(cur);
+	return true;
+}
+
+/**
  * Deletes (erases to transparency) the active layer's pixels inside the
  * selection — one undoable surface swap, like a brush stroke. Returns false
  * when there is nothing to delete.
