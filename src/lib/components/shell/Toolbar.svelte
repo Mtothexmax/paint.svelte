@@ -6,6 +6,7 @@
 	import dropletSvg from '@fluentui-emoji/svg/icons/flat/droplet.svg';
 	import rulerSvg from '@fluentui-emoji/svg/icons/flat/straight-ruler.svg';
 	import moveSvg from '@fluentui-emoji/svg/icons/flat/left-right-arrow.svg';
+	import lassoIcon from '../../assets/lasso.svg';
 
 	import { activeToolId } from '../../state/ui';
 
@@ -25,7 +26,7 @@
 		{ id: 'eyedropper', label: 'Eyedropper', src: dropletSvg, group: 2 },
 		{ id: 'select-rect', label: 'Rect Select', glyph: '🔲', group: 3 },
 		{ id: 'select-ellipse', label: 'Ellipse Select', glyph: '⭕', group: 3 },
-		{ id: 'lasso', label: 'Lasso Select', glyph: '🗾', group: 3 },
+		{ id: 'lasso', label: 'Lasso Select', src: lassoIcon, group: 3 },
 		{ id: 'select-poly', label: 'Polygon Select', glyph: '📐', group: 3 },
 		{ id: 'wand', label: 'Magic Wand', src: wandSvg, group: 3 },
 		{ id: 'bucket', label: 'Paint Bucket', src: bucketSvg, group: 4 },
