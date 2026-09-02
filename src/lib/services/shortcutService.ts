@@ -4,12 +4,29 @@
 import { commands } from './commandRegistry';
 import { dialog } from './dialogService';
 import { get } from 'svelte/store';
+import { cycleBrushSize } from '../state/ui';
 
 function isEditable(target: EventTarget | null): boolean {
 	if (!(target instanceof HTMLElement)) return false;
 	const el = target;
-	if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
-	return el.isContentEditable;
+	if (el.tagName === 'TEXTAREA') return true;
+	if (el.isContentEditable) return true;
+	if (el.tagName === 'INPUT') {
+		// Only real text-ish inputs should block shortcuts. Range sliders,
+		// checkboxes, color and buttons keep their keyboard focus but must NOT
+		// swallow e.g. Ctrl+Z / Ctrl+Y.
+		const type = (el as HTMLInputElement).type;
+		return (
+			type === 'text' ||
+			type === 'search' ||
+			type === 'number' ||
+			type === 'email' ||
+			type === 'url' ||
+			type === 'password' ||
+			type === 'tel'
+		);
+	}
+	return false;
 }
 
 function keyToken(key: string): string {
@@ -65,6 +82,14 @@ export function startShortcutService(): () => void {
 		// Never fire while a modal dialog is open.
 		if (get(dialog).kind) return;
 		if (isEditable(e.target)) return;
+		// brush size keys
+		if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+			if (e.key === '[' || e.key === ']') {
+				e.preventDefault();
+				cycleBrushSize(e.key === '[' ? -1 : 1);
+				return;
+			}
+		}
 		const combo = comboFromEvent(e);
 		const match = commands.all().find((def) => def.shortcut && comboFromShortcut(def.shortcut) === combo);
 		if (!match) return;

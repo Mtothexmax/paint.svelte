@@ -9,7 +9,9 @@ export const RegistryEvents = {
 	/** payload: { id: DocId; doc: ImageDocument } */
 	closed: 'closed',
 	/** payload: { id: DocId | null } */
-	active: 'active'
+	active: 'active',
+	/** fired when a document's contents/state changed (e.g. dirty flag) */
+	changed: 'changed'
 } as const;
 
 export interface RegistryClosePayload {
@@ -65,6 +67,11 @@ export class DocumentRegistry {
 		if (this.activeDocId === id) {
 			this.setActive(this.order.length ? this.order[this.order.length - 1] : null);
 		}
+	}
+
+	/** Signals that a document changed (e.g. dirty flag / pixels) so adapters re-read. */
+	notifyChange(doc?: ImageDocument): void {
+		this.events.emit(RegistryEvents.changed, doc);
 	}
 
 	setActive(id: DocId | null): void {

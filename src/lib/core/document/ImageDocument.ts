@@ -2,6 +2,7 @@
 
 import { newId } from '../id';
 import { type Layer, createRasterLayer, type SurfaceId } from '../layers/Layer';
+import { HistoryStack } from '../history/HistoryStack';
 
 export type DocId = string;
 
@@ -38,6 +39,7 @@ export class ImageDocument {
 	view: ViewState;
 	selection: SelectionState;
 	dirty: boolean;
+	history: HistoryStack;
 
 	constructor(params: NewDocumentParams) {
 		this.id = newId('doc');
@@ -47,6 +49,7 @@ export class ImageDocument {
 		this.selection = { active: false };
 		this.view = params.view ? { ...params.view } : { ...defaultView };
 		this.dirty = false;
+		this.history = new HistoryStack();
 
 		const layer = createRasterLayer(params.surfaceId, 'Background');
 		this.layers = [layer];
@@ -55,6 +58,46 @@ export class ImageDocument {
 
 	get activeLayer(): Layer | null {
 		return this.layers.find((l) => l.id === this.activeLayerId) ?? null;
+	}
+
+	indexOfLayer(id: string): number {
+		return this.layers.findIndex((l) => l.id === id);
+	}
+
+	setActiveLayer(id: string): void {
+		if (this.layers.some((l) => l.id === id)) this.activeLayerId = id;
+	}
+
+	/** Inserts `layer` at `index` (default: top). index 0 = bottom. */
+	insertLayer(layer: Layer, index: number): void {
+		const i = Math.max(0, Math.min(index, this.layers.length));
+		this.layers.splice(i, 0, layer);
+	}
+
+	/** Removes a layer, returns its index (or -1). */
+	removeLayer(id: string): number {
+		const idx = this.indexOfLayer(id);
+		if (idx >= 0) this.layers.splice(idx, 1);
+		return idx;
+	}
+
+	moveLayer(id: string, toIndex: number): void {
+		const from = this.indexOfLayer(id);
+		if (from < 0) return;
+		const target = Math.max(0, Math.min(toIndex, this.layers.length - 1));
+		if (from === target) return;
+		const [layer] = this.layers.splice(from, 1);
+		this.layers.splice(target, 0, layer);
+	}
+
+	setLayerVisible(id: string, visible: boolean): void {
+		const l = this.layers.find((x) => x.id === id);
+		if (l) l.visible = visible;
+	}
+
+	setLayerOpacity(id: string, opacity: number): void {
+		const l = this.layers.find((x) => x.id === id);
+		if (l) l.opacity = Math.max(0, Math.min(1, opacity));
 	}
 
 	/** Marks the doc dirty (or clean). */

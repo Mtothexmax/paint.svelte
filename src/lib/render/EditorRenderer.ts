@@ -103,6 +103,22 @@ export class EditorRenderer {
 		scene.applyView(doc.view.zoom, doc.view.panX, doc.view.panY);
 	}
 
+	/** Returns the active scene's pooled stroke target + preview overlay. */
+	getActiveStroke(): { target: import('pixi.js').RenderTexture; overlay: import('pixi.js').Sprite } | null {
+		if (!this.activeScene || !documentRegistry.active) return null;
+		return this.activeScene.ensureStroke();
+	}
+
+	/** Rebuilds the active scene's layer sprites (e.g. after a surface swap). */
+	rebuildActiveLayers(): void {
+		if (this.activeScene) this.activeScene.resync(this.surfaces);
+	}
+
+	/** Temporary live filter preview on the active layer (effect dialogs). */
+	setActiveLayerFilterPreview(filter: import('pixi.js').Filter | null): void {
+		this.activeScene?.setActiveLayerFilter(filter);
+	}
+
 	/** Call whenever the host element's CSS size changes. */
 	resize(widthCss: number, heightCss: number): void {
 		this.cssWidth = widthCss;

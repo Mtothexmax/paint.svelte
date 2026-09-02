@@ -38,10 +38,10 @@ export const MENUS: MenuDef[] = [
 	},
 	{
 		label: 'Edit',
-		enabled: false,
+		enabled: true,
 		entries: [
-			{ type: 'disabled', label: 'Undo', shortcut: 'Ctrl+Z' },
-			{ type: 'disabled', label: 'Redo', shortcut: 'Ctrl+Y' },
+			{ type: 'command', commandId: 'edit.undo' },
+			{ type: 'command', commandId: 'edit.redo' },
 			{ type: 'separator' },
 			{ type: 'disabled', label: 'Cut', shortcut: 'Ctrl+X' },
 			{ type: 'disabled', label: 'Copy', shortcut: 'Ctrl+C' },
@@ -60,27 +60,29 @@ export const MENUS: MenuDef[] = [
 	},
 	{
 		label: 'Layers',
-		enabled: false,
+		enabled: true,
 		entries: [
-			{ type: 'disabled', label: 'Add New Layer' },
-			{ type: 'disabled', label: 'Delete Layer' },
-			{ type: 'disabled', label: 'Duplicate Layer' }
+			{ type: 'command', commandId: 'layers.add' },
+			{ type: 'command', commandId: 'layers.duplicate' },
+			{ type: 'command', commandId: 'layers.delete' },
+			{ type: 'separator' },
+			{ type: 'disabled', label: 'Merge Down' }
 		]
 	},
 	{
 		label: 'Adjustments',
-		enabled: false,
+		enabled: true,
 		entries: [
+			{ type: 'command', commandId: 'adjustments.hueSat' },
 			{ type: 'disabled', label: 'Brightness…' },
-			{ type: 'disabled', label: 'Contrast…' },
-			{ type: 'disabled', label: 'Saturation…' }
+			{ type: 'disabled', label: 'Contrast…' }
 		]
 	},
 	{
 		label: 'Effects',
-		enabled: false,
+		enabled: true,
 		entries: [
-			{ type: 'disabled', label: 'Gaussian Blur…' },
+			{ type: 'command', commandId: 'effects.blur' },
 			{ type: 'disabled', label: 'Sharpen…' }
 		]
 	}

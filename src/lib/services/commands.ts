@@ -13,6 +13,7 @@ import {
 	openFromPicker
 } from './fileService';
 import type { ViewState } from '../core/document/ImageDocument';
+import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 
 function setStatusZoom(view: ViewState): void {
 	statusBar.update((s) => ({ ...s, zoomPct: Math.round(view.zoom * 100) }));
@@ -95,6 +96,78 @@ export function registerBuiltinCommands(): void {
 					return fitView(doc.width, doc.height, vw, vh);
 				}),
 			isEnabled: hasDoc
+		}
+	]);
+
+	commands.registerMany([
+		{
+			id: 'edit.undo',
+			label: 'Undo',
+			// Ctrl+Z is handled directly in EditorCanvas (layout-robust).
+			run: () => {
+				const doc = documentRegistry.active;
+				if (doc) {
+					doc.history.undo();
+					documentRegistry.notifyChange(doc);
+				}
+			},
+			isEnabled: () => !!documentRegistry.active?.history.canUndo
+		},
+		{
+			id: 'edit.redo',
+			label: 'Redo',
+			// Ctrl+Y / Ctrl+Shift+Z handled directly in EditorCanvas.
+			run: () => {
+				const doc = documentRegistry.active;
+				if (doc) {
+					doc.history.redo();
+					documentRegistry.notifyChange(doc);
+				}
+			},
+			isEnabled: () => !!documentRegistry.active?.history.canRedo
+		}
+	]);
+
+	commands.registerMany([
+		{
+			id: 'effects.blur',
+			label: 'Gaussian Blur…',
+			run: () => openDialog('blur'),
+			isEnabled: hasDoc
+		}
+	]);
+
+	commands.registerMany([
+		{
+			id: 'adjustments.hueSat',
+			label: 'Hue / Saturation…',
+			run: () => openDialog('hueSat'),
+			isEnabled: hasDoc
+		}
+	]);
+
+	commands.registerMany([
+		{ id: 'layers.add', label: 'Add New Layer', run: () => addLayer(), isEnabled: hasDoc },
+		{
+			id: 'layers.duplicate',
+			label: 'Duplicate Layer',
+			run: () => {
+				const d = documentRegistry.active;
+				if (d?.activeLayer) duplicateLayer(d.activeLayer.id);
+			},
+			isEnabled: () => !!documentRegistry.active?.activeLayer
+		},
+		{
+			id: 'layers.delete',
+			label: 'Delete Layer',
+			run: () => {
+				const d = documentRegistry.active;
+				if (d && d.layers.length > 1) deleteLayer(d.activeLayerId ?? undefined);
+			},
+			isEnabled: () => {
+				const d = documentRegistry.active;
+				return !!d && d.layers.length > 1;
+			}
 		}
 	]);
 }

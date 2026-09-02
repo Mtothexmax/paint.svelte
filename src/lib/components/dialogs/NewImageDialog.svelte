@@ -1,5 +1,6 @@
 <script lang="ts">
 	// Layer: components. New Image dialog (Slice 1).
+	import { onMount } from 'svelte';
 	import { MAX_DIMENSION, MAX_PIXELS, formatBytes, surfaceBytes, validateSize } from '../../core/limits';
 	import { deviceMaxTextureSize } from '../../services/device';
 	import { createNewDocument } from '../../services/fileService';
@@ -37,6 +38,29 @@
 		const ok = await createNewDocument({ width, height, background: bg });
 		if (ok) closeDialog();
 	}
+
+	function onGlobalKey(e: KeyboardEvent) {
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			closeDialog();
+			return;
+		}
+		if (e.key === 'Enter') {
+			// Buttons fire their own click on Enter — don't double-create.
+			const tag = (e.target as HTMLElement)?.tagName;
+			if (tag !== 'BUTTON' && validation.ok) {
+				e.preventDefault();
+				void create();
+			}
+		}
+	}
+
+	let widthInput: HTMLInputElement;
+	onMount(() => {
+		widthInput?.focus();
+		window.addEventListener('keydown', onGlobalKey, true);
+		return () => window.removeEventListener('keydown', onGlobalKey, true);
+	});
 </script>
 
 <div class="dialog-backdrop" onclick={() => closeDialog()}>
@@ -47,7 +71,7 @@
 			<div class="grid grid-cols-2 gap-3">
 				<label class="field">
 					<span class="field-label">Width (px)</span>
-					<input type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
+					<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
 				</label>
 				<label class="field">
 					<span class="field-label">Height (px)</span>

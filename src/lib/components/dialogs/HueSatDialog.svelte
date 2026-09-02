@@ -1,0 +1,89 @@
+<script lang="ts">
+	// Layer: components. Hue / Saturation / Lightness — movable popup with live
+	// preview and persisted last-used configuration.
+	import { onMount } from 'svelte';
+	import { ColorMatrixFilter } from 'pixi.js';
+	import MovableDialog from '../common/MovableDialog.svelte';
+	import { getEditorRenderer } from '../../render/EditorRenderer';
+	import { hueSaturationActiveLayer } from '../../render/effects';
+	import { closeDialog } from '../../services/dialogService';
+	import { getSettings, saveSettings } from '../../services/settingsService';
+	import { rememberLastApplied } from '../../state/repeat';
+
+	interface HslPrefs {
+		hue: number;
+		sat: number;
+		light: number;
+	}
+	const prefs = $state<HslPrefs>(getSettings<HslPrefs>('filters.hueSat', { hue: 0, sat: 100, light: 100 }));
+
+	let previewOn = $state(true);
+	const renderer = () => getEditorRenderer();
+
+	function makeFilter() {
+		const cm = new ColorMatrixFilter();
+		cm.saturate(Math.max(0, prefs.sat) / 100, true);
+		cm.hue(prefs.hue, true);
+		cm.brightness(Math.max(0, prefs.light) / 100, true);
+		return cm;
+	}
+	function preview() {
+		if (previewOn) renderer().setActiveLayerFilterPreview(makeFilter());
+		else renderer().setActiveLayerFilterPreview(null);
+	}
+	function togglePreview() {
+		preview();
+	}
+
+	$effect(() =>
+		saveSettings('filters.hueSat', { hue: prefs.hue, sat: prefs.sat, light: prefs.light })
+	);
+
+	function apply() {
+		const r = renderer();
+		r.setActiveLayerFilterPreview(null);
+		const { hue, sat, light } = prefs;
+		if (hueSaturationActiveLayer(r, { hue, sat, light })) {
+			rememberLastApplied({
+				menu: 'adjustments',
+				name: 'Hue/Saturation',
+				apply: () => hueSaturationActiveLayer(getEditorRenderer(), { hue, sat, light })
+			});
+			closeDialog();
+		}
+	}
+	function cancel() {
+		renderer().setActiveLayerFilterPreview(null);
+		closeDialog();
+	}
+
+	onMount(() => {
+		preview();
+		return () => renderer().setActiveLayerFilterPreview(null);
+	});
+</script>
+
+<MovableDialog title="Hue / Saturation" onClose={cancel} width={400}>
+	<label class="field">
+		<span class="field-label">Hue: {prefs.hue}°</span>
+		<input type="range" min="-180" max="180" step="1" bind:value={prefs.hue} oninput={preview} onchange={preview} />
+	</label>
+	<label class="field">
+		<span class="field-label">Saturation: {prefs.sat}%</span>
+		<input type="range" min="0" max="200" step="1" bind:value={prefs.sat} oninput={preview} onchange={preview} />
+	</label>
+	<label class="field">
+		<span class="field-label">Lightness: {prefs.light}%</span>
+		<input type="range" min="0" max="200" step="1" bind:value={prefs.light} oninput={preview} onchange={preview} />
+	</label>
+	<label class="radio">
+		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
+		Preview
+	</label>
+
+	{#snippet actions()}
+		<button class="btn-secondary" onclick={cancel}>Cancel</button>
+		<button class="btn-primary" onclick={apply}>Apply</button>
+	{/snippet}
+</MovableDialog>
+

@@ -37,7 +37,8 @@ export const documents = readable<DocumentsSnapshot>(buildSnapshot(), (set) => {
 	const unsubs = [
 		documentRegistry.events.on(RegistryEvents.opened, sync),
 		documentRegistry.events.on(RegistryEvents.closed, sync),
-		documentRegistry.events.on(RegistryEvents.active, sync)
+		documentRegistry.events.on(RegistryEvents.active, sync),
+		documentRegistry.events.on(RegistryEvents.changed, sync)
 	];
 	sync();
 	return () => unsubs.forEach((u) => u());

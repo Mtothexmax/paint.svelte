@@ -1,6 +1,6 @@
 // Layer: render (pixi). One scene graph per open document.
 
-import { Container, Sprite, TilingSprite, Texture } from 'pixi.js';
+import { Container, RenderTexture, Sprite, TilingSprite, type Filter } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { Layer } from '../core/layers/Layer';
 import { checkerTexture } from './checkerboard';
@@ -15,6 +15,9 @@ export class DocScene {
 	readonly root = new Container();
 	private checker: TilingSprite;
 	private layerSprites: Sprite[] = [];
+	/** Pooled per-document stroke buffer (doc-sized) + its live-preview overlay. */
+	private strokeBuffer: RenderTexture | null = null;
+	private strokeOverlay: Sprite | null = null;
 	private crisp = false;
 
 	constructor(doc: ImageDocument, surfaces: SurfaceStore) {
@@ -43,20 +46,57 @@ export class DocScene {
 			this.root.addChild(sprite);
 			return sprite;
 		});
+		if (this.strokeOverlay) this.root.addChild(this.strokeOverlay); // keep stroke on top
 	}
 
-	/**
-	 * Applies the document view transform to the scene. Called on attach and on
-	 * every zoom/pan so the active document reflects the latest view.
-	 */
+	/** Rebuilds layer sprites after a surface swap (e.g. after an effect). */
+	resync(surfaces: SurfaceStore): void {
+		this.rebuildLayers(surfaces);
+		this.setCrisp(this.crisp);
+	}
+
+	/** Lazily allocates the pooled stroke buffer + overlay (doc-sized). */
+	ensureStroke(): { target: RenderTexture; overlay: Sprite } {
+		if (!this.strokeBuffer || !this.strokeOverlay) {
+			this.strokeBuffer = RenderTexture.create({ width: this.doc.width, height: this.doc.height, resolution: 1 });
+			this.strokeOverlay = new Sprite(this.strokeBuffer);
+			this.strokeOverlay.visible = false;
+			this.root.addChild(this.strokeOverlay);
+		}
+		return { target: this.strokeBuffer, overlay: this.strokeOverlay };
+	}
+
+	/** True when the live-preview overlay is currently shown. */
+	get strokeActive(): boolean {
+		return !!this.strokeOverlay?.visible;
+	}
+
+	// Live filter preview on the ACTIVE layer sprite (used by effect dialogs).
+	private previewFilter: Filter | null = null;
+
+	/** Applies/removes a temporary filter preview on the active layer. */
+	setActiveLayerFilter(filter: Filter | null): void {
+		if (this.previewFilter) {
+			this.previewFilter.destroy();
+			this.previewFilter = null;
+		}
+		const idx = this.doc.layers.findIndex((l) => l.id === this.doc.activeLayerId);
+		const sprite = idx >= 0 ? this.layerSprites[idx] : null;
+		if (sprite) sprite.filters = null;
+		if (filter && sprite) {
+			this.previewFilter = filter;
+			sprite.filters = [filter];
+		}
+	}
+
+	/** Applies the document view transform to the scene. Called on attach and on
+	 * every zoom/pan so the active document reflects the latest view. */
 	applyView(zoom: number, panX: number, panY: number): void {
 		this.root.scale.set(zoom, zoom);
 		this.root.position.set(panX, panY);
-		// Keep checker squares constant in screen space: a BASE-px texture cell
-		// is scaled by tileScale * zoom, so tileScale = BASE-screen / (BASE*zoom).
+		// Keep checker squares constant in screen space.
 		this.checker.tileScale.set(BASE / (BASE * zoom), BASE / (BASE * zoom));
-		// When magnified at/above 100% show hard pixels (no smoothing); below 100%
-		// (fit/downscaled) fall back to linear sampling so it looks smoother.
+		// When magnified at/above 100% show hard pixels; below, smooth.
 		this.setCrisp(zoom >= 1);
 	}
 
@@ -73,5 +113,10 @@ export class DocScene {
 	/** Frees GPU resources (textures are owned by the SurfaceStore). */
 	dispose(): void {
 		this.root.destroy({ children: true });
+		if (this.strokeBuffer) {
+			this.strokeBuffer.destroy(true);
+			this.strokeBuffer = null;
+		}
+		this.strokeOverlay = null;
 	}
 }

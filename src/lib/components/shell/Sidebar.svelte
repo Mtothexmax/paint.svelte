@@ -1,14 +1,10 @@
 <script lang="ts">
-	// Layer: components. Right sidebar with placeholder panels (History/Layers).
+	// Layer: components. Right sidebar: History (top) and Layers panels.
+	import HistoryPanel from '../panels/HistoryPanel.svelte';
+	import LayersPanel from '../panels/LayersPanel.svelte';
 </script>
 
-<div class="flex h-full w-full flex-col gap-2 p-2" style="background:#262626;">
-	<div class="panel-card">
-		<div class="panel-title">History</div>
-		<p class="panel-empty">Undo/redo will appear here in a later slice.</p>
-	</div>
-	<div class="panel-card">
-		<div class="panel-title">Layers</div>
-		<p class="panel-empty">Layers will appear here in a later slice.</p>
-	</div>
+<div class="flex h-full w-full flex-col gap-2 overflow-hidden p-2" style="background:#262626;">
+	<div class="shrink-0"><HistoryPanel /></div>
+	<div class="min-h-0 flex-1"><LayersPanel /></div>
 </div>

@@ -16,8 +16,12 @@
 	import EditorCanvas from './canvas/EditorCanvas.svelte';
 	import StartScreen from './start/StartScreen.svelte';
 	import DialogHost from './dialogs/DialogHost.svelte';
+	import ContextMenu from './common/ContextMenu.svelte';
+	import ColorPickerPanel from './shell/ColorPickerPanel.svelte';
+	import { colorPicker } from '../state/ui';
 
 	let hasDocs = $derived($documents.docs.length > 0);
+	let colorOpen = $derived($colorPicker !== null);
 
 	onMount(() => {
 		registerBuiltinCommands();
@@ -35,26 +39,30 @@
 	oncontextmenu={(e) => e.preventDefault()}
 >
 	<div class="menubar-strip"><MenuBar /></div>
-	<div class="options-strip"><ToolOptions /></div>
 
-	{#if hasDocs}
+	{#if hasDocs && !colorOpen}
+		<div class="options-strip"><ToolOptions /></div>
 		<div class="tab-tray-overlay"><TabBar /></div>
 	{/if}
 
-	<div class="flex min-h-0 flex-1">
-		{#if hasDocs}
+	<div class="relative flex min-h-0 flex-1">
+		{#if hasDocs && !colorOpen}
 			<div class="toolbar-col"><Toolbar /></div>
 		{/if}
 
 		<div class="relative min-h-0 min-w-0 flex-1">
 			<EditorCanvas />
-			{#if !hasDocs}
+			{#if !hasDocs && !colorOpen}
 				<div class="absolute inset-0 z-10"><StartScreen /></div>
 			{/if}
 		</div>
 
-		{#if hasDocs}
+		{#if hasDocs && !colorOpen}
 			<div class="sidebar-col"><Sidebar /></div>
+		{/if}
+
+		{#if colorOpen}
+			<div class="absolute inset-0 z-30"><ColorPickerPanel /></div>
 		{/if}
 	</div>
 
@@ -66,4 +74,5 @@
 	</div>
 
 	<DialogHost />
+	<ContextMenu />
 </div>

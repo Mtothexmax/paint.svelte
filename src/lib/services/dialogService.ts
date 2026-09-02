@@ -2,7 +2,7 @@
 
 import { writable } from 'svelte/store';
 
-export type DialogKind = 'newImage' | null;
+export type DialogKind = 'newImage' | 'blur' | 'hueSat' | null;
 
 export interface DialogState {
 	kind: DialogKind;

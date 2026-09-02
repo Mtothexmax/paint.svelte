@@ -139,7 +139,9 @@ body {
 	background: var(--border);
 }
 
-/* ---- floating tab tray (over the menu + options rows, right 50%) ---- */
+/* ---- floating tab tray (over the menu + options rows, right 50%) ----
+   Transparent: no own background, so the bar backgrounds that start on the
+   left run through to the right edge underneath the tabs. */
 .tab-tray-overlay {
 	position: absolute;
 	top: 0;
@@ -149,10 +151,6 @@ body {
 	z-index: 40;
 	display: flex;
 	align-items: stretch;
-	background: var(--panel);
-	border-left: 1px solid var(--border);
-	border-bottom: 1px solid var(--border);
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 .fltab-tray {
 	display: flex;
@@ -195,7 +193,7 @@ body {
 	overflow: hidden;
 	border: 1px solid var(--border);
 	border-radius: 4px;
-	background: repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%) 0 0/10px 10px;
+	background: rgba(255, 255, 255, 0.05); /* neutral; the image shows its own shape */
 }
 .fltab-thumb img {
 	max-width: 100%;
@@ -264,7 +262,7 @@ body {
 /* ---- color bar ---- */
 .color-stack {
 	position: relative;
-	width: 30px; /* background tucks under/close to the foreground square */
+	width: 40px; /* foreground 25px at left; background shifted 4px further right */
 	height: 25px; /* equals bar height / foreground width */
 	flex: 0 0 auto;
 }
@@ -279,6 +277,14 @@ body {
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 	top: 50%;
 	transform: translateY(-50%);
+	/* transparency checkerboard that shows through the (semi-transparent) colour */
+	background-image: repeating-conic-gradient(#383838 0% 25%, #1d1d1d 0% 50%);
+	background-size: 6px 6px;
+}
+.cs-fill {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
 }
 /* background: smaller square, vertically centered, offset behind (peeks right) */
 .cs-bg {
@@ -453,4 +459,610 @@ body {
 }
 .notice.error {
 	color: #fca5a5;
+}
+
+/* ---- context menu (reusable host) ---- */
+.ctx-menu {
+	position: fixed;
+	z-index: 1000;
+	min-width: 180px;
+	max-width: 280px;
+	padding: 4px;
+	background: #303030;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+	user-select: none;
+}
+.ctx-item {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 5px 10px;
+	font-size: 13px;
+	text-align: left;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--text);
+}
+.ctx-item:not(.disabled):hover {
+	background: var(--accent);
+	color: #fff;
+}
+.ctx-item.disabled {
+	color: #6b6b6b;
+}
+.ctx-shortcut {
+	color: #999;
+	font-size: 11px;
+}
+.ctx-sep {
+	height: 1px;
+	margin: 4px 6px;
+	background: var(--border);
+}
+.ctx-slider {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 2px;
+	padding: 5px 10px;
+	cursor: default;
+}
+.ctx-slider:hover {
+	background: transparent;
+}
+.ctx-slider-label {
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.ctx-slider-control {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ctx-slider-control input[type='range'] {
+	flex: 1;
+	accent-color: var(--accent);
+}
+.ctx-slider-value {
+	font-size: 11px;
+	color: var(--text);
+	width: 28px;
+	text-align: right;
+}
+
+/* ---- colour picker popover ---- */
+.color-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	background: transparent;
+}
+.color-pop {
+	position: fixed;
+	z-index: 901;
+	width: 280px;
+	max-height: calc(100vh - 70px);
+	overflow: auto;
+	background: var(--bg-elev);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+	padding: 8px;
+}
+.color-pop-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 6px;
+	font-size: 12px;
+	color: var(--text);
+}
+.cs-fg,
+.cs-bg {
+	appearance: none;
+	-webkit-appearance: none;
+	font: inherit;
+	padding: 0;
+	text-align: left;
+}
+
+/* ---- tool options fields ---- */
+.opt-field {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-dim);
+}
+.opt-field span:first-child {
+	white-space: nowrap;
+}
+.opt-field input[type='range'] {
+	width: 90px;
+	accent-color: var(--accent);
+}
+.opt-val {
+	min-width: 34px;
+	text-align: right;
+	color: var(--text);
+}
+
+/* ---- full colour-picker mode (replaces canvas area) ---- */
+.color-mode {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	background: var(--bg);
+	overflow: hidden;
+}
+.color-mode-head {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--border);
+	background: var(--bg-elev);
+	flex: 0 0 auto;
+}
+.color-mode-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text);
+	margin-right: auto;
+}
+.color-mode-done {
+	flex: 0 0 auto;
+}
+.seg {
+	display: inline-flex;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 2px;
+	gap: 2px;
+}
+.seg-btn {
+	padding: 5px 12px;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--text-dim);
+	font-size: 13px;
+	cursor: pointer;
+}
+.seg-btn.on {
+	background: var(--accent-soft);
+	color: var(--text);
+}
+.color-mode-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	padding: 12px;
+}
+
+/* ---- own colour picker (dark mode) ---- */
+.cp-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: grid;
+	grid-template-columns: minmax(180px, 1fr) 34px 1fr;
+	gap: 14px;
+	align-items: stretch;
+	padding: 16px;
+	max-width: 860px;
+	margin: 0 auto;
+}
+.cp-sv {
+	position: relative;
+	touch-action: none;
+	user-select: none;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	cursor: crosshair;
+	background-color: var(--hue-css, #f00);
+	background-image:
+		linear-gradient(to right, #fff, rgba(255, 255, 255, 0)),
+		linear-gradient(to top, #000, rgba(0, 0, 0, 0));
+	aspect-ratio: 1;
+	min-height: 0;
+}
+.cp-strips {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.cp-strip {
+	position: relative;
+	flex: 1 1 0;
+	min-height: 0;
+	touch-action: none;
+	user-select: none;
+	cursor: pointer;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+}
+.cp-hue {
+	background: linear-gradient(to top,
+		#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.cp-alpha {
+	background-image:
+		linear-gradient(to top, rgba(0, 0, 0, 0), var(--opaque, #fff)),
+		repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+	background-size: 100% 100%, 10px 10px;
+}
+.cp-handle {
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	border: 2px solid #fff;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+}
+.cp-strip-handle {
+	position: absolute;
+	left: -3px;
+	right: -3px;
+	height: 8px;
+	border-radius: 4px;
+	border: 2px solid #fff;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+	transform: translateY(-50%);
+	pointer-events: none;
+}
+.cp-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+}
+.cp-preview {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.cp-preview-swatch {
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background-image: repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+	background-size: 10px 10px;
+	position: relative;
+	overflow: hidden;
+}
+.cp-preview-swatch::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-color: var(--swatch, #000);
+}
+.cp-hex {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 15px;
+	color: var(--text);
+}
+.cp-alpha-pct {
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.cp-num-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 6px;
+}
+.cp-num {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 11px;
+	color: var(--text-dim);
+}
+.cp-num input {
+	width: 100%;
+	padding: 5px 4px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-size: 12px;
+}
+.cp-hexfield {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.cp-hexfield input {
+	flex: 1;
+	padding: 5px 8px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.cp-quick {
+	display: grid;
+	grid-template-columns: repeat(8, 1fr);
+	gap: 5px;
+}
+.cp-chip {
+	aspect-ratio: 1;
+	border-radius: 5px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	cursor: pointer;
+	padding: 0;
+}
+.cp-chip:hover {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+/* colour picker: fit a bounded, non-overlapping layout (overrides above) */
+.cp-body {
+	display: flex;
+	align-items: stretch;
+	justify-content: center;
+	gap: 16px;
+	padding: 14px;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+.cp-sv {
+	/* bounded square: limited by width AND the available viewport height */
+	width: min(44vw, calc(100vh - 210px), 430px);
+	height: auto;
+	max-height: 100%;
+	flex: 0 0 auto;
+}
+.cp-strips {
+	width: 30px;
+	flex: 0 0 auto;
+	align-self: stretch;
+}
+.cp-fields {
+	width: 250px;
+	flex: 0 0 auto;
+	align-self: center;
+	max-height: 100%;
+	overflow: hidden;
+}
+
+/* colour picker layout: bounded, non-overlapping (final) */
+.cp-body {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 18px;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	padding: 12px;
+}
+.cp-stage {
+	display: flex;
+	align-items: stretch;
+	gap: 12px;
+	flex: 0 0 auto;
+	/* height-driven square: fits the available viewport, never overflows */
+	height: min(52vh, calc(100vh - 260px), calc(42vw - 60px), 430px);
+}
+.cp-sv {
+	height: 100%;
+	width: auto;
+	aspect-ratio: 1 / 1;
+	flex: 0 0 auto;
+	margin: 0;
+}
+.cp-strips {
+	width: 30px;
+	flex: 0 0 auto;
+	align-self: stretch;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.cp-strip {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+.cp-fields {
+	width: 250px;
+	flex: 0 0 auto;
+	align-self: center;
+}
+
+/* ---- layers / history panels ---- */
+.history-list {
+	overflow-y: auto;
+	max-height: 170px;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 2px 0;
+}
+.history-row {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	font-size: 12px;
+	text-align: left;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--text-dim);
+	cursor: pointer;
+}
+.history-row:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+.history-row.on {
+	background: var(--accent-soft);
+	color: var(--text);
+}
+.layer-list {
+	overflow-y: auto;
+	min-height: 0;
+	flex: 1 1 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.layer-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 6px;
+	border-radius: 5px;
+	cursor: pointer;
+	border: 1px solid transparent;
+}
+.layer-row:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+.layer-row.on {
+	background: var(--accent-soft);
+	border-color: var(--accent);
+}
+.layer-row.dim {
+	opacity: 0.45;
+}
+.layer-eye {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 12px;
+	padding: 0;
+}
+.layer-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 12px;
+	color: var(--text);
+}
+.layer-op {
+	font-size: 11px;
+	color: var(--text-dim);
+}
+.layer-actions {
+	display: none;
+	gap: 1px;
+}
+.layer-row:hover .layer-actions,
+.layer-row.on .layer-actions {
+	display: flex;
+}
+.layer-actions .mini-btn {
+	font-size: 12px;
+	padding: 0 4px;
+}
+.layer-opacity {
+	border-top: 1px solid var(--border);
+	margin-top: 6px;
+	padding-top: 6px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.layer-opacity .panel-title {
+	margin: 0;
+}
+.layer-opacity input[type='range'] {
+	flex: 1;
+	min-width: 0;
+	accent-color: var(--accent);
+}
+
+/* menu rows with icons */
+.menu-item {
+	gap: 10px;
+}
+.menu-ic {
+	width: 18px;
+	flex: 0 0 auto;
+	text-align: center;
+	font-size: 14px;
+	line-height: 1;
+}
+.menu-text {
+	flex: 1 1 auto;
+	text-align: left;
+}
+.menu-item:not(.disabled) .menu-ic {
+	filter: saturate(1);
+}
+
+/* ---- movable dialog (filter popups) ---- */
+.m-dialog {
+	position: fixed;
+	z-index: 1200;
+	background: var(--bg-elev);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+.m-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 8px 6px 12px;
+	background: #353535;
+	cursor: move;
+	user-select: none;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text);
+	touch-action: none;
+}
+.m-title-text {
+	pointer-events: none;
+}
+.m-close {
+	background: none;
+	border: none;
+	color: var(--text-dim);
+	font-size: 13px;
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: 4px;
+}
+.m-close:hover {
+	background: rgba(255, 255, 255, 0.1);
+	color: var(--text);
+}
+.m-body {
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	overflow: auto;
+}
+.m-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	padding: 10px 12px;
+	border-top: 1px solid var(--border);
 }
