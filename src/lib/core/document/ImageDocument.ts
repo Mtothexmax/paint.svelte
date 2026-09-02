@@ -3,6 +3,7 @@
 import { newId } from '../id';
 import { type Layer, createRasterLayer, type SurfaceId } from '../layers/Layer';
 import { HistoryStack } from '../history/HistoryStack';
+import { emptySelection, type SelectionModel } from '../selection/SelectionModel';
 
 export type DocId = string;
 
@@ -13,13 +14,6 @@ export interface ViewState {
 }
 
 export const defaultView: ViewState = { zoom: 1, panX: 0, panY: 0 };
-
-/**
- * Placeholder for the (later) selection system. Slice 1 stores nothing real.
- */
-export interface SelectionState {
-	active: boolean;
-}
 
 export interface NewDocumentParams {
 	name: string;
@@ -37,7 +31,7 @@ export class ImageDocument {
 	layers: Layer[];
 	activeLayerId: string;
 	view: ViewState;
-	selection: SelectionState;
+	selection: SelectionModel;
 	dirty: boolean;
 	history: HistoryStack;
 
@@ -46,7 +40,7 @@ export class ImageDocument {
 		this.name = params.name;
 		this.width = params.width;
 		this.height = params.height;
-		this.selection = { active: false };
+		this.selection = emptySelection();
 		this.view = params.view ? { ...params.view } : { ...defaultView };
 		this.dirty = false;
 		this.history = new HistoryStack();

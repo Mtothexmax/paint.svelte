@@ -45,7 +45,12 @@ export const MENUS: MenuDef[] = [
 			{ type: 'separator' },
 			{ type: 'disabled', label: 'Cut', shortcut: 'Ctrl+X' },
 			{ type: 'disabled', label: 'Copy', shortcut: 'Ctrl+C' },
-			{ type: 'disabled', label: 'Paste', shortcut: 'Ctrl+V' }
+			{ type: 'disabled', label: 'Paste', shortcut: 'Ctrl+V' },
+			{ type: 'separator' },
+			{ type: 'command', commandId: 'edit.selectAll' },
+			{ type: 'command', commandId: 'edit.deselect' },
+			{ type: 'command', commandId: 'edit.invertSelection' },
+			{ type: 'command', commandId: 'edit.delete' }
 		]
 	},
 	{

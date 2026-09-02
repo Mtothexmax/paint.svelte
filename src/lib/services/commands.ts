@@ -14,6 +14,7 @@ import {
 } from './fileService';
 import type { ViewState } from '../core/document/ImageDocument';
 import { addLayer, deleteLayer, duplicateLayer } from './layersService';
+import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
 
 function setStatusZoom(view: ViewState): void {
 	statusBar.update((s) => ({ ...s, zoomPct: Math.round(view.zoom * 100) }));
@@ -125,6 +126,39 @@ export function registerBuiltinCommands(): void {
 				}
 			},
 			isEnabled: () => !!documentRegistry.active?.history.canRedo
+		}
+	]);
+
+	commands.registerMany([
+		{
+			id: 'edit.selectAll',
+			label: 'Select All',
+			shortcut: 'Ctrl+A',
+			// Ctrl+A is handled directly in EditorCanvas (capture phase +
+			// stopPropagation, so the shortcut service never double-fires).
+			run: () => selectAll(),
+			isEnabled: hasDoc
+		},
+		{
+			id: 'edit.deselect',
+			label: 'Deselect',
+			shortcut: 'Ctrl+D',
+			run: () => deselect(),
+			isEnabled: () => !!documentRegistry.active?.selection.active
+		},
+		{
+			id: 'edit.invertSelection',
+			label: 'Invert Selection',
+			shortcut: 'Ctrl+I',
+			run: () => invertSelection(),
+			isEnabled: () => !!documentRegistry.active?.selection.active
+		},
+		{
+			id: 'edit.delete',
+			label: 'Delete',
+			shortcut: 'Del',
+			run: () => deleteSelection(),
+			isEnabled: () => !!documentRegistry.active?.selection.active
 		}
 	]);
 

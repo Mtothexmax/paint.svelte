@@ -4,11 +4,21 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
+	import type { Point } from '../../core/geometry';
 	import { screenToImage, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
+	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import { dialog } from '../../services/dialogService';
+	import {
+		deleteSelection,
+		deselect,
+		invertSelection,
+		selectAll,
+		setLassoSelection,
+		setRectSelection
+	} from '../../services/selectionService';
 	import { activeToolId, statusBar, brushSize, brushOpacity, brushHardness, brushSpacing, foregroundColor, backgroundColor, antiAliasMode } from '../../state/ui';
 
 	const PAINT_TOOLS = new Set(['brush', 'pencil', 'eraser']);
@@ -17,6 +27,14 @@
 		pencil: 'pencil',
 		eraser: 'eraser'
 	};
+	const SELECT_TOOLS = new Set(['select-rect', 'select-ellipse', 'lasso']);
+	const SELECT_KIND: Record<string, 'rect' | 'ellipse' | 'lasso'> = {
+		'select-rect': 'rect',
+		'select-ellipse': 'ellipse',
+		lasso: 'lasso'
+	};
+	/** Minimum pointer travel (screen px) before a selection drag commits. */
+	const SELECT_DRAG_MIN = 3;
 
 	let host: HTMLDivElement;
 	let canvasEl: HTMLCanvasElement;
@@ -33,6 +51,14 @@
 	let painting = $state(false);
 	let paintPointerId = -1;
 
+	// selection-tool state (rect / ellipse / lasso drags)
+	let selectionArmed = $state(false);
+	let selecting = $state(false);
+	let selectPointerId = -1;
+	let selDownClient = { x: 0, y: 0 }; // screen px (click vs drag threshold)
+	let selStart: Point | null = null; // image px
+	let lassoPts: Point[] = [];
+
 	// Paint.NET-style brush preview: an outline circle of the brush size (scaled
 	// with the current zoom) follows the pointer. While it is shown the OS
 	// pointer is hidden — also while painting, exactly like Paint.NET.
@@ -45,11 +71,13 @@
 	const showRing = $derived(paintArmed && !panning && (pointerInside || painting));
 
 	// OS pointer over the canvas: crosshair (the system "plus" cursor) while a
-	// paint tool is armed and NOT painting; fully hidden while painting (only
-	// the preview ring + painted stroke are visible, like Paint.NET).
+	// paint tool OR a selection tool is armed and NOT painting; fully hidden
+	// while painting (only the preview ring + painted stroke are visible, like
+	// Paint.NET). The brush preview ring itself only ever shows for paint tools.
 	const cursorCss = $derived.by(() => {
-		if (!paintArmed || panning) return '';
+		if (panning) return '';
 		if (painting) return 'cursor: none;';
+		if (!(paintArmed || selectionArmed)) return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
 
@@ -77,7 +105,9 @@
 
 	/** Re-evaluates whether a paint tool is armed (tool + open document). */
 	function updateArmed(): void {
-		paintArmed = PAINT_TOOLS.has($activeToolId) && !!documentRegistry.active;
+		const hasDoc = !!documentRegistry.active;
+		paintArmed = PAINT_TOOLS.has($activeToolId) && hasDoc;
+		selectionArmed = SELECT_TOOLS.has($activeToolId) && hasDoc;
 		refreshRing();
 	}
 
@@ -107,14 +137,25 @@
 
 	function onKeyDown(e: KeyboardEvent) {
 		const typing = isTextTarget(e.target);
-		// Undo / Redo — handled here directly (robust on every layout) so a
-		// brush stroke can always be reverted with Ctrl+Z / Ctrl+Y.
+		// Escape aborts an in-progress selection drag (the committed ants — if
+		// any — are restored by refreshActiveSelection).
+		if (e.key === 'Escape' && selecting) {
+			cancelSelectDrag();
+			return;
+		}
+		// Undo / Redo and the selection commands — handled here directly
+		// (layout-robust on every keyboard) so a brush stroke can always be
+		// reverted with Ctrl+Z / Ctrl+Y and selections via Ctrl+A/D/I. The
+		// stopPropagation below is required: the commands also carry shortcut
+		// strings for the menu, and without it the global shortcut service
+		// would run them a second time.
 		if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey && !get(dialog).kind) {
 			const doc = documentRegistry.active;
 			if (doc) {
 				const key = e.key.toLowerCase();
 				if (key === 'z') {
 					e.preventDefault();
+					e.stopPropagation();
 					if (e.shiftKey) doc.history.redo();
 					else doc.history.undo();
 					documentRegistry.notifyChange(doc);
@@ -122,10 +163,39 @@
 				}
 				if (key === 'y') {
 					e.preventDefault();
+					e.stopPropagation();
 					doc.history.redo();
 					documentRegistry.notifyChange(doc);
 					return;
 				}
+				if (key === 'a') {
+					e.preventDefault();
+					e.stopPropagation();
+					selectAll();
+					return;
+				}
+				if (key === 'd') {
+					e.preventDefault();
+					e.stopPropagation();
+					deselect();
+					return;
+				}
+				if (key === 'i') {
+					e.preventDefault();
+					e.stopPropagation();
+					invertSelection();
+					return;
+				}
+			}
+		}
+		// Delete erases the selection content on the active layer (no
+		// modifiers; guarded against typing in inputs and open dialogs).
+		if (!typing && !get(dialog).kind && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Delete') {
+			if (documentRegistry.active?.selection.active) {
+				e.preventDefault();
+				e.stopPropagation();
+				deleteSelection();
+				return;
 			}
 		}
 		if (e.code === 'Space' && !typing) {
@@ -155,6 +225,44 @@
 		return screenToImage(doc.view, sp.x, sp.y);
 	}
 
+	// --- selection tools (rect / ellipse / lasso) -------------------------
+
+	function selectionToolKind(): 'rect' | 'ellipse' | 'lasso' | null {
+		const kind = SELECT_KIND[$activeToolId];
+		return kind ?? null;
+	}
+
+	/** Live draft outline (solid) for the drag in progress. `cur` is the
+	 * current pointer position in image px. */
+	function showSelectDraft(cur: Point): void {
+		if (!ready) return;
+		const kind = selectionToolKind();
+		const start = selStart;
+		if (!kind || !start) return;
+		if (kind === 'lasso') {
+			if (lassoPts.length >= 2) getEditorRenderer().previewSelectionOutline([lassoPts], false);
+			return;
+		}
+		// rect/ellipse: outline follows the current pointer position.
+		const rect = {
+			x: Math.min(start.x, cur.x),
+			y: Math.min(start.y, cur.y),
+			width: Math.abs(cur.x - start.x),
+			height: Math.abs(cur.y - start.y)
+		};
+		const loop = selectionOutlinePoints(kind, rect, null);
+		getEditorRenderer().previewSelectionOutline(loop.length ? [loop] : null, false);
+	}
+
+	/** Aborts a selection drag and restores the committed ants (if any). */
+	function cancelSelectDrag(): void {
+		selecting = false;
+		selectPointerId = -1;
+		selStart = null;
+		lassoPts = [];
+		if (ready) getEditorRenderer().refreshActiveSelection();
+	}
+
 	function onPointerDown(e: PointerEvent) {
 		if (!ready) return;
 		movePointer(screenPoint(e));
@@ -172,6 +280,24 @@
 			} catch {
 				/* ignore */
 			}
+			return;
+		}
+		// Selection tools: LEFT drag defines a new selection; the draft outline
+		// is shown live and the mask is committed on pointer-up. A plain click
+		// (no travel) never commits — the previous selection (if any) stays.
+		if (e.button === 0 && selectionArmed && selectionToolKind()) {
+			e.preventDefault();
+			selecting = true;
+			selectPointerId = e.pointerId;
+			selDownClient = { x: e.clientX, y: e.clientY };
+			selStart = imageFromScreen(screenPoint(e));
+			lassoPts = [selStart];
+			try {
+				host.setPointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+			getEditorRenderer().previewSelectionOutline(null, false);
 			return;
 		}
 		// Paint with the LEFT button in the foreground colour and with the RIGHT
@@ -218,6 +344,16 @@
 			if (painting && e.pointerId === paintPointerId && engine) {
 				engine.lineTo(imageFromScreen(sp));
 			}
+			if (selecting && e.pointerId === selectPointerId && selStart) {
+				const img = imageFromScreen(sp);
+				if ($activeToolId === 'lasso') {
+					const last = lassoPts[lassoPts.length - 1];
+					if (!last || Math.hypot(img.x - last.x, img.y - last.y) >= 1) {
+						lassoPts.push(img);
+					}
+				}
+				showSelectDraft(img);
+			}
 		}
 		movePointer(sp);
 		if (!doc || !ready) return;
@@ -249,6 +385,41 @@
 				/* ignore */
 			}
 		}
+		if (selecting && e.pointerId === selectPointerId) {
+			commitSelect(e);
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
+	}
+
+	/** Commits the selection drag (mask fill + model update) when it was a real
+	 * drag and not a plain click. */
+	function commitSelect(e: PointerEvent): void {
+		const doc = documentRegistry.active;
+		const kind = selectionToolKind();
+		const start = selStart;
+		selecting = false;
+		selectPointerId = -1;
+		selStart = null;
+		if (!doc || !kind || !start) {
+			lassoPts = [];
+			if (ready) getEditorRenderer().refreshActiveSelection();
+			return;
+		}
+		const up = imageFromScreen(screenPoint(e));
+		if (kind === 'lasso') {
+			const last = lassoPts[lassoPts.length - 1];
+			if (!last || Math.hypot(up.x - last.x, up.y - last.y) >= 1) lassoPts.push(up);
+			if (lassoPts.length >= 2) setLassoSelection(lassoPts);
+		} else if (Math.hypot(e.clientX - selDownClient.x, e.clientY - selDownClient.y) >= SELECT_DRAG_MIN) {
+			setRectSelection(kind, start, up);
+		}
+		lassoPts = [];
+		// The draft wiped the committed ants — redraw whatever the model now says.
+		if (ready) getEditorRenderer().refreshActiveSelection();
 	}
 
 	function cancelPointer(e: PointerEvent) {
@@ -256,6 +427,9 @@
 			engine?.cancel();
 			painting = false;
 			paintPointerId = -1;
+		}
+		if (selecting && e.pointerId === selectPointerId) {
+			cancelSelectDrag();
 		}
 		if (panning && e.pointerId === panPointerId) {
 			panning = false;

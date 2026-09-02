@@ -5,8 +5,11 @@
 import { Application } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry, RegistryEvents } from '../core/document/registry';
+import type { Point } from '../core/geometry';
+import type { SurfaceId } from '../core/layers/Layer';
 import { DocScene } from './DocScene';
 import { SurfaceStore } from './SurfaceStore';
+import { selectionOutlinePoints } from './selection';
 
 type DocId = string;
 
@@ -77,7 +80,26 @@ export class EditorRenderer {
 		if (this.activeScene === scene) this.activeScene = null;
 		scene.dispose();
 		this.scenes.delete(id);
+		this.disposeSelectionMask(scene.doc);
 		for (const layer of scene.doc.layers) this.surfaces.dispose(layer.surfaceId);
+	}
+
+	/** Returns (creating on demand) the doc-sized selection-mask surface for a
+	 * document. The handle is cached on the domain SelectionModel. */
+	ensureSelectionMask(doc: ImageDocument): SurfaceId {
+		const existing = doc.selection.maskId;
+		if (existing && this.surfaces.has(existing)) return existing;
+		const id = this.surfaces.create(doc.width, doc.height);
+		doc.selection.maskId = id;
+		return id;
+	}
+
+	/** Frees the document's selection-mask surface (if any). */
+	disposeSelectionMask(doc: ImageDocument): void {
+		const id = doc.selection.maskId;
+		if (!id) return;
+		if (this.surfaces.has(id)) this.surfaces.dispose(id);
+		doc.selection.maskId = null;
 	}
 
 	attachActive(id: DocId | null = documentRegistry.activeId): void {
@@ -92,6 +114,7 @@ export class EditorRenderer {
 		this.activeScene = scene;
 		this.app.stage.addChild(scene.root);
 		this.refreshActiveView();
+		this.refreshActiveSelection();
 	}
 
 	/** Re-applies the active document's view transform to its scene. */
@@ -112,6 +135,57 @@ export class EditorRenderer {
 	/** Rebuilds the active scene's layer sprites (e.g. after a surface swap). */
 	rebuildActiveLayers(): void {
 		if (this.activeScene) this.activeScene.resync(this.surfaces);
+	}
+
+	/**
+	 * Shows/hides the selection overlay on the ACTIVE scene and (re)attaches
+	 * the selection mask as the stroke-overlay clip. Called whenever the active
+	 * document's selection changes and on every doc switch.
+	 */
+	refreshActiveSelection(): void {
+		if (!this.app) return;
+		const doc = documentRegistry.active;
+		const scene = this.activeScene;
+		if (!doc || !scene) return;
+		const sel = doc.selection;
+		if (!sel.active) {
+			scene.showSelectionOutline(null, true);
+			scene.setStrokeClipTexture(null);
+			return;
+		}
+		const loops = this.selectionOutlineLoops(doc);
+		scene.showSelectionOutline(loops, true);
+		const maskTex = sel.maskId && this.surfaces.has(sel.maskId) ? this.surfaces.getTexture(sel.maskId) : null;
+		scene.setStrokeClipTexture(maskTex);
+	}
+
+	/**
+	 * Transient draft preview (used by the selection tools while dragging,
+	 * BEFORE anything is committed to the mask). Replaces the current ants
+	 * until refreshActiveSelection() draws the committed state again.
+	 */
+	previewSelectionOutline(loops: Point[][] | null, dashed = false): void {
+		if (this.activeScene) this.activeScene.showSelectionOutline(loops, dashed);
+	}
+
+	/** Closed outline loops describing the active selection (mask is the
+	 * authority; this is purely for drawing ants). When the mask is the
+	 * complement (Invert Selection) the document border is added so the whole
+	 * selection boundary is visible. */
+	private selectionOutlineLoops(doc: ImageDocument): Point[][] | null {
+		const sel = doc.selection;
+		const geometry = selectionOutlinePoints(sel.kind, sel.rect, sel.points);
+		const loops: Point[][] = [];
+		if (geometry.length) loops.push(geometry);
+		if (sel.inverted) {
+			loops.push([
+				{ x: 0, y: 0 },
+				{ x: doc.width, y: 0 },
+				{ x: doc.width, y: doc.height },
+				{ x: 0, y: doc.height }
+			]);
+		}
+		return loops.length ? loops : null;
 	}
 
 	/** Temporary live filter preview on the active layer (effect dialogs). */

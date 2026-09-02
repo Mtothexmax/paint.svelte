@@ -10,7 +10,7 @@
 // sampling is distance-based (independent of pointer event frequency and
 // velocity).
 
-import { BlurFilter, Container, Graphics, Rectangle, Sprite } from 'pixi.js';
+import { BlurFilter, Container, Graphics, Rectangle, RenderTexture, Sprite } from 'pixi.js';
 import type { Point, Rect } from '../core/geometry';
 import type { RGBA } from '../core/color';
 import type { ImageDocument } from '../core/document/ImageDocument';
@@ -125,7 +125,7 @@ export class BrushEngine {
 		const aa = s.antiAlias !== false;
 		const hardness = aa ? clamp(s.hardness, 0.05, 1) : 1;
 		const core = size * hardness; // crisp dab diameter
-		const aaEdge = 1; // px of rim AA applied even at hardness 100%
+		const aaEdge = 0.1; // px of rim AA applied even at hardness 100%
 		const strength = aa ? aaEdge + (1 - hardness) * size * 0.42 : 0; // blur px (softness)
 		// generous transparent border so any filter-edge smear stays far away
 		const margin = size / 2 + strength + 8;
@@ -168,11 +168,13 @@ export class BrushEngine {
 		const MASK = 0xffffff;
 
 		// Render the crisp white dab mask DIRECTLY with the blur filter (only in
-		// anti-aliased mode). The filter region is explicitly pinned to the whole
-		// document + explicit padding, so Pixi does NOT derive its intermediate
-		// filter bounds from the Graphics geometry (which produced the
-		// bottom/right bounding-box lines).
-		const blur = strength >= 0.5 ? new BlurFilter({ strength, resolution: 1 }) : null;
+		// anti-aliased mode). Small strengths (e.g. 0.25 px rim AA) are valid and
+		// must NOT be skipped — only an exact 0 (pixel mode) skips the pass. The
+		// filter region is explicitly pinned to the whole document + explicit
+		// padding, so Pixi does NOT derive its intermediate filter bounds from
+		// the Graphics geometry (which produced the bottom/right bounding-box
+		// lines).
+		const blur = strength > 0 ? new BlurFilter({ strength, resolution: 1 }) : null;
 		if (blur) blur.padding = Math.ceil(strength * 2 + 4);
 		const wrap = new Container();
 		// Path is in image coordinates and the pooled target IS the document —
@@ -248,12 +250,41 @@ export class BrushEngine {
 		// the layer's surfaceId. Undo/redo only swap the reference back/forth,
 		// which is guaranteed to restore the exact pixels (no in-place blend).
 		const afterId = surfaces.copyRegion(layerId, { x: 0, y: 0, width: doc.width, height: doc.height });
-		const comp = new Sprite(stroke.target);
+
+		// Selection clip: when the document has an active selection the stroke
+		// may only land inside it. The stroke target holds an alpha-only WHITE
+		// dab mask (colour/opacity applied on the composite sprite below), so we
+		// first render a masked copy of that content — {sprite(stroke), masked by
+		// a sprite of the selection mask texture} into a scratch doc-sized RT.
+		// A Sprite mask takes Pixi's AlphaMask path (content × mask RED channel),
+		// which clips exactly the white mask region. The normal/erase composite
+		// then runs on the CLIPPED sprite, so colour, per-stroke opacity and
+		// erasing semantics stay identical to the unclipped path.
+		const maskId = doc.selection.active ? doc.selection.maskId : null;
+		let clippedSprite: Sprite | null = null;
+		let clippedTex: import('pixi.js').RenderTexture | null = null;
+		if (maskId && surfaces.has(maskId)) {
+			clippedTex = RenderTexture.create({ width: doc.width, height: doc.height, resolution: 1 });
+			const holder = new Container();
+			const srcSprite = new Sprite(stroke.target);
+			const maskSprite = new Sprite(surfaces.getTexture(maskId));
+			maskSprite.position.set(0, 0);
+			holder.addChild(srcSprite);
+			holder.addChild(maskSprite); // same transform chain as the content
+			holder.mask = maskSprite;
+			this.renderer.app.renderer.render({ container: holder, target: clippedTex, clear: true });
+			holder.destroy({ children: true });
+			clippedSprite = new Sprite(clippedTex);
+		}
+
+		const comp = clippedSprite ?? new Sprite(stroke.target);
 		comp.blendMode = s.kind === 'eraser' ? 'erase' : 'normal';
 		comp.alpha = eff;
 		comp.tint = s.kind === 'eraser' ? 0xffffff : rgbToInt(s.color);
 		surfaces.renderInto(surfaces.getTexture(afterId), comp, false);
 		comp.destroy();
+		clippedSprite?.destroy();
+		if (clippedTex) clippedTex.destroy(true);
 
 		const beforeId = layerId;
 		const layerObj = doc.layers.find((l) => l.surfaceId === beforeId);
