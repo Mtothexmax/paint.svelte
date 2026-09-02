@@ -37,6 +37,8 @@
 	};
 	/** Minimum pointer travel (screen px) before a selection drag commits. */
 	const SELECT_DRAG_MIN = 3;
+	// debug: last tool id that was logged (avoid console spam)
+	let lastLoggedTool: string | null = null;
 
 	let host: HTMLDivElement;
 	let canvasEl: HTMLCanvasElement;
@@ -111,6 +113,21 @@
 		paintArmed = PAINT_TOOLS.has($activeToolId) && hasDoc;
 		selectionArmed = SELECT_TOOLS.has($activeToolId) && hasDoc;
 		refreshRing();
+		// Debug: only log when the ACTIVE TOOL actually changed (not on every
+		// pointer event), so we can see why switching tools misbehaves.
+		if (lastLoggedTool !== $activeToolId) {
+			lastLoggedTool = $activeToolId;
+			console.log(
+				'[tool] active=',
+				$activeToolId,
+				'paintArmed=',
+				paintArmed,
+				'selectionArmed=',
+				selectionArmed,
+				'doc=',
+				hasDoc
+			);
+		}
 	}
 
 	/** Recomputes the ring radius from the brush size and the current zoom
@@ -297,6 +314,7 @@
 		// is shown live and the mask is committed on pointer-up. A plain click
 		// (no travel) never commits — the previous selection (if any) stays.
 		if (e.button === 0 && selectionArmed && selectionToolKind()) {
+			console.log('[editor] pointerdown: selection tool', $activeToolId, 'kind', selectionToolKind());
 			e.preventDefault();
 			selecting = true;
 			selectPointerId = e.pointerId;

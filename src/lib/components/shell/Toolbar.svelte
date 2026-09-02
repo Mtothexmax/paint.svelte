@@ -48,7 +48,10 @@
 			class:active={$activeToolId === tool.id}
 			title={tool.label}
 			aria-label={tool.label}
-			onclick={() => activeToolId.set(tool.id)}
+			onclick={() => {
+				console.log('[toolbar] click →', tool.id, '(was', $activeToolId + ')');
+				activeToolId.set(tool.id);
+			}}
 		>
 			{#if tool.src}
 				<img src={tool.src} alt={tool.label} class="h-6 w-6" draggable="false" />
