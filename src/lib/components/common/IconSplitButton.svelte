@@ -71,7 +71,7 @@
 	title={title || (current?.label ?? '')}
 >
 	<span class="isp-icon" onclick={cycle}>{current?.icon ?? ''}</span>
-	{#if titleInButton}<span class="isp-label-inline">{current?.label ?? ''}</span>{/if}
+	{#if titleInButton}<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>{/if}
 	<span class="isp-arrow" onclick={toggleMenu}>▾</span>
 </button>
 

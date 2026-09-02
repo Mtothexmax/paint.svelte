@@ -31,7 +31,10 @@
 		foregroundColor,
 		backgroundColor,
 		antiAliasMode,
-		selectionMode
+		selectionMode,
+		selectionRatio,
+		selectionFixedRatio,
+		selectionFixedSize
 	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
 
@@ -293,10 +296,34 @@
 		return kind ?? null;
 	}
 
+	/** Returns the opposite (drag) corner for the RECTANGLE tool according to the
+	 * selected Ratio mode: free (pass-through), fixed aspect ratio, or a fixed
+	 * size. `start` is the anchor point, `cur` the raw pointer position. */
+	function constrainRectCorner(start: Point, cur: Point): Point {
+		const mode = get(selectionRatio);
+		if (mode === 'normal') return cur;
+		const dirX = cur.x >= start.x ? 1 : -1;
+		const dirY = cur.y >= start.y ? 1 : -1;
+		if (mode === 'fixedSize') {
+			const s = get(selectionFixedSize);
+			return {
+				x: start.x + dirX * Math.max(1, s.width),
+				y: start.y + dirY * Math.max(1, s.height)
+			};
+		}
+		// fixed ratio
+		const r = get(selectionFixedRatio);
+		const ratio = r.height > 0 ? r.width / r.height : 1;
+		let w = Math.max(1, Math.abs(cur.x - start.x));
+		let h = Math.max(1, Math.abs(cur.y - start.y));
+		if (w / h > ratio) w = h * ratio;
+		else h = w / ratio;
+		return { x: start.x + dirX * Math.max(1, Math.round(w)), y: start.y + dirY * Math.max(1, Math.round(h)) };
+	}
+
 	/** Live draft outline (solid) for the drag in progress. `cur` is the
 	 * current pointer position in image px. */
-	function showSelectDraft(cur: Point): void {
-		if (!ready) return;
+	function showSelectDraft(cur: Point): void {		if (!ready) return;
 		const kind = selectionToolKind();
 		const start = selStart;
 		if (!kind || !start) return;
@@ -304,12 +331,14 @@
 			if (lassoPts.length >= 2) getEditorRenderer().previewSelectionOutline([lassoPts], false);
 			return;
 		}
-		// rect/ellipse: outline follows the current pointer position.
+		// rect/ellipse: outline follows the current pointer position (rectangle
+		// tool honours the Free/Fixed-Ratio/Fixed-Size mode).
+		const eff = kind === 'rect' ? constrainRectCorner(start, cur) : cur;
 		const rect = {
-			x: Math.min(start.x, cur.x),
-			y: Math.min(start.y, cur.y),
-			width: Math.abs(cur.x - start.x),
-			height: Math.abs(cur.y - start.y)
+			x: Math.min(start.x, eff.x),
+			y: Math.min(start.y, eff.y),
+			width: Math.abs(eff.x - start.x),
+			height: Math.abs(eff.y - start.y)
 		};
 		const loop = selectionOutlinePoints(kind, rect, null);
 		getEditorRenderer().previewSelectionOutline(loop.length ? [loop] : null, false);
@@ -522,10 +551,11 @@
 			if (ready) getEditorRenderer().refreshActiveSelection();
 			return;
 		}
-		const up = imageFromScreen(screenPoint(e));
+		const upRaw = imageFromScreen(screenPoint(e));
+		const up = kind === 'rect' ? constrainRectCorner(start, upRaw) : upRaw;
 		if (kind === 'lasso') {
 			const last = lassoPts[lassoPts.length - 1];
-			if (!last || Math.hypot(up.x - last.x, up.y - last.y) >= 1) lassoPts.push(up);
+			if (!last || Math.hypot(upRaw.x - last.x, upRaw.y - last.y) >= 1) lassoPts.push(upRaw);
 			if (lassoPts.length >= 2) applySelectionMode(dragMode, 'lasso', start, start, lassoPts);
 		} else if (Math.hypot(e.clientX - selDownClient.x, e.clientY - selDownClient.y) >= SELECT_DRAG_MIN) {
 			applySelectionMode(dragMode, kind, start, up, []);

@@ -11,7 +11,9 @@
 		brushSpacing,
 		antiAliasMode,
 		selectionMode,
-		selectionRatio
+		selectionRatio,
+		selectionFixedRatio,
+		selectionFixedSize
 	} from '../../state/ui';
 	import { get } from 'svelte/store';
 	import { requestPolygonFinish } from '../../state/polygon';
@@ -79,6 +81,16 @@
 	$effect(() => {
 		selectionRatio.set(ratio as 'normal' | 'fixedRatio' | 'fixedSize');
 	});
+
+	function setSizeField(
+		store: 'ratio' | 'size',
+		key: 'width' | 'height',
+		raw: string
+	): void {
+		const n = Math.max(1, Math.round(parseFloat(raw) || 0));
+		if (store === 'ratio') selectionFixedRatio.update((o) => ({ ...o, [key]: n }));
+		else selectionFixedSize.update((o) => ({ ...o, [key]: n }));
+	}
 </script>
 
 <div class="flex h-full w-full items-center gap-4 px-2 text-xs" style="color:var(--text-dim);">
@@ -125,6 +137,45 @@
 				bind:value={ratio}
 				title="Rectangle aspect ratio"
 			/>
+			{#if ratio === 'fixedRatio'}
+				<span class="aa-label">W:</span>
+				<input
+					class="fsl-num"
+					type="number"
+					min="1"
+					step="1"
+					value={$selectionFixedRatio.width}
+					onchange={(e) => setSizeField('ratio', 'width', (e.currentTarget as HTMLInputElement).value)}
+				/>
+				<span class="aa-label">H:</span>
+				<input
+					class="fsl-num"
+					type="number"
+					min="1"
+					step="1"
+					value={$selectionFixedRatio.height}
+					onchange={(e) => setSizeField('ratio', 'height', (e.currentTarget as HTMLInputElement).value)}
+				/>
+			{:else if ratio === 'fixedSize'}
+				<span class="aa-label">W:</span>
+				<input
+					class="fsl-num"
+					type="number"
+					min="1"
+					step="1"
+					value={$selectionFixedSize.width}
+					onchange={(e) => setSizeField('size', 'width', (e.currentTarget as HTMLInputElement).value)}
+				/>
+				<span class="aa-label">H:</span>
+				<input
+					class="fsl-num"
+					type="number"
+					min="1"
+					step="1"
+					value={$selectionFixedSize.height}
+					onchange={(e) => setSizeField('size', 'height', (e.currentTarget as HTMLInputElement).value)}
+				/>
+			{/if}
 		{/if}
 		{#if isLasso}
 			<span class="aa-label">Tool:</span>

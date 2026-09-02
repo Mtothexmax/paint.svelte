@@ -82,6 +82,10 @@ export const selectionMode = writable<SelectionMode>('replace');
 /** Rectangle-select sizing: normal (free), fixed aspect ratio, or fixed size. */
 export type SelectionRatio = 'normal' | 'fixedRatio' | 'fixedSize';
 export const selectionRatio = writable<SelectionRatio>('normal');
+/** Aspect ratio (width:height) used by the rectangle tool's Fixed Ratio mode. */
+export const selectionFixedRatio = writable<{ width: number; height: number }>({ width: 1, height: 1 });
+/** Exact size used by the rectangle tool's Fixed Size mode. */
+export const selectionFixedSize = writable<{ width: number; height: number }>({ width: 800, height: 600 });
 
 export function cycleBrushSize(delta: number): void {
 	brushSize.update((v) => clamp(Math.round(v + delta), 1, 400));
