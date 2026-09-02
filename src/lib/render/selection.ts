@@ -110,27 +110,31 @@ export function maskAll(surfaces: SurfaceStore, maskId: SurfaceId, width: number
 
 /** Appends the geometry of the positive selection shape to a Graphics path.
  * Rect/ellipse draw from their bounding rect; lasso draws the closed polygon. */
-function addShapePath(g: Graphics, kind: SelectionKind, rect: Rect | null, points: Point[] | null): void {
+function addShapePath(g: Graphics, kind: SelectionKind, rect: Rect | null, points: Point[] | null): boolean {
 	if (kind === 'lasso') {
-		if (points && points.length >= 3) g.poly(points, true);
-		return;
+		if (points && points.length >= 3) {
+			g.poly(points, true);
+			return true;
+		}
+		return false;
 	}
-	if (!rect || rect.width <= 0 || rect.height <= 0) return;
+	if (!rect || rect.width <= 0 || rect.height <= 0) return false;
 	if (kind === 'ellipse') {
 		g.ellipse(rect.x + rect.width / 2, rect.y + rect.height / 2, Math.abs(rect.width) / 2, Math.abs(rect.height) / 2);
 	} else {
 		g.rect(rect.x, rect.y, rect.width, rect.height);
 	}
+	return true;
 }
 
 /**
  * Writes the complement of the POSITIVE selection shape (`kind`/`rect`/`points`)
- * into the (already-doc-sized) `maskId` surface: the whole document is filled
- * white, then the original shape region is reset to fully transparent with a
- * `'none'` (replace) blend — which zeroes BOTH RGB and alpha, so no premultiplied
- * residue remains inside the punched hole (unlike an 'erase' pass). Works for
- * holes / donut-like selections (inverting a small shape selects everything
- * except that shape).
+ * into the (already-doc-sized) `maskId` surface: a full-document white rectangle
+ * is filled and the shape is then subtracted as a real GEOMETRIC hole via Pixi's
+ * `Graphics.cut()` (outer shape filled first, then the inner shape is cut out).
+ * This is the framework-native way to make a hole and produces a clean,
+ * consistent mask (no premultiplied residue). The result: everything EXCEPT the
+ * shape is selected — exactly a donut/complement selection.
  */
 export function invertSelectionMask(
 	surfaces: SurfaceStore,
@@ -141,22 +145,14 @@ export function invertSelectionMask(
 	rect: Rect | null,
 	points: Point[] | null
 ): void {
-	// 1) clear, 2) fill the whole document white
 	wipeMask(surfaces, maskId);
-	const full = new Graphics();
-	full.rect(0, 0, width, height).fill(WHITE);
-	surfaces.renderInto(surfaces.getTexture(maskId), full, false);
-	full.destroy();
-
-	// 3) punch the original shape region to transparent (replace, not erase).
-	const hole = new Graphics();
-	addShapePath(hole, kind, rect, points);
-	if (hole) {
-		hole.fill({ color: 0x000000, alpha: 0 });
-		hole.blendMode = 'none';
-		surfaces.renderInto(surfaces.getTexture(maskId), hole, false);
-		hole.destroy();
-	}
+	const g = new Graphics();
+	// 1) fill the whole document white
+	g.rect(0, 0, width, height).fill(WHITE);
+	// 2) draw the inner (hole) path and cut it out of the filled rectangle
+	if (addShapePath(g, kind, rect, points)) g.cut();
+	surfaces.renderInto(surfaces.getTexture(maskId), g, false);
+	g.destroy();
 }
 
 /**
