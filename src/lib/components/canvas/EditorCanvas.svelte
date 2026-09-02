@@ -156,10 +156,12 @@
 
 	function onKeyDown(e: KeyboardEvent) {
 		const typing = isTextTarget(e.target);
-		// Escape aborts an in-progress selection drag (the committed ants — if
-		// any — are restored by refreshActiveSelection).
-		if (e.key === 'Escape' && selecting) {
-			cancelSelectDrag();
+		// Escape cancels an in-progress selection drag AND clears an active
+		// selection (Paint.NET behaviour). Guarded against typing inputs and
+		// open modal dialogs so it never steals Escape from them.
+		if (e.key === 'Escape' && !typing && !get(dialog).kind) {
+			if (selecting) cancelSelectDrag();
+			if (documentRegistry.active?.selection.active) deselect();
 			return;
 		}
 		// Undo / Redo and the selection commands — handled here directly
