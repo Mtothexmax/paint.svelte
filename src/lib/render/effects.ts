@@ -3,7 +3,9 @@
 
 import { BlurFilter, ColorMatrixFilter, RenderTexture, Sprite, type Filter } from 'pixi.js';
 import { documentRegistry } from '../core/document/registry';
+import type { SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
+import { blitMaskedInto, eraseSelectionRegion } from './selection';
 
 /** Applies an arbitrary filter off-screen and swaps the layer surface (undoable). */
 function applyFilterSwap(
@@ -97,4 +99,72 @@ export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
 		cm.negative(true);
 		return cm;
 	});
+}
+
+/** Renders an inverted (negative) copy of surface `srcId` into a NEW owned
+ * surface and returns its id (the original is left untouched). */
+function invertSurfaceCopy(renderer: EditorRenderer, srcId: SurfaceId, width: number, height: number): SurfaceId {
+	const surfaces = renderer.surfaces;
+	const src = surfaces.getTexture(srcId);
+	const target = RenderTexture.create({ width, height, resolution: 1 });
+	const sprite = new Sprite(src);
+	const cm = new ColorMatrixFilter();
+	cm.negative(true);
+	sprite.filters = [cm];
+	renderer.app.renderer.render({ container: sprite, target, clear: true });
+	sprite.destroy();
+	cm.destroy();
+	return surfaces.adopt(target);
+}
+
+/**
+ * Inverts the colours of the ACTIVE LAYER, but ONLY inside the current
+ * selection when one is active (Paint.NET semantics); without a selection the
+ * whole layer is inverted. Always recorded as a single undoable surface swap.
+ */
+export function invertColorsScoped(renderer: EditorRenderer): boolean {
+	const doc = documentRegistry.active;
+	const layer = doc?.activeLayer;
+	if (!doc || !layer) return false;
+	const sel = doc.selection;
+	if (!(sel.active && sel.maskId)) return invertColorsActiveLayer(renderer);
+
+	const surfaces = renderer.surfaces;
+	const beforeId = layer.surfaceId;
+
+	// Surface-swap undo: never mutate the live layer surface in place.
+	const afterId: SurfaceId = surfaces.copyRegion(beforeId, { x: 0, y: 0, width: doc.width, height: doc.height });
+	// Clear the selected area in the clone …
+	eraseSelectionRegion(surfaces, sel.maskId, afterId, doc.width, doc.height);
+	// … then compose the inverted copy ONLY inside the selection.
+	const invertedId = invertSurfaceCopy(renderer, beforeId, doc.width, doc.height);
+	blitMaskedInto(surfaces, sel.maskId, invertedId, afterId, 'normal', doc.width, doc.height);
+	surfaces.dispose(invertedId);
+
+	layer.surfaceId = afterId;
+	renderer.rebuildActiveLayers();
+	doc.setDirty(true);
+	documentRegistry.notifyChange(doc);
+
+	doc.history.push({
+		label: 'Invert Colors',
+		memoryBytes: doc.width * doc.height * 4 * 2,
+		undo: () => {
+			if (layer.surfaceId === afterId) {
+				layer.surfaceId = beforeId;
+				renderer.rebuildActiveLayers();
+			}
+		},
+		redo: () => {
+			if (layer.surfaceId === beforeId) {
+				layer.surfaceId = afterId;
+				renderer.rebuildActiveLayers();
+			}
+		},
+		dispose: () => {
+			if (layer.surfaceId === afterId) surfaces.dispose(beforeId);
+			else surfaces.dispose(afterId);
+		}
+	});
+	return true;
 }

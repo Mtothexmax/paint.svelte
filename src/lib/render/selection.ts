@@ -185,6 +185,35 @@ export function fillSelectionRegion(
 	surfaces.dispose(scratchId);
 }
 
+/**
+ * Composites an arbitrary source surface (`srcId`) into `destId` but ONLY where
+ * the selection mask is set. The source is copied into a scratch masked by the
+ * selection, then blended into the destination with the given blend mode. Used
+ * by selection-scoped effects (e.g. Invert Colors inside the selection).
+ */
+export function blitMaskedInto(
+	surfaces: SurfaceStore,
+	maskId: SurfaceId,
+	srcId: SurfaceId,
+	destId: SurfaceId,
+	blend: 'normal' | 'erase',
+	width: number,
+	height: number
+): void {
+	const scratchId = surfaces.create(width, height);
+	const holder = new Container();
+	const srcSprite = new Sprite(surfaces.getTexture(srcId));
+	const maskSprite = new Sprite(surfaces.getTexture(maskId));
+	maskSprite.position.set(0, 0);
+	holder.addChild(srcSprite);
+	holder.addChild(maskSprite);
+	holder.mask = maskSprite;
+	surfaces.renderInto(surfaces.getTexture(scratchId), holder, true);
+	holder.destroy({ children: true });
+	surfaces.blitRegion(scratchId, destId, 0, 0, blend, 1);
+	surfaces.dispose(scratchId);
+}
+
 /** Closed outline (image px, no duplicated first point) of the current shape,
  * used to draw the ants. Rect → 4 corners, ellipse → sampled points, lasso →
  * the raw polygon points. */
