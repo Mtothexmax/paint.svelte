@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { BlurFilter } from 'pixi.js';
 	import MovableDialog from '../common/MovableDialog.svelte';
+	import FilterSlider from '../common/FilterSlider.svelte';
 	import { getEditorRenderer } from '../../render/EditorRenderer';
 	import { gaussianBlurActiveLayer } from '../../render/effects';
 	import { closeDialog } from '../../services/dialogService';
@@ -54,10 +55,15 @@
 </script>
 
 <MovableDialog title="Gaussian Blur" onClose={cancel} width={380}>
-	<label class="field">
-		<span class="field-label">Blur strength: {prefs.strength}</span>
-		<input type="range" min="0" max="50" step="1" bind:value={prefs.strength} oninput={preview} onchange={preview} />
-	</label>
+	<FilterSlider
+		label="Blur strength"
+		min={0}
+		max={50}
+		step={1}
+		default={8}
+		bind:value={prefs.strength}
+		oninput={preview}
+	/>
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
 		Preview

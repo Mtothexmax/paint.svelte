@@ -4,6 +4,7 @@
 	import { onMount } from 'svelte';
 	import { ColorMatrixFilter } from 'pixi.js';
 	import MovableDialog from '../common/MovableDialog.svelte';
+	import FilterSlider from '../common/FilterSlider.svelte';
 	import { getEditorRenderer } from '../../render/EditorRenderer';
 	import { hueSaturationActiveLayer } from '../../render/effects';
 	import { closeDialog } from '../../services/dialogService';
@@ -64,18 +65,9 @@
 </script>
 
 <MovableDialog title="Hue / Saturation" onClose={cancel} width={400}>
-	<label class="field">
-		<span class="field-label">Hue: {prefs.hue}°</span>
-		<input type="range" min="-180" max="180" step="1" bind:value={prefs.hue} oninput={preview} onchange={preview} />
-	</label>
-	<label class="field">
-		<span class="field-label">Saturation: {prefs.sat}%</span>
-		<input type="range" min="0" max="200" step="1" bind:value={prefs.sat} oninput={preview} onchange={preview} />
-	</label>
-	<label class="field">
-		<span class="field-label">Lightness: {prefs.light}%</span>
-		<input type="range" min="0" max="200" step="1" bind:value={prefs.light} oninput={preview} onchange={preview} />
-	</label>
+	<FilterSlider label="Hue" min={-180} max={180} step={1} default={0} bind:value={prefs.hue} oninput={preview} />
+	<FilterSlider label="Saturation" min={0} max={200} step={1} default={100} bind:value={prefs.sat} oninput={preview} />
+	<FilterSlider label="Lightness" min={0} max={200} step={1} default={100} bind:value={prefs.light} oninput={preview} />
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
 		Preview
