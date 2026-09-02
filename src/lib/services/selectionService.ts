@@ -7,9 +7,11 @@ import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
 import type { Point, Rect } from '../core/geometry';
 import type { SurfaceId } from '../core/layers/Layer';
+import type { RGBA } from '../core/color';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import {
 	eraseSelectionRegion,
+	fillSelectionRegion,
 	fillShapeMask,
 	invertSelectionMask,
 	maskAll
@@ -201,6 +203,62 @@ export function deleteSelection(): boolean {
 
 	doc.history.push({
 		label: 'Delete',
+		memoryBytes: doc.width * doc.height * 4 * 2,
+		undo: () => {
+			if (layer.surfaceId === afterId) {
+				layer.surfaceId = beforeId;
+				renderer.rebuildActiveLayers();
+			}
+		},
+		redo: () => {
+			if (layer.surfaceId === beforeId) {
+				layer.surfaceId = afterId;
+				renderer.rebuildActiveLayers();
+			}
+		},
+		dispose: () => {
+			if (layer.surfaceId === afterId) surfaces.dispose(beforeId);
+			else surfaces.dispose(afterId);
+		}
+	});
+	return true;
+}
+
+/**
+ * Fills with an OPAQUE version of `color`: inside the active selection when one
+ * exists, otherwise over the whole active layer (Backspace). One undoable
+ * surface swap, like Delete.
+ */
+export function fillSelection(color: RGBA): boolean {
+	const doc = activeDoc();
+	if (!doc || !hasEditorRenderer()) return false;
+	const layer = doc.activeLayer;
+	if (!layer) return false;
+
+	const colorInt =
+		((Math.round(color.r) & 0xff) << 16) | ((Math.round(color.g) & 0xff) << 8) | (Math.round(color.b) & 0xff);
+
+	const renderer = getEditorRenderer();
+	const surfaces = renderer.surfaces;
+	const sel = doc.selection;
+
+	const beforeId = layer.surfaceId;
+	const afterId: SurfaceId =
+		sel.active && sel.maskId
+			? surfaces.copyRegion(beforeId, { x: 0, y: 0, width: doc.width, height: doc.height })
+			: surfaces.create(doc.width, doc.height, colorInt);
+
+	if (sel.active && sel.maskId) {
+		fillSelectionRegion(surfaces, sel.maskId, afterId, colorInt, doc.width, doc.height);
+	}
+
+	layer.surfaceId = afterId;
+	renderer.rebuildActiveLayers();
+	doc.setDirty(true);
+	documentRegistry.notifyChange(doc);
+
+	doc.history.push({
+		label: 'Fill',
 		memoryBytes: doc.width * doc.height * 4 * 2,
 		undo: () => {
 			if (layer.surfaceId === afterId) {

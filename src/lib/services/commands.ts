@@ -15,6 +15,7 @@ import {
 import type { ViewState } from '../core/document/ImageDocument';
 import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
+import { invertColorsActiveLayer } from '../render/effects';
 
 function setStatusZoom(view: ViewState): void {
 	statusBar.update((s) => ({ ...s, zoomPct: Math.round(view.zoom * 100) }));
@@ -176,6 +177,18 @@ export function registerBuiltinCommands(): void {
 			id: 'adjustments.hueSat',
 			label: 'Hue / Saturation…',
 			run: () => openDialog('hueSat'),
+			isEnabled: hasDoc
+		}
+	]);
+
+	commands.registerMany([
+		{
+			id: 'adjustments.invertColors',
+			label: 'Invert Colors',
+			shortcut: 'Ctrl+Shift+I',
+			run: () => {
+				invertColorsActiveLayer(getEditorRenderer());
+			},
 			isEnabled: hasDoc
 		}
 	]);

@@ -32,6 +32,7 @@
 		'layers.duplicate': '⧉',
 		'layers.delete': '🗑️',
 		'adjustments.hueSat': '🌈',
+		'adjustments.invertColors': '🔁',
 		'effects.blur': '💧'
 	};
 	const LABEL_ICONS: Record<string, string> = {

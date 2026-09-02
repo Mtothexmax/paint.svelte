@@ -89,3 +89,12 @@ export function hueSaturationActiveLayer(renderer: EditorRenderer, s: HslSetting
 		return cm;
 	});
 }
+
+/** Inverts the colours of the active layer (photographic negative). */
+export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
+	return applyFilterSwap(renderer, 'Invert Colors', () => {
+		const cm = new ColorMatrixFilter();
+		cm.negative(true);
+		return cm;
+	});
+}

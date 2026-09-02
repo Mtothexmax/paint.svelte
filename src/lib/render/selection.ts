@@ -155,6 +155,36 @@ export function eraseSelectionRegion(
 	surfaces.dispose(scratchId);
 }
 
+/**
+ * Paints a solid, fully-opaque `colorRGB` over `destId` but ONLY inside the
+ * selection: a scratch surface is filled with the colour where the mask is set
+ * (Sprite AlphaMask), then that scratch is blended into `destId` normally.
+ * Pixels outside the selection are untouched. The caller is responsible for the
+ * surface-swap undo bookkeeping.
+ */
+export function fillSelectionRegion(
+	surfaces: SurfaceStore,
+	maskId: SurfaceId,
+	destId: SurfaceId,
+	colorRGB: number,
+	width: number,
+	height: number
+): void {
+	const scratchId = surfaces.create(width, height);
+	const holder = new Container();
+	const shape = new Graphics();
+	shape.rect(0, 0, width, height).fill(colorRGB);
+	const maskSprite = new Sprite(surfaces.getTexture(maskId));
+	maskSprite.position.set(0, 0);
+	holder.addChild(shape);
+	holder.addChild(maskSprite);
+	holder.mask = maskSprite;
+	surfaces.renderInto(surfaces.getTexture(scratchId), holder, true);
+	holder.destroy({ children: true });
+	surfaces.blitRegion(scratchId, destId, 0, 0, 'normal', 1);
+	surfaces.dispose(scratchId);
+}
+
 /** Closed outline (image px, no duplicated first point) of the current shape,
  * used to draw the ants. Rect → 4 corners, ellipse → sampled points, lasso →
  * the raw polygon points. */

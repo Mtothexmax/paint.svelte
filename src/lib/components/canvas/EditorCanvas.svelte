@@ -11,9 +11,11 @@
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import { dialog } from '../../services/dialogService';
+	import { commands } from '../../services/commandRegistry';
 	import {
 		deleteSelection,
 		deselect,
+		fillSelection,
 		invertSelection,
 		selectAll,
 		setLassoSelection,
@@ -183,7 +185,8 @@
 				if (key === 'i') {
 					e.preventDefault();
 					e.stopPropagation();
-					invertSelection();
+					if (e.shiftKey) commands.run('adjustments.invertColors');
+					else invertSelection();
 					return;
 				}
 			}
@@ -197,6 +200,14 @@
 				deleteSelection();
 				return;
 			}
+		}
+		// Backspace fills the active layer (or the current selection, when one
+		// exists) with the foreground colour.
+		if (!typing && !get(dialog).kind && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Backspace') {
+			e.preventDefault();
+			e.stopPropagation();
+			fillSelection(get(foregroundColor));
+			return;
 		}
 		if (e.code === 'Space' && !typing) {
 			spaceHeld = true;
