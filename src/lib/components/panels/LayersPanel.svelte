@@ -4,6 +4,7 @@
 	// (which records undoable history).
 	import { onMount } from 'svelte';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
+	import PdnSlider from '../common/PdnSlider.svelte';
 	import {
 		addLayer,
 		deleteLayer,
@@ -19,7 +20,8 @@
 
 	let rows = $state<LayerRow[]>([]);
 	let opacityVal = $state(100);
-	let opacityStart = 0;
+	let prevActiveId: string | null = null;
+	let lastCommittedOpacity = 100;
 	let unsubHist: (() => void) | null = null;
 
 	function refresh() {
@@ -54,23 +56,28 @@
 		return rows.find((r) => r.active);
 	}
 
+	// When the active layer changes, remember its opacity as the baseline for
+	// the next commit.
+	$effect(() => {
+		const active = activeRow();
+		if (active && prevActiveId !== active.id) {
+			prevActiveId = active.id;
+			lastCommittedOpacity = active.opacity;
+		}
+	});
 	// Live preview while dragging (no history entry yet).
-	function onOpacityInput(e: Event) {
-		const v = Number((e.currentTarget as HTMLInputElement).value);
-		opacityVal = v;
+	$effect(() => {
 		const active = activeRow();
-		if (active) setLayerOpacityLive(active.id, v / 100);
-	}
-	// Capture the value at the start of the drag gesture.
-	function onOpacityStart() {
-		opacityStart = activeRow()?.opacity ?? 1;
-	}
-	// One history entry when the drag is released.
-	function onOpacityCommit(e: Event) {
-		const v = Number((e.currentTarget as HTMLInputElement).value);
-		opacityVal = v;
+		if (active && Math.abs(active.opacity * 100 - opacityVal) > 0.01) {
+			setLayerOpacityLive(active.id, opacityVal / 100);
+		}
+	});
+	// One history entry when the slider is released / +/- pressed.
+	function onOpacityCommit() {
 		const active = activeRow();
-		if (active) commitLayerOpacity(active.id, opacityStart, v / 100);
+		if (!active) return;
+		commitLayerOpacity(active.id, lastCommittedOpacity, opacityVal / 100);
+		lastCommittedOpacity = opacityVal / 100;
 	}
 </script>
 
@@ -144,17 +151,15 @@
 	{/if}
 
 	<div class="layer-opacity">
-		<span class="panel-title">Opacity</span>
-		<input
-			type="range"
-			min="0"
-			max="100"
-			step="1"
+		<PdnSlider
+			label="Opacity"
+			min={0}
+			max={100}
+			step={1}
+			unit="%"
+			fit
 			bind:value={opacityVal}
-			onpointerdown={onOpacityStart}
-			oninput={onOpacityInput}
-			onchange={onOpacityCommit}
+			onCommit={onOpacityCommit}
 		/>
-		<span class="layer-op">{opacityVal}%</span>
 	</div>
 </div>

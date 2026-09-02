@@ -9,7 +9,7 @@
 	import { BrushEngine } from '../../render/BrushEngine';
 	import { openFiles } from '../../services/fileService';
 	import { dialog } from '../../services/dialogService';
-	import { activeToolId, statusBar, brushSize, brushOpacity, brushHardness, foregroundColor } from '../../state/ui';
+	import { activeToolId, statusBar, brushSize, brushOpacity, brushHardness, brushSpacing, foregroundColor, backgroundColor, antiAliasMode } from '../../state/ui';
 
 	const PAINT_TOOLS = new Set(['brush', 'pencil', 'eraser']);
 	const KIND: Record<string, 'brush' | 'pencil' | 'eraser'> = {
@@ -23,21 +23,35 @@
 	let ready = false;
 
 	let spaceHeld = false;
-	let panning = false;
+	let panning = $state(false);
 	let panPointerId = -1;
 	let panStart = { x: 0, y: 0 };
 	let panStartView = { panX: 0, panY: 0 };
 
 	// painting state
 	let engine: BrushEngine | null = null;
-	let painting = false;
+	let painting = $state(false);
 	let paintPointerId = -1;
 
-	// brush cursor ring
-	let ringX = -100;
-	let ringY = -100;
-	let ringR = 0;
-	let ringVisible = false;
+	// Paint.NET-style brush preview: an outline circle of the brush size (scaled
+	// with the current zoom) follows the pointer. While it is shown the OS
+	// pointer is hidden — also while painting, exactly like Paint.NET.
+	let pointerX = $state(-1000);
+	let pointerY = $state(-1000);
+	let pointerInside = $state(false);
+	let paintArmed = $state(false);
+	let ringR = $state(0);
+
+	const showRing = $derived(paintArmed && !panning && (pointerInside || painting));
+
+	// OS pointer over the canvas: crosshair (the system "plus" cursor) while a
+	// paint tool is armed and NOT painting; fully hidden while painting (only
+	// the preview ring + painted stroke are visible, like Paint.NET).
+	const cursorCss = $derived.by(() => {
+		if (!paintArmed || panning) return '';
+		if (painting) return 'cursor: none;';
+		return pointerInside ? 'cursor: crosshair;' : '';
+	});
 
 	const isPaintTool = () => PAINT_TOOLS.has($activeToolId) && !!documentRegistry.active;
 
@@ -61,15 +75,24 @@
 		}));
 	}
 
-	function updateRing(sp: { x: number; y: number }, doc = documentRegistry.active) {
-		if (PAINT_TOOLS.has($activeToolId) && doc) {
-			ringX = sp.x;
-			ringY = sp.y;
-			ringR = (get(brushSize) / 2) * doc.view.zoom;
-			ringVisible = true;
-		} else {
-			ringVisible = false;
-		}
+	/** Re-evaluates whether a paint tool is armed (tool + open document). */
+	function updateArmed(): void {
+		paintArmed = PAINT_TOOLS.has($activeToolId) && !!documentRegistry.active;
+		refreshRing();
+	}
+
+	/** Recomputes the ring radius from the brush size and the current zoom
+	 * (zooming changes the on-screen size of the brush preview). */
+	function refreshRing(): void {
+		const doc = documentRegistry.active;
+		ringR = paintArmed && doc ? (get(brushSize) / 2) * doc.view.zoom : 0;
+	}
+
+	/** Moves the brush preview to the pointer position. */
+	function movePointer(sp: { x: number; y: number }): void {
+		pointerX = sp.x;
+		pointerY = sp.y;
+		refreshRing();
 	}
 
 	function isTextTarget(target: EventTarget | null): boolean {
@@ -124,6 +147,7 @@
 		doc.view = zoomBy(doc.view, anchor, factor);
 		renderer.refreshActiveView();
 		updateStatus(doc);
+		refreshRing(); // zoom changed the on-screen brush size
 	}
 
 	function imageFromScreen(sp: { x: number; y: number }): { x: number; y: number } {
@@ -133,6 +157,7 @@
 
 	function onPointerDown(e: PointerEvent) {
 		if (!ready) return;
+		movePointer(screenPoint(e));
 		const wantsPan = e.button === 1 || (e.button === 0 && spaceHeld);
 		if (wantsPan) {
 			e.preventDefault();
@@ -149,7 +174,11 @@
 			}
 			return;
 		}
-		if (e.button === 0 && isPaintTool()) {
+		// Paint with the LEFT button in the foreground colour and with the RIGHT
+		// button in the background colour (Paint.NET behaviour). Right-button
+		// painting also suppresses the context menu (preventDefault + the
+		// App-level oncontextmenu guard), so it never interrupts a stroke.
+		if ((e.button === 0 || e.button === 2) && isPaintTool()) {
 			e.preventDefault();
 			painting = true;
 			paintPointerId = e.pointerId;
@@ -160,14 +189,16 @@
 			}
 			if (!engine) engine = new BrushEngine(getEditorRenderer());
 			const img = imageFromScreen(screenPoint(e));
-			const fg = get(foregroundColor);
+			const color = e.button === 2 ? get(backgroundColor) : get(foregroundColor);
 			engine.begin(
 				{
 					kind: KIND[$activeToolId] ?? 'brush',
 					size: get(brushSize),
 					opacity: get(brushOpacity) / 100,
 					hardness: get(brushHardness) / 100,
-					color: fg
+					spacingRatio: get(brushSpacing) / 100,
+					antiAlias: get(antiAliasMode) === 'smooth',
+					color
 				},
 				img
 			);
@@ -188,7 +219,7 @@
 				engine.lineTo(imageFromScreen(sp));
 			}
 		}
-		updateRing(sp, doc);
+		movePointer(sp);
 		if (!doc || !ready) return;
 		const image = screenToImage(doc.view, sp.x, sp.y);
 		if (image.x >= 0 && image.y >= 0 && image.x < doc.width && image.y < doc.height) {
@@ -259,13 +290,30 @@
 			ro.observe(host);
 			disposers.push(() => ro.disconnect());
 
-			disposers.push(documentRegistry.events.on(RegistryEvents.active, () => updateStatus(documentRegistry.active)));
+			disposers.push(
+				documentRegistry.events.on(RegistryEvents.active, () => {
+					updateStatus(documentRegistry.active);
+					updateArmed();
+				})
+			);
+			const unTool = activeToolId.subscribe(() => updateArmed());
+			const unSize = brushSize.subscribe(() => refreshRing());
+			disposers.push(unTool, unSize);
+
+			const onEnter = () => {
+				pointerInside = true;
+			};
+			const onLeave = () => {
+				pointerInside = false;
+			};
 
 			host.addEventListener('wheel', onWheel, { passive: false });
 			host.addEventListener('pointerdown', onPointerDown);
 			host.addEventListener('pointermove', onPointerMove);
 			host.addEventListener('pointerup', endPointer);
 			host.addEventListener('pointercancel', cancelPointer);
+			host.addEventListener('pointerenter', onEnter);
+			host.addEventListener('pointerleave', onLeave);
 			host.addEventListener('dragover', onDragOver);
 			host.addEventListener('drop', onDrop);
 			window.addEventListener('keydown', onKeyDown, true);
@@ -276,6 +324,8 @@
 				host.removeEventListener('pointermove', onPointerMove);
 				host.removeEventListener('pointerup', endPointer);
 				host.removeEventListener('pointercancel', cancelPointer);
+				host.removeEventListener('pointerenter', onEnter);
+				host.removeEventListener('pointerleave', onLeave);
 				host.removeEventListener('dragover', onDragOver);
 				host.removeEventListener('drop', onDrop);
 				window.removeEventListener('keydown', onKeyDown, true);
@@ -283,6 +333,7 @@
 			});
 
 			updateStatus(documentRegistry.active);
+			updateArmed();
 		};
 
 		void initEditorRenderer(canvasEl).then(() => {
@@ -299,13 +350,13 @@
 <div
 	bind:this={host}
 	class="relative h-full w-full overflow-hidden select-none"
-	style="touch-action: none;"
+	style="touch-action: none; {cursorCss}"
 >
 	<canvas bind:this={canvasEl} class="absolute inset-0 block h-full w-full" style="touch-action:none;"></canvas>
-	{#if ringVisible}
+	{#if showRing}
 		<div
-			class="pointer-events-none absolute z-10"
-			style="left:{ringX - ringR}px; top:{ringY - ringR}px; width:{ringR * 2}px; height:{ringR * 2}px; border:1px solid rgba(255,255,255,0.9); border-radius:9999px; box-shadow:0 0 0 1px rgba(0,0,0,0.5);"
+			class="brush-preview-ring pointer-events-none absolute z-10"
+			style="left:{pointerX - ringR}px; top:{pointerY - ringR}px; width:{ringR * 2}px; height:{ringR * 2}px;"
 		></div>
 	{/if}
 </div>

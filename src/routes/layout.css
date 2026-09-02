@@ -58,6 +58,16 @@ body {
 .tooloptions-placeholder {
 	opacity: 0.55;
 }
+/* options strip: uniform, small labels across the PdnSlider groups (e.g.
+   "Spacing:") and the anti-alias toggle — same size and same colour. */
+.options-strip .pdn-label,
+.options-strip .aa-label {
+	font-size: 11px;
+	line-height: 1;
+	color: var(--text-dim);
+	opacity: 1;
+	white-space: nowrap;
+}
 .toolbar-col {
 	width: 102px;
 	flex: 0 0 auto;
@@ -145,7 +155,7 @@ body {
 .tab-tray-overlay {
 	position: absolute;
 	top: 0;
-	left: 50%;
+	left: 75%;
 	right: 0;
 	height: 64px; /* 30 (menu) + 34 (options) */
 	z-index: 40;
@@ -289,7 +299,7 @@ body {
 /* background: smaller square, vertically centered, offset behind (peeks right) */
 .cs-bg {
 	right: 0;
-	width: 16px;
+	width: 14px;
 	height: 16px;
 	z-index: 1;
 	border-color: rgba(255, 255, 255, 0.35);
@@ -535,6 +545,13 @@ body {
 	text-align: right;
 }
 
+/* ---- Paint.NET-style brush preview ring (canvas cursor) ---- */
+.brush-preview-ring {
+	border: 1px solid rgba(255, 255, 255, 0.9);
+	border-radius: 9999px;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
 /* ---- colour picker popover ---- */
 .color-backdrop {
 	position: fixed;
@@ -702,7 +719,7 @@ body {
 }
 .cp-handle {
 	position: absolute;
-	width: 16px;
+	width: 14px;
 	height: 16px;
 	border-radius: 50%;
 	border: 2px solid #fff;
@@ -1065,4 +1082,195 @@ body {
 	gap: 8px;
 	padding: 10px 12px;
 	border-top: 1px solid var(--border);
+}
+
+/* ---- Paint.NET-style slider ---- */
+.pdn-slider {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--text);
+}
+.pdn-label {
+	white-space: nowrap;
+	color: var(--text-dim);
+}
+.pdn-btn {
+	width: 18px;
+	height: 18px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 13px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0;
+}
+.pdn-btn:hover {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+.pdn-track {
+	position: relative;
+	width: 110px;
+	height: 16px;
+	background: #2f2f2f;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	overflow: hidden;
+	cursor: pointer;
+	touch-action: none;
+	user-select: none;
+}
+.pdn-fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	height: 100%;
+	background: var(--accent);
+	pointer-events: none;
+}
+.pdn-text {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	line-height: 1;
+	color: #ffffff; /* white text, also over the (dark) filled part */
+	pointer-events: none;
+}
+.pdn-text-dark {
+	color: #ffffff; /* keep white over the fill for readability in dark mode */
+}
+
+/* fit variant: fill available width (narrow panels) without affecting others */
+.pdn-slider.fit {
+	display: flex;
+	width: 100%;
+	min-width: 0;
+}
+.pdn-slider.fit .pdn-track {
+	width: auto;
+	flex: 1 1 auto;
+	min-width: 28px;
+}
+.pdn-slider.fit .pdn-label {
+	flex: 0 0 auto;
+}
+
+/* ---- split toggle button (icon + ?) ---- */
+.isp {
+	position: relative;
+	display: inline-flex;
+	align-items: stretch;
+	height: 40px;
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	overflow: visible;
+	padding: 0;
+}
+.isp.open {
+	border-color: var(--accent);
+}
+.isp-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	font-size: 18px;
+	cursor: pointer;
+	border-right: 1px solid var(--border);
+}
+.isp-icon:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+.isp-arrow {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	font-size: 10px;
+	color: var(--text-dim);
+	cursor: pointer;
+}
+.isp-arrow:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--text);
+}
+.isp-menu {
+	position: fixed;
+	z-index: 1300;
+	min-width: 220px;
+	max-width: 300px;
+	background: #303030;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+}
+.isp-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 6px 8px;
+	background: transparent;
+	border: none;
+	border-radius: 5px;
+	text-align: left;
+	color: var(--text);
+	cursor: pointer;
+}
+.isp-item:hover {
+	background: rgba(255, 255, 255, 0.07);
+}
+.isp-item.on {
+	background: var(--accent-soft);
+}
+.isp-item-icon {
+	font-size: 16px;
+	width: 20px;
+	text-align: center;
+	flex: 0 0 auto;
+}
+.isp-item-texts {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+.isp-item-label {
+	font-size: 13px;
+	font-weight: 600;
+}
+.isp-item-desc {
+	font-size: 11px;
+	color: var(--text-dim);
+}
+.isp-check {
+	flex: 0 0 auto;
+	color: var(--accent);
+}
+
+
+/* split button sized for the slim options strip */
+.isp {
+	height: 26px;
+	border-radius: 5px;
+}
+.isp-icon {
+	width: 26px;
+	font-size: 15px;
+}
+.isp-arrow {
+	width: 14px;
+	font-size: 9px;
 }

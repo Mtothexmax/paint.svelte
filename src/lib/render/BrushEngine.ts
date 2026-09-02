@@ -1,12 +1,14 @@
 // Layer: render (pixi). GPU brush/eraser stroke engine.
 //
-// Strategy: the stroke is rasterised as ONE crisp round-capped/round-joined
-// path (uniform body, clean caps, no wedge/spike at joins) and then softened by
-// a single GPU blur. The blur produces a continuous, distance-like alpha
-// falloff — so there are no discrete bands, no double-alpha accumulation from
-// overlapping dabs, and no stepping/banding. Everything is GPU-side (no
-// CPU<->GPU readbacks); sampling is distance-based (independent of pointer
-// event frequency and velocity).
+// Strategy: the stroke is rasterised as overlapping dabs (filled circles)
+// spaced by the Spacing slider — at small spacing they fuse into one crisp
+// round-cap stroke, at large spacing they separate into dotted/beaded lines —
+// and the whole dab set is then softened by a single GPU blur (anti-aliased
+// mode). The blur produces a continuous, distance-like alpha falloff, so there
+// are no discrete bands, no double-alpha accumulation from overlapping dabs,
+// and no stepping/banding. Everything is GPU-side (no CPU<->GPU readbacks);
+// sampling is distance-based (independent of pointer event frequency and
+// velocity).
 
 import { BlurFilter, Container, Graphics, Rectangle, Sprite } from 'pixi.js';
 import type { Point, Rect } from '../core/geometry';
@@ -24,6 +26,13 @@ export interface PaintSettings {
 	opacity: number; // 0..1
 	hardness: number; // 0..1
 	color: RGBA;
+	/** paint spacing as a fraction of `size` (Paint.NET style). Controls the
+	 * distance between the stamped dabs of the path. */
+	spacingRatio?: number;
+	/** anti-aliased (soft) edges when true (default); false renders hard,
+	 * pixel-crisp edges at the full brush size (hardness is ignored, like a
+	 * pencil). */
+	antiAlias?: boolean;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -78,13 +87,18 @@ export class BrushEngine {
 		return true;
 	}
 
-	/** Adds a path point (thinned so event density doesn't matter). */
+	/** Adds a path point (spacing-controlled thinning). Points are snapped to
+	 * the pixel grid so a plain click always stamps an IDENTICAL dab no matter
+	 * where on the canvas it lands (Paint.NET behaviour) — sub-pixel centres
+	 * would rasterise the circle/blur edge slightly differently per position. */
 	lineTo(p: Point): void {
 		if (!this.bufferActive) return;
+		const q = { x: Math.round(p.x), y: Math.round(p.y) };
 		const last = this.path[this.path.length - 1];
-		const thin = Math.max(0.5, (this.settings!.size || 4) * 0.1);
-		if (!last || Math.hypot(p.x - last.x, p.y - last.y) >= thin) {
-			this.path.push({ x: p.x, y: p.y });
+		const ratio = Math.max(0.02, this.settings?.spacingRatio ?? 0.15);
+		const thin = Math.max(0.5, (this.settings!.size || 4) * ratio);
+		if (!last || Math.hypot(q.x - last.x, q.y - last.y) >= thin) {
+			this.path.push(q);
 		}
 		if (!this.rafPending) {
 			this.rafPending = true;
@@ -103,9 +117,16 @@ export class BrushEngine {
 		if (!stroke || !doc || !s || !this.bufferActive || this.path.length === 0) return;
 
 		const size = s.size;
-		const hardness = clamp(s.hardness, 0.05, 1);
-		const core = size * hardness; // crisp stroke width
-		const strength = (1 - hardness) * size * 0.42; // blur px (softness)
+		// AA 'pixel': hard, pixel-crisp edges at the full brush size (hardness
+		// ignored — like a pencil). AA 'smooth': hardness sets the soft-brush
+		// falloff, but a small rim anti-aliasing is ALWAYS applied — as in
+		// Paint.NET, where the edge stays anti-aliased even at 100% hardness
+		// (hardness only controls how much extra softness is added on top).
+		const aa = s.antiAlias !== false;
+		const hardness = aa ? clamp(s.hardness, 0.05, 1) : 1;
+		const core = size * hardness; // crisp dab diameter
+		const aaEdge = 1; // px of rim AA applied even at hardness 100%
+		const strength = aa ? aaEdge + (1 - hardness) * size * 0.42 : 0; // blur px (softness)
 		// generous transparent border so any filter-edge smear stays far away
 		const margin = size / 2 + strength + 8;
 
@@ -146,35 +167,53 @@ export class BrushEngine {
 		// avoids premultiplied colour fringes at the blurred edges.
 		const MASK = 0xffffff;
 
-		// Render the crisp white path DIRECTLY with the blur filter. The filter
-		// region is explicitly pinned to the whole document + explicit padding,
-		// so Pixi does NOT derive its intermediate filter bounds from the
-		// Graphics geometry (which produced the bottom/right bounding-box lines).
-		const filter = new BlurFilter({ strength, resolution: 1 });
-		filter.padding = Math.ceil(strength * 2 + 4);
+		// Render the crisp white dab mask DIRECTLY with the blur filter (only in
+		// anti-aliased mode). The filter region is explicitly pinned to the whole
+		// document + explicit padding, so Pixi does NOT derive its intermediate
+		// filter bounds from the Graphics geometry (which produced the
+		// bottom/right bounding-box lines).
+		const blur = strength >= 0.5 ? new BlurFilter({ strength, resolution: 1 }) : null;
+		if (blur) blur.padding = Math.ceil(strength * 2 + 4);
 		const wrap = new Container();
 		// Path is in image coordinates and the pooled target IS the document —
 		// so no extra offset (that shifted the stroke away from the cursor).
-		wrap.filterArea = new Rectangle(0, 0, doc.width, doc.height);
-		wrap.filters = [filter];
+		if (blur) {
+			wrap.filterArea = new Rectangle(0, 0, doc.width, doc.height);
+			wrap.filters = [blur];
+		}
 
 		const g = new Graphics();
+		const dabR = Math.max(0.5, core / 2);
 		if (this.path.length === 1) {
-			// a click is a filled disc (not a degenerate capsule)
+			// a click is a single dab (filled disc)
 			const p = this.path[0];
-			g.circle(p.x, p.y, Math.max(0.5, core / 2)).fill(MASK);
+			g.circle(p.x, p.y, dabR).fill(MASK);
 		} else {
-			g.moveTo(this.path[0].x, this.path[0].y);
-			for (let i = 1; i < this.path.length; i++) {
-				g.lineTo(this.path[i].x, this.path[i].y);
+			// Paint.NET-style spacing. While the stamped dabs would overlap
+			// (spacing <= dab diameter) draw ONE continuous round-cap stroke —
+			// the crisp single-path union is guaranteed to be solid (no
+			// multi-subpath fill artefacts). Only when spacing is wider than a
+			// dab are separate dabs stamped, so the stroke visibly breaks into
+			// dotted/beaded lines.
+			const ratio = Math.max(0.02, s.spacingRatio ?? 0.15);
+			const dabStep = Math.max(0.5, size * ratio);
+			if (dabStep <= core) {
+				g.moveTo(this.path[0].x, this.path[0].y);
+				for (let i = 1; i < this.path.length; i++) {
+					g.lineTo(this.path[i].x, this.path[i].y);
+				}
+				g.stroke({ width: core, color: MASK, alpha: 1, cap: 'round', join: 'round' });
+			} else {
+				// dabs are separate by construction — each is its own fill, so
+				// no overlapping-subpath union is ever rasterised.
+				for (const p of this.path) g.circle(p.x, p.y, dabR).fill(MASK);
 			}
-			g.stroke({ width: core, color: MASK, alpha: 1, cap: 'round', join: 'round' });
 		}
 		wrap.addChild(g);
 
 		this.renderer.app.renderer.render({ container: wrap, target: stroke.target, clear: true });
 		wrap.destroy({ children: true });
-		filter.destroy();
+		blur?.destroy();
 	}
 
 	/** Commits the stroke into the layer, records undo/redo, cleans up. */

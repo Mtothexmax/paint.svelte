@@ -61,6 +61,10 @@ export class DocScene {
 			this.strokeBuffer = RenderTexture.create({ width: this.doc.width, height: this.doc.height, resolution: 1 });
 			this.strokeOverlay = new Sprite(this.strokeBuffer);
 			this.strokeOverlay.visible = false;
+			if (this.strokeBuffer.source) {
+				this.strokeBuffer.source.scaleMode = this.crisp ? 'nearest' : 'linear';
+				this.strokeBuffer.source.style.update();
+			}
 			this.root.addChild(this.strokeOverlay);
 		}
 		return { target: this.strokeBuffer, overlay: this.strokeOverlay };
@@ -96,17 +100,38 @@ export class DocScene {
 		this.root.position.set(panX, panY);
 		// Keep checker squares constant in screen space.
 		this.checker.tileScale.set(BASE / (BASE * zoom), BASE / (BASE * zoom));
-		// When magnified at/above 100% show hard pixels; below, smooth.
+		// Zooming in at/above 100% always shows the real pixels (nearest
+		// sampling); below 100% linear sampling keeps the downscale smooth.
 		this.setCrisp(zoom >= 1);
 	}
 
-	/** nearest vs linear sampling for the layer sprites (toggled on zoom). */
+	/** nearest vs linear sampling for the layer + live-stroke sprites. */
 	private setCrisp(crisp: boolean): void {
-		if (crisp === this.crisp) return;
 		this.crisp = crisp;
-		const mode = crisp ? 'nearest' : 'linear';
+		this.applySampling();
+	}
+
+	/** Applies the current sampling mode to EVERY sprite/texture present right
+	 * now — must always run (not just on a mode flip), because surfaces are
+	 * swapped/created per stroke and a freshly created texture would otherwise
+	 * keep its default (linear) sampling while zoomed in.
+	 *
+	 * NOTE: after changing `source.scaleMode`, `source.style.update()` must be
+	 * called — TextureStyle only emits its "change" event from `update()`, so
+	 * without it the GPU keeps the previously cached (linear) sampler. */
+	private applySampling(): void {
+		const mode = this.crisp ? 'nearest' : 'linear';
 		for (const sprite of this.layerSprites) {
-			if (sprite.texture?.source) sprite.texture.source.scaleMode = mode;
+			const src = sprite.texture?.source;
+			if (src && src.scaleMode !== mode) {
+				src.scaleMode = mode;
+				src.style.update();
+			}
+		}
+		const buf = this.strokeBuffer?.source;
+		if (buf && buf.scaleMode !== mode) {
+			buf.scaleMode = mode;
+			buf.style.update();
 		}
 	}
 

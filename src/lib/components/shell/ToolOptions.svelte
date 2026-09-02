@@ -1,47 +1,47 @@
 <script lang="ts">
-	// Layer: components. Tool Options strip — shows settings for the active tool.
-	// Slice 2: brush / pencil / eraser expose size / opacity / hardness.
-	import { activeToolId, brushSize, brushOpacity, brushHardness } from '../../state/ui';
-
-	const labels: Record<string, string> = {
-		move: 'Move Tool',
-		brush: 'Brush Tool',
-		pencil: 'Pencil Tool',
-		eraser: 'Eraser Tool',
-		eyedropper: 'Eyedropper Tool',
-		'select-rect': 'Rectangle Select',
-		'select-ellipse': 'Ellipse Select',
-		lasso: 'Lasso Select',
-		wand: 'Magic Wand',
-		bucket: 'Paint Bucket',
-		shape: 'Shapes',
-		text: 'Text Tool',
-		gradient: 'Gradient Tool'
-	};
+	// Layer: components. Tool Options strip — shows settings for the active tool
+	// with Paint.NET-style sliders. The brush tools additionally expose an
+	// anti-aliased rendering toggle (IconSplitButton).
+	import { activeToolId, brushSize, brushOpacity, brushHardness, brushSpacing, antiAliasMode } from '../../state/ui';
+	import { get } from 'svelte/store';
+	import PdnSlider from '../common/PdnSlider.svelte';
+	import IconSplitButton from '../common/IconSplitButton.svelte';
 
 	const paintTools = new Set(['brush', 'pencil', 'eraser']);
 	const isPaint = $derived(paintTools.has($activeToolId));
+
+	const AA_OPTIONS = [
+		{
+			id: 'pixel',
+			icon: '🔲',
+			label: 'Pixel-Perfect',
+			description: 'Hard pixel edges — no anti-aliasing when painting'
+		},
+		{
+			id: 'smooth',
+			icon: '◐',
+			label: 'Smooth',
+			description: 'Soft anti-aliased edges (uses hardness)'
+		}
+	];
+
+	let aa = $state<string>('pixel');
+	$effect(() => {
+		aa = get(antiAliasMode);
+	});
+	$effect(() => {
+		antiAliasMode.set(aa as 'pixel' | 'smooth');
+	});
 </script>
 
 <div class="flex h-full w-full items-center gap-4 px-2 text-xs" style="color:var(--text-dim);">
-	<span class="font-semibold whitespace-nowrap" style="color:var(--text);">{labels[$activeToolId] ?? $activeToolId}</span>
-
 	{#if isPaint}
-		<label class="opt-field">
-			<span>Size</span>
-			<input type="range" min="1" max="300" bind:value={$brushSize} />
-			<span class="opt-val">{$brushSize}</span>
-		</label>
-		<label class="opt-field">
-			<span>Opacity</span>
-			<input type="range" min="0" max="100" step="1" bind:value={$brushOpacity} />
-			<span class="opt-val">{$brushOpacity}%</span>
-		</label>
-		<label class="opt-field">
-			<span>Hardness</span>
-			<input type="range" min="0" max="100" step="1" bind:value={$brushHardness} />
-			<span class="opt-val">{$brushHardness}%</span>
-		</label>
+		<PdnSlider label="Size" min={1} max={300} step={1} bind:value={$brushSize} />
+		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$brushOpacity} />
+		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$brushHardness} />
+		<PdnSlider label="Spacing" min={1} max={300} step={1} unit="%" bind:value={$brushSpacing} />
+		<span class="aa-label">Anti-alias:</span>
+		<IconSplitButton options={AA_OPTIONS} bind:value={aa} title="Anti-aliased rendering" />
 	{:else}
 		<span class="tooloptions-placeholder">No tool options for the selected tool yet.</span>
 	{/if}
