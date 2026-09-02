@@ -22,6 +22,7 @@
 		setRectSelection
 	} from '../../services/selectionService';
 	import { activeToolId, statusBar, brushSize, brushOpacity, brushHardness, brushSpacing, foregroundColor, backgroundColor, antiAliasMode } from '../../state/ui';
+	import { polygonAction } from '../../state/polygon';
 
 	const PAINT_TOOLS = new Set(['brush', 'pencil', 'eraser']);
 	const KIND: Record<string, 'brush' | 'pencil' | 'eraser'> = {
@@ -571,7 +572,14 @@
 			);
 			const unTool = activeToolId.subscribe(() => updateArmed());
 			const unSize = brushSize.subscribe(() => refreshRing());
-			disposers.push(unTool, unSize);
+			// Polygon-lasso options strip → finish/cancel requests.
+			const unPoly = polygonAction.subscribe((a) => {
+				if (!a) return;
+				if (a === 'finish') finishPolygon();
+				else cancelPolygon();
+				polygonAction.set(null);
+			});
+			disposers.push(unTool, unSize, unPoly);
 
 			const onEnter = () => {
 				pointerInside = true;
