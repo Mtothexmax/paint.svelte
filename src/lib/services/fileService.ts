@@ -120,6 +120,53 @@ export async function openFiles(fileList: FileList | File[]): Promise<void> {
 	}
 }
 
+/**
+ * Opens an image taken from the OS clipboard as a brand-new document. Reads the
+ * first image item (e.g. a screenshot or copied picture) and opens it in a new
+ * tab. Requires a secure context (https / localhost) for clipboard access.
+ */
+export async function openFromClipboard(): Promise<void> {
+	if (typeof navigator === 'undefined' || !navigator.clipboard?.read) {
+		showNotice('Clipboard access is not available here.', 'error');
+		return;
+	}
+	try {
+		const items = await navigator.clipboard.read();
+		for (const item of items) {
+			const type = item.types.find((t) => t.startsWith('image/'));
+			if (!type) continue;
+			const blob = await item.getType(type);
+			const bitmap = await createImageBitmap(blob);
+			const tooBig = bitmap.width > MAX_DIMENSION || bitmap.height > MAX_DIMENSION || bitmap.width * bitmap.height > 2 ** 26;
+			const v = validateSize(bitmap.width, bitmap.height, deviceMaxTextureSize() ?? undefined);
+			if (tooBig || !v.ok) {
+				bitmap.close();
+				showNotice('Clipboard image is too large.', 'error');
+				return;
+			}
+			const renderer = await rendererReady;
+			const w = bitmap.width;
+			const h = bitmap.height;
+			const surfaceId = renderer.surfaces.createFromBitmap(bitmap);
+			bitmap.close();
+			const doc = new ImageDocument({
+				name: 'Clipboard',
+				width: w,
+				height: h,
+				surfaceId,
+				view: initialView(w, h, renderer.viewWidth, renderer.viewHeight)
+			});
+			documentRegistry.open(doc);
+			showNotice('Opened image from clipboard.');
+			return;
+		}
+		showNotice('Clipboard contains no image.', 'error');
+	} catch (err) {
+		console.error(err);
+		showNotice('Could not read the clipboard.', 'error');
+	}
+}
+
 /** Exports the active document as PNG via a download. */
 export async function exportActiveDocument(): Promise<void> {
 	const doc = documentRegistry.active;

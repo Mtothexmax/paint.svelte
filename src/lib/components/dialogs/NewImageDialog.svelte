@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import { MAX_DIMENSION, MAX_PIXELS, formatBytes, surfaceBytes, validateSize } from '../../core/limits';
 	import { deviceMaxTextureSize } from '../../services/device';
-	import { createNewDocument } from '../../services/fileService';
+	import { createNewDocument, openFromClipboard } from '../../services/fileService';
 	import { closeDialog } from '../../services/dialogService';
 
 	const device = typeof window !== 'undefined' ? deviceMaxTextureSize() : null;
@@ -37,6 +37,12 @@
 		const bg: 'transparent' | string = background === 'transparent' ? 'transparent' : background === 'white' ? '#ffffff' : customColor;
 		const ok = await createNewDocument({ width, height, background: bg });
 		if (ok) closeDialog();
+	}
+
+	/** Creates a new document from an image currently on the OS clipboard. */
+	async function fromClipboard() {
+		await openFromClipboard();
+		closeDialog();
 	}
 
 	function onGlobalKey(e: KeyboardEvent) {
@@ -113,6 +119,9 @@
 		</div>
 
 		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => void fromClipboard()} title="Create a document from an image on the clipboard">
+				📋 From Clipboard…
+			</button>
 			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
 			<button class="btn-primary" disabled={!validation.ok} onclick={create}>Create</button>
 		</div>

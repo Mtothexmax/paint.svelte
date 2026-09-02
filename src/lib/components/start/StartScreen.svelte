@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { openFromPicker, openFiles } from '../../services/fileService';
+	import { openFromPicker, openFiles, openFromClipboard } from '../../services/fileService';
 	import { openDialog } from '../../services/dialogService';
 
 	let dragging = $state(false);
@@ -47,6 +47,7 @@
 
 	<div class="flex gap-3">
 		<button class="btn-primary" onclick={() => openDialog('newImage')}>New…</button>
+		<button class="btn-secondary" onclick={() => void openFromClipboard()}>From Clipboard…</button>
 		<button class="btn-secondary" onclick={() => openFromPicker()}>Open…</button>
 	</div>
 </div>
