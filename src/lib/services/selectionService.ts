@@ -10,7 +10,7 @@ import type { SurfaceId } from '../core/layers/Layer';
 import type { RGBA } from '../core/color';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import {
-	eraseSelectionRegion,
+	blitMaskedInto,
 	fillSelectionRegion,
 	fillShapeMask,
 	invertSelectionMask,
@@ -193,13 +193,23 @@ export function deleteSelection(): boolean {
 
 	// Surface-swap undo: never mutate the live layer surface in place.
 	const beforeId = layer.surfaceId;
-	const afterId: SurfaceId = surfaces.copyRegion(beforeId, {
-		x: 0,
-		y: 0,
-		width: doc.width,
-		height: doc.height
-	});
-	eraseSelectionRegion(surfaces, sel.maskId, afterId, doc.width, doc.height);
+
+	// Build a "keep" mask = the pixels that must SURVIVE the delete (everything
+	// NOT in the current selection). Rebuilding the result onto a fresh
+	// transparent surface from this mask guarantees the deleted region becomes
+	// exactly #00000000 — no premultiplied RGB residue from an 'erase' pass.
+	const keepId: SurfaceId = surfaces.create(doc.width, doc.height);
+	if (sel.inverted) {
+		// currently the complement is selected → keep the positive shape
+		fillShapeMask(surfaces, keepId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
+	} else {
+		// positive shape selected → keep the complement (doc minus shape)
+		invertSelectionMask(surfaces, keepId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
+	}
+	const afterId: SurfaceId = surfaces.create(doc.width, doc.height); // fully transparent
+	blitMaskedInto(surfaces, keepId, beforeId, afterId, 'normal', doc.width, doc.height);
+	surfaces.dispose(keepId);
+
 	layer.surfaceId = afterId;
 	renderer.rebuildActiveLayers();
 	doc.setDirty(true);
