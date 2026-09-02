@@ -18,10 +18,21 @@
 		fillSelection,
 		invertSelection,
 		selectAll,
-		setLassoSelection,
-		setRectSelection
+		applySelectionMode,
+		setLassoSelection
 	} from '../../services/selectionService';
-	import { activeToolId, statusBar, brushSize, brushOpacity, brushHardness, brushSpacing, foregroundColor, backgroundColor, antiAliasMode } from '../../state/ui';
+	import {
+		activeToolId,
+		statusBar,
+		brushSize,
+		brushOpacity,
+		brushHardness,
+		brushSpacing,
+		foregroundColor,
+		backgroundColor,
+		antiAliasMode,
+		selectionMode
+	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
 
 	const PAINT_TOOLS = new Set(['brush', 'pencil', 'eraser']);
@@ -63,6 +74,7 @@
 	let selecting = $state(false);
 	let selectPointerId = -1;
 	let selDownClient = { x: 0, y: 0 }; // screen px (click vs drag threshold)
+	let dragMode: 'replace' | 'add' | 'subtract' = 'replace'; // mode for the current drag
 	let selStart: Point | null = null; // image px
 	let lassoPts: Point[] = [];
 
@@ -378,11 +390,12 @@
 			polyClick(e);
 			return;
 		}
-		// Selection tools: LEFT drag defines a new selection; the draft outline
-		// is shown live and the mask is committed on pointer-up. A plain click
-		// (no travel) never commits — the previous selection (if any) stays.
-		if (e.button === 0 && selectionArmed && selectionToolKind()) {
-			console.log('[editor] pointerdown: selection tool', get(activeToolId), 'kind', selectionToolKind());
+		// Selection tools: a LEFT drag selects with the chosen mode (Ctrl = add,
+		// Alt = subtract, else the options-strip mode); a RIGHT-button drag always
+		// subtracts. The draft outline is shown live and committed on pointer-up.
+		if ((e.button === 0 || e.button === 2) && selectionArmed && selectionToolKind()) {
+			dragMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey ? 'add' : get(selectionMode);
+			console.log('[editor] pointerdown: selection tool', get(activeToolId), 'kind', selectionToolKind(), 'mode', dragMode);
 			e.preventDefault();
 			selecting = true;
 			selectPointerId = e.pointerId;
@@ -513,9 +526,9 @@
 		if (kind === 'lasso') {
 			const last = lassoPts[lassoPts.length - 1];
 			if (!last || Math.hypot(up.x - last.x, up.y - last.y) >= 1) lassoPts.push(up);
-			if (lassoPts.length >= 2) setLassoSelection(lassoPts);
+			if (lassoPts.length >= 2) applySelectionMode(dragMode, 'lasso', start, start, lassoPts);
 		} else if (Math.hypot(e.clientX - selDownClient.x, e.clientY - selDownClient.y) >= SELECT_DRAG_MIN) {
-			setRectSelection(kind, start, up);
+			applySelectionMode(dragMode, kind, start, up, []);
 		}
 		lassoPts = [];
 		// The draft wiped the committed ants — redraw whatever the model now says.

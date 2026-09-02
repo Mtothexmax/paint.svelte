@@ -22,6 +22,12 @@ export interface SelectionModel {
 	/** Doc-sized alpha mask surface handle (pixels owned by the render layer). */
 	maskId: SurfaceId | null;
 	/**
+	 * True once the selection was built from multiple add/subtract operations,
+	 * so it can no longer be described by one simple shape. The mask surface is
+	 * then the ONLY source of truth (Delete/Invert fall back to it).
+	 */
+	composite: boolean;
+	/**
 	 * True when the mask is the COMPLEMENT of `rect`/`points` (produced by
 	 * Invert Selection). The geometry fields still describe the pre-invert
 	 * shape; the renderer uses this flag to draw the complement outline
@@ -39,6 +45,7 @@ export function emptySelection(): SelectionModel {
 		points: null,
 		bounds: null,
 		maskId: null,
+		composite: false,
 		inverted: false
 	};
 }

@@ -14,9 +14,12 @@ import {
 	fillSelectionRegion,
 	fillShapeMask,
 	invertSelectionMask,
-	maskAll
+	maskAll,
+	subtractSelection,
+	unionSelection
 } from '../render/selection';
 import { clamp } from '../core/geometry';
+import { showNotice } from '../state/ui';
 
 function activeDoc(): ImageDocument | null {
 	return documentRegistry.active;
@@ -79,6 +82,7 @@ export function setRectSelection(kind: 'rect' | 'ellipse', a: Point, b: Point): 
 	sel.points = null;
 	sel.bounds = bounds;
 	sel.inverted = false;
+		sel.composite = false;
 	touch(doc);
 	return true;
 }
@@ -101,6 +105,7 @@ export function setLassoSelection(points: Point[]): boolean {
 	sel.points = snapped;
 	sel.bounds = bounds;
 	sel.inverted = false;
+		sel.composite = false;
 	touch(doc);
 	return true;
 }
@@ -119,6 +124,7 @@ export function selectAll(): boolean {
 	sel.points = null;
 	sel.bounds = { ...sel.rect };
 	sel.inverted = false;
+		sel.composite = false;
 	touch(doc);
 	return true;
 }
@@ -143,6 +149,10 @@ export function invertSelection(): boolean {
 	if (!doc || !hasEditorRenderer()) return false;
 	const sel = doc.selection;
 	if (!sel.active || !sel.maskId) return false;
+	if (sel.composite) {
+		showNotice('Invert Selection is not supported on a combined selection yet.');
+		return false;
+	}
 
 	const renderer = getEditorRenderer();
 	const surfaces = renderer.surfaces;
@@ -168,10 +178,71 @@ export function invertSelection(): boolean {
 		// Complement -> restore the positive shape.
 		fillShapeMask(surfaces, sel.maskId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
 		sel.inverted = false;
+		sel.composite = false;
 		sel.bounds = sel.rect && sel.rect.width > 0 ? { ...sel.rect } : null;
 	}
 
 	touch(doc);
+	return true;
+}
+
+/**
+ * Applies a selection gesture under the given mode. `mode='replace'` sets a new
+ * selection; `mode='add'` unions the new shape into the current selection;
+ * `mode='subtract'` removes it. Works for rect/ellipse (drag endpoints `a`,`b`)
+ * and lasso/polygon (`points`). Add/subtract produce a mask-authoritative
+ * (composite) selection.
+ */
+export function applySelectionMode(
+	mode: 'replace' | 'add' | 'subtract',
+	kind: 'rect' | 'ellipse' | 'lasso',
+	a: Point,
+	b: Point,
+	points: Point[]
+): boolean {
+	const doc = activeDoc();
+	if (!doc || !hasEditorRenderer()) return false;
+	const renderer = getEditorRenderer();
+	const surfaces = renderer.surfaces;
+
+	const rect = kind === 'lasso' ? null : normalizedRect(a, b);
+	const geomPts = kind === 'lasso' ? clampedPoints(points, doc) : null;
+	if (kind === 'lasso') {
+		if (!geomPts || geomPts.length < 2) return false;
+	} else if (!rect || rect.width < 1 || rect.height < 1) {
+		return false;
+	}
+
+	if (mode === 'replace') {
+		return kind === 'lasso' ? setLassoSelection(geomPts ?? []) : setRectSelection(kind, a, b);
+	}
+
+	const sel = doc.selection;
+	// No current selection yet → add acts like replace; subtract has nothing to remove.
+	if (!sel.active || !sel.maskId || !surfaces.has(sel.maskId)) {
+		if (mode === 'subtract') {
+			showNotice('Nothing to subtract from.');
+			return false;
+		}
+		return kind === 'lasso' ? setLassoSelection(geomPts ?? []) : setRectSelection(kind, a, b);
+	}
+
+	const cur = sel.maskId;
+	const newMask =
+		mode === 'add'
+			? unionSelection(surfaces, cur, doc.width, doc.height, kind, rect, geomPts)
+			: subtractSelection(surfaces, cur, doc.width, doc.height, kind, rect, geomPts);
+
+	sel.maskId = newMask;
+	sel.composite = true;
+	sel.inverted = false;
+	sel.active = true;
+	sel.rect = kind === 'lasso' ? null : rect;
+	sel.points = kind === 'lasso' ? geomPts : null;
+	sel.bounds = { x: 0, y: 0, width: doc.width, height: doc.height };
+
+	touch(doc);
+	if (cur !== newMask && surfaces.has(cur)) surfaces.dispose(cur);
 	return true;
 }
 
@@ -185,6 +256,10 @@ export function deleteSelection(): boolean {
 	if (!doc || !hasEditorRenderer()) return false;
 	const sel = doc.selection;
 	if (!sel.active || !sel.maskId) return false;
+	if (sel.composite) {
+		showNotice('Delete is not supported on a combined selection yet.');
+		return false;
+	}
 	const layer = doc.activeLayer;
 	if (!layer) return false;
 

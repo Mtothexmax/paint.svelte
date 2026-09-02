@@ -73,6 +73,12 @@ export const brushSpacing = writable(15); // percent of brush size (Paint.NET st
  * applies) vs 'pixel' (hard, pixel-crisp edges at the full brush size). */
 export const antiAliasMode = writable<'pixel' | 'smooth'>('smooth');
 
+/** Selection tool add/subtract mode (Paint.NET): new replaces, add unions,
+ * subtract removes from the current selection. The keyboard (Ctrl/Alt) and the
+ * right mouse button override it per gesture. */
+export type SelectionMode = 'replace' | 'add' | 'subtract';
+export const selectionMode = writable<SelectionMode>('replace');
+
 export function cycleBrushSize(delta: number): void {
 	brushSize.update((v) => clamp(Math.round(v + delta), 1, 400));
 }

@@ -1,9 +1,17 @@
 <script lang="ts">
 	// Layer: components. Tool Options strip — shows settings for the active tool.
-	// The brush tools expose Paint.NET-style sliders; the lasso tool exposes a
-	// Freehand/Polygon mode switch (plus a "Finish" action while drawing a
-	// polygon), mirroring the selection tools.
-	import { activeToolId, brushSize, brushOpacity, brushHardness, brushSpacing, antiAliasMode } from '../../state/ui';
+	// Brush tools: Paint.NET-style sliders + anti-alias toggle. Selection tools:
+	// a Replace/Add/Subtract mode switch; the lasso family additionally exposes a
+	// Freehand/Polygon mode switch and a Finish action while drawing a polygon.
+	import {
+		activeToolId,
+		brushSize,
+		brushOpacity,
+		brushHardness,
+		brushSpacing,
+		antiAliasMode,
+		selectionMode
+	} from '../../state/ui';
 	import { get } from 'svelte/store';
 	import { requestPolygonFinish } from '../../state/polygon';
 	import PdnSlider from '../common/PdnSlider.svelte';
@@ -11,6 +19,9 @@
 
 	const paintTools = new Set(['brush', 'pencil', 'eraser']);
 	const isPaint = $derived(paintTools.has($activeToolId));
+
+	const selectionTools = new Set(['select-rect', 'select-ellipse', 'lasso', 'select-poly']);
+	const isSelection = $derived(selectionTools.has($activeToolId));
 
 	// Lasso family: Freehand lasso ('lasso') or Polygon lasso ('select-poly').
 	const lassoTools = new Set(['lasso', 'select-poly']);
@@ -48,28 +59,57 @@
 		<PdnSlider label="Spacing" min={1} max={300} step={1} unit="%" bind:value={$brushSpacing} />
 		<span class="aa-label">Anti-alias:</span>
 		<IconSplitButton options={AA_OPTIONS} bind:value={aa} title="Anti-aliased rendering" />
-	{:else if isLasso}
+	{:else if isSelection}
 		<span class="aa-label">Mode:</span>
 		<div class="seg">
 			<button
 				class="seg-btn"
-				class:on={$activeToolId === 'lasso'}
-				onclick={() => activeToolId.set('lasso')}
+				class:on={$selectionMode === 'replace'}
+				title="Replace the selection"
+				onclick={() => selectionMode.set('replace')}
 			>
-				Freehand
+				⛶ Replace
 			</button>
 			<button
 				class="seg-btn"
-				class:on={$activeToolId === 'select-poly'}
-				onclick={() => activeToolId.set('select-poly')}
+				class:on={$selectionMode === 'add'}
+				title="Add to the selection"
+				onclick={() => selectionMode.set('add')}
 			>
-				Polygon
+				+ Add
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$selectionMode === 'subtract'}
+				title="Subtract from the selection"
+				onclick={() => selectionMode.set('subtract')}
+			>
+				− Subtract
 			</button>
 		</div>
-		{#if $activeToolId === 'select-poly'}
-			<button class="mini-btn" onclick={requestPolygonFinish} title="Finish the polygon selection">
-				✓ Finish
-			</button>
+		{#if isLasso}
+			<span class="aa-label">Tool:</span>
+			<div class="seg">
+				<button
+					class="seg-btn"
+					class:on={$activeToolId === 'lasso'}
+					onclick={() => activeToolId.set('lasso')}
+				>
+					Freehand
+				</button>
+				<button
+					class="seg-btn"
+					class:on={$activeToolId === 'select-poly'}
+					onclick={() => activeToolId.set('select-poly')}
+				>
+					Polygon
+				</button>
+			</div>
+			{#if $activeToolId === 'select-poly'}
+				<button class="mini-btn" onclick={requestPolygonFinish} title="Finish the polygon selection">
+					✓ Finish
+				</button>
+			{/if}
 		{/if}
 	{:else}
 		<span class="tooloptions-placeholder">No tool options for the selected tool yet.</span>

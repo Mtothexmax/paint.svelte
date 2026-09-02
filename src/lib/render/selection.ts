@@ -262,3 +262,54 @@ export function selectionOutlinePoints(kind: SelectionKind, rect: Rect | null, p
 		{ x: rect.x, y: rect.y + rect.height }
 	];
 }
+
+/** Renders the white selection shape onto an existing mask surface (no wipe):
+ * used to ADD the shape to whatever is currently selected. */
+function addShapeToMask(surfaces: SurfaceStore, destId: SurfaceId, kind: SelectionKind, rect: Rect | null, points: Point[] | null): void {
+	const g = new Graphics();
+	if (addShapePath(g, kind, rect, points)) {
+		g.fill(WHITE);
+		surfaces.renderInto(surfaces.getTexture(destId), g, false);
+	}
+	g.destroy();
+}
+
+/** Returns a NEW surface = current selection ∪ shape (union). */
+export function unionSelection(
+	surfaces: SurfaceStore,
+	currentMaskId: SurfaceId,
+	width: number,
+	height: number,
+	kind: SelectionKind,
+	rect: Rect | null,
+	points: Point[] | null
+): SurfaceId {
+	// complement of the shape (white = everything except the shape)
+	const compShape = surfaces.create(width, height);
+	invertSelectionMask(surfaces, compShape, width, height, kind, rect, points);
+	// keep only the current content that lies OUTSIDE the shape …
+	const out = surfaces.create(width, height);
+	blitMaskedInto(surfaces, compShape, currentMaskId, out, 'normal', width, height);
+	surfaces.dispose(compShape);
+	// … then add the shape back → current ∪ shape.
+	addShapeToMask(surfaces, out, kind, rect, points);
+	return out;
+}
+
+/** Returns a NEW surface = current selection − shape (difference). */
+export function subtractSelection(
+	surfaces: SurfaceStore,
+	currentMaskId: SurfaceId,
+	width: number,
+	height: number,
+	kind: SelectionKind,
+	rect: Rect | null,
+	points: Point[] | null
+): SurfaceId {
+	const compShape = surfaces.create(width, height);
+	invertSelectionMask(surfaces, compShape, width, height, kind, rect, points);
+	const out = surfaces.create(width, height);
+	blitMaskedInto(surfaces, compShape, currentMaskId, out, 'normal', width, height);
+	surfaces.dispose(compShape);
+	return out;
+}
