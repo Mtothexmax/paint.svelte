@@ -29,12 +29,14 @@
 		pencil: 'pencil',
 		eraser: 'eraser'
 	};
-	const SELECT_TOOLS = new Set(['select-rect', 'select-ellipse', 'lasso']);
+	const SELECT_TOOLS = new Set(['select-rect', 'select-ellipse', 'lasso', 'select-poly']);
 	const SELECT_KIND: Record<string, 'rect' | 'ellipse' | 'lasso'> = {
 		'select-rect': 'rect',
 		'select-ellipse': 'ellipse',
 		lasso: 'lasso'
 	};
+	/** Polygon-lasso tool (click to place vertices). */
+	const isPolyTool = () => get(activeToolId) === 'select-poly';
 	/** Minimum pointer travel (screen px) before a selection drag commits. */
 	const SELECT_DRAG_MIN = 3;
 	// debug: last tool id that was logged (avoid console spam)
@@ -62,6 +64,10 @@
 	let selDownClient = { x: 0, y: 0 }; // screen px (click vs drag threshold)
 	let selStart: Point | null = null; // image px
 	let lassoPts: Point[] = [];
+
+	// polygon-lasso state (click to place vertices)
+	let polyPts: Point[] = [];
+	let polyBuilding = false;
 
 	// Paint.NET-style brush preview: an outline circle of the brush size (scaled
 	// with the current zoom) follows the pointer. While it is shown the OS
@@ -128,6 +134,8 @@
 				hasDoc
 			);
 		}
+		// Leaving the polygon tool mid-edit cancels the in-progress polygon.
+		if (polyBuilding && get(activeToolId) !== 'select-poly') cancelPolygon();
 	}
 
 	/** Recomputes the ring radius from the brush size and the current zoom
@@ -160,8 +168,18 @@
 		// selection (Paint.NET behaviour). Guarded against typing inputs and
 		// open modal dialogs so it never steals Escape from them.
 		if (e.key === 'Escape' && !typing && !get(dialog).kind) {
+			if (polyBuilding) {
+				cancelPolygon();
+				return;
+			}
 			if (selecting) cancelSelectDrag();
 			if (documentRegistry.active?.selection.active) deselect();
+			return;
+		}
+		// Enter finishes an in-progress polygon-lasso selection.
+		if (polyBuilding && e.key === 'Enter' && !typing && !get(dialog).kind) {
+			e.preventDefault();
+			finishPolygon();
 			return;
 		}
 		// Undo / Redo and the selection commands — handled here directly
@@ -293,6 +311,47 @@
 		if (ready) getEditorRenderer().refreshActiveSelection();
 	}
 
+	// --- polygon lasso (click to place vertices) ---------------------------
+
+	/** Live draft preview of the polygon built so far (plus the current pointer). */
+	function showPolyOutline(cur?: Point): void {
+		if (!ready || !polyBuilding || polyPts.length === 0) return;
+		const pts = cur ? [...polyPts, cur] : polyPts;
+		getEditorRenderer().previewSelectionOutline(pts.length >= 2 ? [pts] : null, false);
+	}
+
+	/** Adds a vertex on a (single) click. A double-click finishes the polygon. */
+	function polyClick(e: PointerEvent): void {
+		const img = imageFromScreen(screenPoint(e));
+		// A double click = finishing gesture; do NOT add its point as a vertex.
+		if (polyBuilding && e.detail >= 2 && polyPts.length >= 2) {
+			finishPolygon();
+			return;
+		}
+		if (!polyBuilding) {
+			polyPts = [];
+			polyBuilding = true;
+			getEditorRenderer().previewSelectionOutline(null, false);
+		}
+		polyPts.push(img);
+		showPolyOutline();
+	}
+
+	/** Commits the polygon as a lasso selection and clears the draft. */
+	function finishPolygon(): void {
+		if (polyPts.length >= 2) setLassoSelection(polyPts);
+		polyPts = [];
+		polyBuilding = false;
+		if (ready) getEditorRenderer().refreshActiveSelection();
+	}
+
+	/** Cancels the in-progress polygon (the committed selection, if any, stays). */
+	function cancelPolygon(): void {
+		polyPts = [];
+		polyBuilding = false;
+		if (ready) getEditorRenderer().refreshActiveSelection();
+	}
+
 	function onPointerDown(e: PointerEvent) {
 		if (!ready) return;
 		movePointer(screenPoint(e));
@@ -310,6 +369,12 @@
 			} catch {
 				/* ignore */
 			}
+			return;
+		}
+		// Polygon lasso: left clicks place vertices; double-click finishes.
+		if (e.button === 0 && selectionArmed && isPolyTool()) {
+			e.preventDefault();
+			polyClick(e);
 			return;
 		}
 		// Selection tools: LEFT drag defines a new selection; the draft outline
@@ -366,6 +431,9 @@
 		const sp = screenPoint(e);
 		const doc = documentRegistry.active;
 		if (ready && doc) {
+			if (polyBuilding && isPolyTool() && !panning) {
+				showPolyOutline(imageFromScreen(sp)); // live polygon preview follows the pointer
+			}
 			if (panning && e.pointerId === panPointerId) {
 				doc.view.panX = panStartView.panX + (e.clientX - panStart.x);
 				doc.view.panY = panStartView.panY + (e.clientY - panStart.y);
