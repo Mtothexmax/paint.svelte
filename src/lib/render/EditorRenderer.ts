@@ -2,14 +2,14 @@
 // surface store and view reconciliation. This is the ONLY place pixi is wired
 // to the app lifecycle.
 
-import { Application } from 'pixi.js';
+import { Application, Sprite } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry, RegistryEvents } from '../core/document/registry';
 import type { Point } from '../core/geometry';
 import type { SurfaceId } from '../core/layers/Layer';
 import { DocScene } from './DocScene';
 import { SurfaceStore } from './SurfaceStore';
-import { selectionOutlinePoints } from './selection';
+import { selectionOutlinePoints, traceSelectionOutline } from './selection';
 
 type DocId = string;
 
@@ -176,8 +176,13 @@ export class EditorRenderer {
 	 * selection boundary is visible. */
 	private selectionOutlineLoops(doc: ImageDocument): Point[][] | null {
 		const sel = doc.selection;
-		const geometry = selectionOutlinePoints(sel.kind, sel.rect, sel.points);
 		const loops: Point[][] = [];
+		// Composite (mask-derived) selections use the traced outline loops.
+		if (sel.composite) {
+			if (sel.outlineLoops?.length) loops.push(...sel.outlineLoops);
+			return loops.length ? loops : null;
+		}
+		const geometry = selectionOutlinePoints(sel.kind, sel.rect, sel.points);
 		if (geometry.length) loops.push(geometry);
 		if (sel.inverted) {
 			loops.push([
@@ -188,6 +193,21 @@ export class EditorRenderer {
 			]);
 		}
 		return loops.length ? loops : null;
+	}
+
+	/** Reads a mask surface back to the CPU and returns its outline loops — used
+	 * for composite (add/subtract) selections that have no single geometric
+	 * shape, so the marching-ants outline can still be drawn around the exact
+	 * selected region. */
+	computeMaskOutline(maskId: SurfaceId, width: number, height: number): Point[][] {
+		if (!this.app) return [];
+		const sprite = new Sprite(this.surfaces.getTexture(maskId));
+		const canvas = this.app.renderer.extract.canvas(sprite);
+		sprite.destroy();
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return [];
+		const data = ctx.getImageData(0, 0, width, height).data;
+		return traceSelectionOutline(data, width, height);
 	}
 
 	/** Temporary live filter preview on the active layer (effect dialogs). */

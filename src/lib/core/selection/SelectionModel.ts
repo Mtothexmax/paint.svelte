@@ -19,6 +19,9 @@ export interface SelectionModel {
 	points: Point[] | null;
 	/** Integer bounding box of the selection, clamped to the document. */
 	bounds: Rect | null;
+	/** Outline loops (image px) drawn as the ants when the selection is a
+	 * composite (mask-derived) region without a single shape. Null otherwise. */
+	outlineLoops: Point[][] | null;
 	/** Doc-sized alpha mask surface handle (pixels owned by the render layer). */
 	maskId: SurfaceId | null;
 	/**
@@ -44,6 +47,7 @@ export function emptySelection(): SelectionModel {
 		rect: null,
 		points: null,
 		bounds: null,
+		outlineLoops: null,
 		maskId: null,
 		composite: false,
 		inverted: false

@@ -263,8 +263,7 @@ export function selectionOutlinePoints(kind: SelectionKind, rect: Rect | null, p
 	];
 }
 
-/** Renders the white selection shape onto an existing mask surface (no wipe):
- * used to ADD the shape to whatever is currently selected. */
+/** Renders the white selection shape onto an existing mask surface (no wipe) — used to ADD a shape. */
 function addShapeToMask(surfaces: SurfaceStore, destId: SurfaceId, kind: SelectionKind, rect: Rect | null, points: Point[] | null): void {
 	const g = new Graphics();
 	if (addShapePath(g, kind, rect, points)) {
@@ -311,5 +310,98 @@ export function subtractSelection(
 	const out = surfaces.create(width, height);
 	blitMaskedInto(surfaces, compShape, currentMaskId, out, 'normal', width, height);
 	surfaces.dispose(compShape);
+	return out;
+}
+
+/**
+ * Traces the closed outline loops of a selection from its mask's alpha channel
+ * (RGBA data, one pixel per 4 bytes). The mask region can be any composite of
+ * add/subtract shapes, so we walk the axis-aligned pixel boundary between
+ * inside and outside pixels, chain the unit segments into closed loops and
+ * merge collinear runs. Returns loops in image-pixel coordinates (the shared
+ * ant outline used when the selection has no single geometric shape).
+ */
+export function traceSelectionOutline(rgba: Uint8ClampedArray, width: number, height: number): Point[][] {
+	const W = width;
+	const H = height;
+	// boundary segments live on integer grid lines between an inside and an
+	// outside cell. Each segment is stored under both endpoint keys for chaining.
+	type Seg = { x1: number; y1: number; x2: number; y2: number };
+	const segs: Seg[] = [];
+	const isIn = (x: number, y: number): boolean => {
+		if (x < 0 || y < 0 || x >= W || y >= H) return false;
+		return rgba[(y * W + x) * 4 + 3] > 80;
+	};
+	// For every inside cell, the unit edge to each outside neighbour.
+	for (let y = 0; y < H; y++) {
+		for (let x = 0; x < W; x++) {
+			if (!isIn(x, y)) continue;
+			if (!isIn(x, y - 1)) segs.push({ x1: x, y1: y, x2: x + 1, y2: y }); // top
+			if (!isIn(x + 1, y)) segs.push({ x1: x + 1, y1: y, x2: x + 1, y2: y + 1 }); // right
+			if (!isIn(x, y + 1)) segs.push({ x1: x, y1: y + 1, x2: x + 1, y2: y + 1 }); // bottom
+			if (!isIn(x - 1, y)) segs.push({ x1: x, y1: y, x2: x, y2: y + 1 }); // left
+		}
+	}
+	if (!segs.length) return [];
+
+	// adjacency from endpoint key -> list of segment ids
+	const key = (x: number, y: number) => `${x},${y}`;
+	const adj = new Map<string, number[]>();
+	const addAdj = (k: string, i: number) => {
+		const list = adj.get(k);
+		if (list) list.push(i);
+		else adj.set(k, [i]);
+	};
+	segs.forEach((s, i) => {
+		addAdj(key(s.x1, s.y1), i);
+		addAdj(key(s.x2, s.y2), i);
+	});
+	const used = new Array<boolean>(segs.length).fill(false);
+	const loops: Point[][] = [];
+
+	for (let start = 0; start < segs.length; start++) {
+		if (used[start]) continue;
+		// walk a loop from segs[start]
+		let cur = start;
+		const pts: Point[] = [];
+		const seenInLoop = new Set<number>();
+		let guard = 0;
+		while (!used[cur] && !seenInLoop.has(cur) && guard++ < segs.length * 2) {
+			used[cur] = true;
+			seenInLoop.add(cur);
+			const s = segs[cur];
+			pts.push({ x: s.x1, y: s.y1 });
+			// choose the other endpoint to continue from
+			let nextX = s.x2;
+			let nextY = s.y2;
+			const candidates = adj.get(key(nextX, nextY)) ?? [];
+			const next = candidates.find((i) => i !== cur && !used[i] && !seenInLoop.has(i));
+			if (next === undefined) break;
+			cur = next;
+		}
+		if (pts.length > 2) {
+			// close the loop back to the first point
+			pts.push({ x: pts[0].x, y: pts[0].y });
+			loops.push(mergeCollinear(pts));
+		}
+	}
+	return loops;
+}
+
+/** Removes colinear points from an orthogonal polyline loop. */
+function mergeCollinear(pts: Point[]): Point[] {
+	if (pts.length < 3) return pts;
+	const out: Point[] = [];
+	for (let i = 0; i < pts.length; i++) {
+		const prev = pts[(i - 1 + pts.length) % pts.length];
+		const cur = pts[i];
+		const next = pts[(i + 1) % pts.length];
+		const dx1 = cur.x - prev.x;
+		const dy1 = cur.y - prev.y;
+		const dx2 = next.x - cur.x;
+		const dy2 = next.y - cur.y;
+		const colinear = dx1 * dy2 === dy1 * dx2; // parallel
+		if (!colinear) out.push(cur);
+	}
 	return out;
 }
