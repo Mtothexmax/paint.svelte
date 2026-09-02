@@ -70,8 +70,13 @@ export class DocScene {
 	private crisp = false;
 
 	// --- selection overlay state ----------------------------------------
-	/** Top-most overlay drawing the selection ants / transient tool drafts. */
-	private selectionOverlay = new Graphics();
+	/** Always the LAST child of `root`: a group holding the translucent blue
+	 * selection indicator (tint) below the dashed ants outline. */
+	private top = new Container();
+	/** Dashed ants / transient tool-draft outline (image space). */
+	private ants = new Graphics();
+	/** Translucent blue veil showing exactly what is selected (mask texture). */
+	private tintSprite: Sprite | null = null;
 	/** Outline currently displayed (image-space loops); re-stroked on zoom. */
 	private outlineLoops: Point[][] | null = null;
 	private outlineDashed = true;
@@ -91,7 +96,18 @@ export class DocScene {
 		this.checker.roundPixels = false;
 		this.root.addChild(this.checker);
 		this.rebuildLayers(surfaces);
+		this.top.addChild(this.ants);
+		this.root.addChild(this.top);
+		this.raiseTop();
 		this.applyView(doc.view.zoom, doc.view.panX, doc.view.panY);
+	}
+
+	/** Keeps the selection-overlay group the last child of `root`, i.e. above
+	 * every layer sprite and the live-stroke overlay. */
+	private raiseTop(): void {
+		if (this.top.parent !== this.root) this.root.addChild(this.top);
+		this.root.removeChild(this.top);
+		this.root.addChild(this.top);
 	}
 
 	private rebuildLayers(surfaces: SurfaceStore): void {
@@ -108,7 +124,7 @@ export class DocScene {
 			return sprite;
 		});
 		if (this.strokeOverlay) this.root.addChild(this.strokeOverlay); // keep stroke on top
-		if (this.selectionOverlay) this.root.addChild(this.selectionOverlay); // ants above everything
+		this.raiseTop(); // selection indicator + ants stay above everything
 	}
 
 	/** Rebuilds layer sprites after a surface swap (e.g. after an effect). */
@@ -128,10 +144,10 @@ export class DocScene {
 				this.strokeBuffer.source.style.update();
 			}
 			this.root.addChild(this.strokeOverlay);
-			this.root.addChild(this.selectionOverlay); // ants stay on top of the live stroke
 			// A selection may already be active when the overlay is created —
 			// apply the pending clip texture now.
 			if (this.strokeClipTexture) this.applyStrokeClip(this.strokeClipTexture);
+			this.raiseTop();
 		}
 		return { target: this.strokeBuffer, overlay: this.strokeOverlay };
 	}
@@ -227,17 +243,17 @@ export class DocScene {
 
 	/** (Re)strokes the stored outline at the current zoom. */
 	private strokeOutline(): void {
-		this.selectionOverlay.clear();
+		this.ants.clear();
 		const loops = this.outlineLoops;
 		if (!loops) return;
 		const z = Math.max(this.zoom, 1e-4);
 		const pass = (color: number, widthScreen: number) => {
 			for (const loop of loops) {
 				if (!loop || loop.length < 2) continue;
-				if (this.outlineDashed) addDashedLoop(this.selectionOverlay, loop, ANT_DASH_ON_SCREEN / z, ANT_DASH_OFF_SCREEN / z);
-				else addClosedLoop(this.selectionOverlay, loop);
+				if (this.outlineDashed) addDashedLoop(this.ants, loop, ANT_DASH_ON_SCREEN / z, ANT_DASH_OFF_SCREEN / z);
+				else addClosedLoop(this.ants, loop);
 			}
-			this.selectionOverlay.stroke({
+			this.ants.stroke({
 				width: widthScreen / z,
 				color,
 				alpha: 1,
@@ -247,6 +263,33 @@ export class DocScene {
 		};
 		pass(0xffffff, ANT_HALO_SCREEN); // white halo underneath
 		pass(0x111111, ANT_CORE_SCREEN); // dark core on top
+	}
+
+	/**
+	 * Shows/hides the translucent blue veil that indicates the selected region
+	 * (Paint.NET style). The indicator samples the selection-mask texture: it is
+	 * a light-blue tint over exactly the pixels that are selected, which makes
+	 * donut/complement selections obvious.
+	 */
+	setSelectionTint(texture: Texture | null): void {
+		if (!texture) {
+			if (this.tintSprite) {
+				this.top.removeChild(this.tintSprite);
+				this.tintSprite.destroy();
+				this.tintSprite = null;
+				this.raiseTop();
+			}
+			return;
+		}
+		if (!this.tintSprite) {
+			this.tintSprite = new Sprite(texture);
+			this.tintSprite.tint = 0x8fc7ff; // light blue veil
+			this.tintSprite.alpha = 0.32;
+			this.top.addChildAt(this.tintSprite, 0); // below the ants outline
+			this.raiseTop();
+		} else {
+			this.tintSprite.texture = texture;
+		}
 	}
 
 	/**

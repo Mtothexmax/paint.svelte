@@ -151,12 +151,14 @@ export class EditorRenderer {
 		if (!sel.active) {
 			scene.showSelectionOutline(null, true);
 			scene.setStrokeClipTexture(null);
+			scene.setSelectionTint(null);
 			return;
 		}
 		const loops = this.selectionOutlineLoops(doc);
 		scene.showSelectionOutline(loops, true);
 		const maskTex = sel.maskId && this.surfaces.has(sel.maskId) ? this.surfaces.getTexture(sel.maskId) : null;
 		scene.setStrokeClipTexture(maskTex);
+		scene.setSelectionTint(maskTex);
 	}
 
 	/**

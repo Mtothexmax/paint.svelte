@@ -128,10 +128,10 @@ export function invertSelectionMask(
 
 /**
  * Erases (destination-out) the pixels inside the selection of `destId` (a
- * doc-sized surface). A scratch surface is filled with WHITE only where the
- * selection mask is set (Sprite AlphaMask), then that scratch is blended into
- * `destId` with 'erase' — pixels outside the selection are untouched, pixels
- * inside become fully transparent.
+ * doc-sized surface). The selection MASK itself is used as the erase source, so
+ * holes are respected exactly (e.g. a donut/complement selection only clears
+ * its ring, never the hole). Premultiplied masking through an intermediate
+ * scratch is unnecessary — dest-out already keys off the mask's alpha.
  */
 export function eraseSelectionRegion(
 	surfaces: SurfaceStore,
@@ -140,19 +140,10 @@ export function eraseSelectionRegion(
 	width: number,
 	height: number
 ): void {
-	const scratchId = surfaces.create(width, height);
-	const holder = new Container();
-	const white = new Graphics();
-	white.rect(0, 0, width, height).fill(WHITE);
-	const maskSprite = new Sprite(surfaces.getTexture(maskId));
-	maskSprite.position.set(0, 0);
-	holder.addChild(white);
-	holder.addChild(maskSprite);
-	holder.mask = maskSprite;
-	surfaces.renderInto(surfaces.getTexture(scratchId), holder, true);
-	holder.destroy({ children: true });
-	surfaces.blitRegion(scratchId, destId, 0, 0, 'erase', 1);
-	surfaces.dispose(scratchId);
+	// width/height are informational (the surfaces are doc-sized).
+	void width;
+	void height;
+	surfaces.blitRegion(maskId, destId, 0, 0, 'erase', 1);
 }
 
 /**
