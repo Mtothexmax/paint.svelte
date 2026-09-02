@@ -85,7 +85,7 @@
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
 
-	const isPaintTool = () => PAINT_TOOLS.has($activeToolId) && !!documentRegistry.active;
+	const isPaintTool = () => PAINT_TOOLS.has(get(activeToolId)) && !!documentRegistry.active;
 
 	function screenPoint(e: { clientX: number; clientY: number }) {
 		const rect = host.getBoundingClientRect();
@@ -110,16 +110,16 @@
 	/** Re-evaluates whether a paint tool is armed (tool + open document). */
 	function updateArmed(): void {
 		const hasDoc = !!documentRegistry.active;
-		paintArmed = PAINT_TOOLS.has($activeToolId) && hasDoc;
-		selectionArmed = SELECT_TOOLS.has($activeToolId) && hasDoc;
+		paintArmed = PAINT_TOOLS.has(get(activeToolId)) && hasDoc;
+		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
 		refreshRing();
 		// Debug: only log when the ACTIVE TOOL actually changed (not on every
 		// pointer event), so we can see why switching tools misbehaves.
-		if (lastLoggedTool !== $activeToolId) {
-			lastLoggedTool = $activeToolId;
+		if (lastLoggedTool !== get(activeToolId)) {
+			lastLoggedTool = get(activeToolId);
 			console.log(
 				'[tool] active=',
-				$activeToolId,
+				get(activeToolId),
 				'paintArmed=',
 				paintArmed,
 				'selectionArmed=',
@@ -256,7 +256,7 @@
 	// --- selection tools (rect / ellipse / lasso) -------------------------
 
 	function selectionToolKind(): 'rect' | 'ellipse' | 'lasso' | null {
-		const kind = SELECT_KIND[$activeToolId];
+		const kind = SELECT_KIND[get(activeToolId)];
 		return kind ?? null;
 	}
 
@@ -314,7 +314,7 @@
 		// is shown live and the mask is committed on pointer-up. A plain click
 		// (no travel) never commits — the previous selection (if any) stays.
 		if (e.button === 0 && selectionArmed && selectionToolKind()) {
-			console.log('[editor] pointerdown: selection tool', $activeToolId, 'kind', selectionToolKind());
+			console.log('[editor] pointerdown: selection tool', get(activeToolId), 'kind', selectionToolKind());
 			e.preventDefault();
 			selecting = true;
 			selectPointerId = e.pointerId;
@@ -347,7 +347,7 @@
 			const color = e.button === 2 ? get(backgroundColor) : get(foregroundColor);
 			engine.begin(
 				{
-					kind: KIND[$activeToolId] ?? 'brush',
+					kind: KIND[get(activeToolId)] ?? 'brush',
 					size: get(brushSize),
 					opacity: get(brushOpacity) / 100,
 					hardness: get(brushHardness) / 100,
@@ -375,7 +375,7 @@
 			}
 			if (selecting && e.pointerId === selectPointerId && selStart) {
 				const img = imageFromScreen(sp);
-				if ($activeToolId === 'lasso') {
+				if (get(activeToolId) === 'lasso') {
 					const last = lassoPts[lassoPts.length - 1];
 					if (!last || Math.hypot(img.x - last.x, img.y - last.y) >= 1) {
 						lassoPts.push(img);
