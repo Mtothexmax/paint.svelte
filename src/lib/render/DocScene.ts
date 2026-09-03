@@ -294,6 +294,15 @@ export class DocScene {
 		} else {
 			this.tintSprite.texture = texture;
 		}
+		// a fresh mask texture is anchored at the origin — any offset applied
+		// while a floating selection was dragged no longer applies
+		this.tintSprite.position.set(0, 0);
+	}
+
+	/** Offsets the blue veil (image px) so it travels with a floating selection
+	 * while the Move tool drags it; reset by the next setSelectionTint call. */
+	setSelectionTintOffset(x: number, y: number): void {
+		if (this.tintSprite) this.tintSprite.position.set(x, y);
 	}
 
 	/**

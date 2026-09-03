@@ -176,6 +176,12 @@ export class EditorRenderer {
 		this.activeScene?.setFloatingTexture(texture, x, y);
 	}
 
+	/** Offsets the blue selection veil so it travels with the floating
+	 * selection while the Move tool drags it. */
+	setActiveTintOffset(x: number, y: number): void {
+		this.activeScene?.setSelectionTintOffset(x, y);
+	}
+
 	/** Live ants preview shifted by (dx,dy) — drawn while the Move tool drags
 	 * the selection content, so the outline travels with the floating pixels
 	 * until the commit refreshes the selection from the model. */

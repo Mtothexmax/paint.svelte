@@ -1,10 +1,14 @@
-// Layer: render (pixi). Move-tool engine. Lifts the selected pixels of the
-// active layer into a floating preview (through the selection mask) and erases
-// them from the layer while the user drags; on release the gesture is committed
-// as ONE undoable step: layer pixels moved + selection (mask + geometry) moved
-// by the same offset. Works for any selection the mask can express — simple
-// shapes, complements (donuts) and combined add/subtract regions.
+// Layer: render (pixi). Move-tool engine, Paint.NET style: the first drag
+// INSIDE the selection lifts the selected pixels into a floating preview
+// (through the mask) and erases them from the layer; the floating content can
+// then be re-dragged any number of times. NOTHING is written to the document
+// until the selection is DROPPED — click outside the selection, Enter, or a
+// tool switch — which commits pixels + selection (mask + geometry) as ONE
+// undoable step. Escape cancels and restores the original state. Works for
+// any selection the mask can express: simple shapes, complements (donuts) and
+// combined add/subtract regions.
 
+import { Rectangle, Sprite } from 'pixi.js';
 import type { Point, Rect } from '../core/geometry';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
@@ -17,38 +21,62 @@ export type MoveBeginResult = 'ok' | 'none';
 export class MoveEngine {
 	private renderer: EditorRenderer;
 
-	// gesture state (all null while idle)
+	// session state — valid while `active` (floating or being dragged)
 	private doc: ImageDocument | null = null;
 	private layer: Layer | null = null;
 	private beforeId: SurfaceId | null = null;
 	private erasedId: SurfaceId | null = null;
 	private floatingId: SurfaceId | null = null;
 	private bounds: Rect | null = null;
-	private origin: Point | null = null; // pointer start, image px
 	private offset: Point = { x: 0, y: 0 };
+
+	// drag-in-flight state
+	private origin: Point | null = null; // press point of the current drag
+	private baseOffset: Point = { x: 0, y: 0 }; // offset when the drag started
 	private active = false;
 
 	constructor(renderer: EditorRenderer) {
 		this.renderer = renderer;
 	}
 
-	get moving(): boolean {
+	/** True while a lifted (floating) selection exists — dropped only via drop(). */
+	get floating(): boolean {
 		return this.active;
+	}
+
+	/** True when the current selection mask covers the given image point. A 1×1
+	 * GPU read-back of the mask surface — mask-authoritative, so donut holes
+	 * count as "outside". */
+	pointInSelection(p: Point): boolean {
+		const doc = documentRegistry.active;
+		const sel = doc?.selection;
+		if (!doc || !sel?.maskId || !this.renderer.surfaces.has(sel.maskId)) return false;
+		const x = Math.floor(p.x);
+		const y = Math.floor(p.y);
+		if (x < 0 || y < 0 || x >= doc.width || y >= doc.height) return false;
+		const sprite = new Sprite(this.renderer.surfaces.getTexture(sel.maskId));
+		const px = this.renderer.app.renderer.extract.pixels({
+			target: sprite,
+			frame: new Rectangle(x, y, 1, 1),
+			resolution: 1
+		});
+		sprite.destroy();
+		return px.pixels[3] > 0;
 	}
 
 	/**
 	 * Lifts the selection content of the active layer: the floating pixels are
 	 * shown at the selection bounds, the layer itself shows the erased "hole".
-	 * Returns 'none' when there is nothing to move (no doc / no selection).
+	 * The document is NOT changed undoably until drop().
 	 */
-	begin(start: Point): MoveBeginResult {
-		if (this.active) this.cancel();
+	begin(): MoveBeginResult {
+		if (this.active) return 'ok';
 		const doc = documentRegistry.active;
 		const sel = doc?.selection;
 		const layer = doc?.activeLayer;
 		if (!doc || !sel || !layer || !sel.active || !sel.maskId) return 'none';
 		const surfaces = this.renderer.surfaces;
-		if (!surfaces.has(sel.maskId)) return 'none';
+		if (!surfaces.has(sel.maskId) || !surfaces.has(layer.surfaceId)) return 'none';
 
 		const w = doc.width;
 		const h = doc.height;
@@ -73,8 +101,9 @@ export class MoveEngine {
 		this.erasedId = erasedId;
 		this.floatingId = floatingId;
 		this.bounds = bounds;
-		this.origin = { x: Math.round(start.x), y: Math.round(start.y) };
 		this.offset = { x: 0, y: 0 };
+		this.baseOffset = { x: 0, y: 0 };
+		this.origin = null;
 		this.active = true;
 
 		layer.surfaceId = erasedId;
@@ -83,27 +112,36 @@ export class MoveEngine {
 		return 'ok';
 	}
 
-	/** Moves the floating preview by the (integer) drag offset and shifts the
-	 * ants preview along. Cheap: only sprite positions + an outline redraw. */
+	/** Starts a drag gesture at image point `p` (offsets are relative to it). */
+	beginDrag(p: Point): void {
+		if (!this.active) return;
+		this.origin = { x: Math.round(p.x), y: Math.round(p.y) };
+		this.baseOffset = { x: this.offset.x, y: this.offset.y };
+	}
+
+	/** Moves the floating preview by the drag offset (integer image px) and
+	 * shifts the ants + tint veil along. Cheap: sprite positions + outline. */
 	moveTo(p: Point): void {
 		if (!this.active || !this.doc || !this.bounds || !this.origin) return;
-		const dx = Math.round(p.x - this.origin.x);
-		const dy = Math.round(p.y - this.origin.y);
+		const dx = this.baseOffset.x + Math.round(p.x - this.origin.x);
+		const dy = this.baseOffset.y + Math.round(p.y - this.origin.y);
 		if (dx === this.offset.x && dy === this.offset.y) return;
 		this.offset = { x: dx, y: dy };
 		const surfaces = this.renderer.surfaces;
 		if (!this.floatingId || !surfaces.has(this.floatingId)) return;
 		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + dx, this.bounds.y + dy);
 		this.renderer.previewMovedSelectionOutline(dx, dy);
+		this.renderer.setActiveTintOffset(dx, dy);
 	}
 
 	/**
-	 * Commits the gesture: builds the after-layer (erased + floating content at
-	 * the new position), moves the selection mask/geometry by the same offset
-	 * and records everything as one history entry. A zero-offset gesture is
-	 * cancelled instead. Returns false when nothing was committed.
+	 * Drops the floating selection: builds the after-layer (erased + floating
+	 * content at the new position), moves the selection mask/geometry by the
+	 * same offset and records everything as one history entry. A zero-offset
+	 * session restores the original state instead (nothing moved).
+	 * Returns false when nothing was committed.
 	 */
-	commit(): boolean {
+	drop(): boolean {
 		if (!this.active || !this.doc || !this.layer || !this.bounds) {
 			this.cancel();
 			return false;
@@ -111,14 +149,15 @@ export class MoveEngine {
 		const doc = this.doc;
 		const layer = this.layer;
 		const surfaces = this.renderer.surfaces;
-		// surfaces vanished (document closed mid-drag) → bail out silently
+		// surfaces vanished (document closed mid-session) → bail out silently
 		if (
 			!this.beforeId ||
 			!this.erasedId ||
 			!this.floatingId ||
 			!surfaces.has(this.beforeId) ||
 			!surfaces.has(this.erasedId) ||
-			!surfaces.has(this.floatingId)
+			!surfaces.has(this.floatingId) ||
+			!doc.selection.active
 		) {
 			this.reset();
 			return false;
@@ -221,7 +260,7 @@ export class MoveEngine {
 		return true;
 	}
 
-	/** Aborts the gesture: restores the untouched layer and drops the previews. */
+	/** Aborts the session: restores the untouched layer and drops the previews. */
 	cancel(): void {
 		if (!this.active) {
 			this.reset();
@@ -253,6 +292,7 @@ export class MoveEngine {
 		this.floatingId = null;
 		this.bounds = null;
 		this.origin = null;
+		this.baseOffset = { x: 0, y: 0 };
 		this.offset = { x: 0, y: 0 };
 		this.active = false;
 	}

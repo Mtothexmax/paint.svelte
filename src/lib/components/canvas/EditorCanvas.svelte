@@ -154,12 +154,8 @@
 		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
 		moveArmed = get(activeToolId) === 'move' && hasDoc;
 		refreshRing();
-		// Switching away from the move tool mid-drag cancels the floating gesture.
-		if (moving && !moveArmed) {
-			moveEngine?.cancel();
-			moving = false;
-			movePointerId = -1;
-		}
+		// Switching away from the move tool drops (applies) a floating selection.
+		if (moveEngine?.floating && !moveArmed) moveEngine.drop();
 		// Debug: only log when the ACTIVE TOOL actually changed (not on every
 		// pointer event), so we can see why switching tools misbehaves.
 		if (lastLoggedTool !== get(activeToolId)) {
@@ -214,9 +210,9 @@
 				return;
 			}
 			if (selecting) cancelSelectDrag();
-			// Escape during a move drag aborts it (the selection stays where it was).
-			if (moving) {
-				moveEngine?.cancel();
+			// Escape aborts a floating move: the content returns to its source.
+			if (moveEngine?.floating) {
+				moveEngine.cancel();
 				moving = false;
 				movePointerId = -1;
 				return;
@@ -224,10 +220,16 @@
 			if (documentRegistry.active?.selection.active) deselect();
 			return;
 		}
-		// While a move drag is in flight the layer/selection are in a transient
-		// (lifted) state — no other keyboard action may interleave. Escape above
-		// is the only way out besides finishing/cancelling the drag.
-		if (moving) return;
+		// Enter drops (applies) a floating selection.
+		if (moveEngine?.floating && e.key === 'Enter' && !typing && !get(dialog).kind) {
+			e.preventDefault();
+			moveEngine.drop();
+			return;
+		}
+		// While a floating selection exists the document is in a transient state
+		// — no other keyboard action may interleave. Escape cancels and Enter
+		// drops; everything else waits until the selection is dropped.
+		if (moveEngine?.floating) return;
 		// Enter finishes an in-progress polygon-lasso selection.
 		if (polyBuilding && e.key === 'Enter' && !typing && !get(dialog).kind) {
 			e.preventDefault();
@@ -464,6 +466,18 @@
 		if (ready) getEditorRenderer().refreshActiveSelection();
 	}
 
+	/** Starts (or continues) a floating-selection drag gesture. */
+	function startMoveDrag(e: PointerEvent, img: Point): void {
+		moveEngine?.beginDrag(img);
+		moving = true;
+		movePointerId = e.pointerId;
+		try {
+			host.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
+	}
+
 	function onPointerDown(e: PointerEvent) {
 		if (!ready) return;
 		movePointer(screenPoint(e));
@@ -509,28 +523,30 @@
 			getEditorRenderer().previewSelectionOutline(null, false);
 			return;
 		}
-		// Move tool: LEFT-drag lifts the selection content into a floating
-		// preview and moves it; the gesture commits (one undo step) on release.
+		// Move tool, Paint.NET style: the FIRST press inside the selection lifts
+		// the content into a floating preview; further presses inside re-drag it;
+		// a press OUTSIDE the selection drops (applies) it and is consumed.
 		if (e.button === 0 && moveArmed) {
+			e.preventDefault();
+			const img = imageFromScreen(screenPoint(e));
+			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
+			if (moveEngine.floating) {
+				if (moveEngine.pointInSelection(img)) startMoveDrag(e, img);
+				else moveEngine.drop();
+				return;
+			}
 			const mdoc = documentRegistry.active;
 			if (!mdoc) return;
-			e.preventDefault();
 			if (!mdoc.selection.active) {
 				showNotice('Draw a selection first.');
 				return;
 			}
-			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
-			if (moveEngine.begin(imageFromScreen(screenPoint(e))) === 'ok') {
-				moving = true;
-				movePointerId = e.pointerId;
-				try {
-					host.setPointerCapture(e.pointerId);
-				} catch {
-					/* ignore */
-				}
-			}
+			if (moveEngine.pointInSelection(img) && moveEngine.begin() === 'ok') startMoveDrag(e, img);
 			return;
 		}
+		// Any other tool/action first drops a floating selection (Paint.NET
+		// behaviour): the content is stamped at its current position.
+		if (moveEngine?.floating) moveEngine.drop();
 		// Paint with the LEFT button in the foreground colour and with the RIGHT
 		// button in the background colour (Paint.NET behaviour). Right-button
 		// painting also suppresses the context menu (preventDefault + the
@@ -614,7 +630,8 @@
 			}
 		}
 		if (moving && e.pointerId === movePointerId) {
-			moveEngine?.commit();
+			// release only ends the drag — the floating selection stays floating
+			// until it is dropped (click outside / Enter / tool switch)
 			moving = false;
 			movePointerId = -1;
 			try {
@@ -681,7 +698,7 @@
 			paintPointerId = -1;
 		}
 		if (moving && e.pointerId === movePointerId) {
-			moveEngine?.cancel();
+			// interrupted drag: keep the floating selection where it was
 			moving = false;
 			movePointerId = -1;
 		}
