@@ -361,27 +361,41 @@ export function traceSelectionOutline(rgba: Uint8ClampedArray, width: number, he
 
 	for (let start = 0; start < segs.length; start++) {
 		if (used[start]) continue;
-		// walk a loop from segs[start]
-		let cur = start;
-		const pts: Point[] = [];
-		const seenInLoop = new Set<number>();
+		// Walk a loop from segs[start]. Segments are stored with generation-order
+		// orientation (per-cell top L→R, right T→B, bottom L→R, left T→B), so a
+		// boundary walk consumes some of them FORWARDS and others BACKWARDS. We
+		// therefore treat every segment as an undirected edge: from the current
+		// point, take any unused incident edge and hop to its OTHER endpoint.
+		// (The old code always continued from s.x2, which broke the chain at
+		// reversed edges — the loop closed early with a diagonal across the
+		// selection and the rest became a second bogus loop.)
+		used[start] = true;
+		const first = segs[start];
+		const pts: Point[] = [
+			{ x: first.x1, y: first.y1 },
+			{ x: first.x2, y: first.y2 }
+		];
+		let px = first.x2;
+		let py = first.y2;
 		let guard = 0;
-		while (!used[cur] && !seenInLoop.has(cur) && guard++ < segs.length * 2) {
-			used[cur] = true;
-			seenInLoop.add(cur);
-			const s = segs[cur];
-			pts.push({ x: s.x1, y: s.y1 });
-			// choose the other endpoint to continue from
-			let nextX = s.x2;
-			let nextY = s.y2;
-			const candidates = adj.get(key(nextX, nextY)) ?? [];
-			const next = candidates.find((i) => i !== cur && !used[i] && !seenInLoop.has(i));
+		while ((px !== pts[0].x || py !== pts[0].y) && guard++ < segs.length) {
+			const candidates = adj.get(key(px, py)) ?? [];
+			const next = candidates.find((i) => !used[i]);
 			if (next === undefined) break;
-			cur = next;
+			used[next] = true;
+			const s = segs[next];
+			const hop = s.x1 === px && s.y1 === py ? { x: s.x2, y: s.y2 } : { x: s.x1, y: s.y1 };
+			pts.push(hop);
+			px = hop.x;
+			py = hop.y;
 		}
-		if (pts.length > 2) {
-			// close the loop back to the first point
-			pts.push({ x: pts[0].x, y: pts[0].y });
+		if (pts.length > 3 && px === pts[0].x && py === pts[0].y) {
+			// closed back on the start point. The walk appended a duplicate of the
+			// start point; strip it so `pts` is an OPEN ring (the ants drawing
+			// connects the last point back to the first itself). mergeCollinear
+			// then evaluates the turn at every vertex — including the start —
+			// against real neighbours, so corners are never dropped.
+			pts.pop();
 			loops.push(mergeCollinear(pts));
 		}
 	}
