@@ -42,7 +42,10 @@ export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): P
 	renderer.app.renderer.render({ container, target: rt, clear: true });
 
 	const probe = new Sprite(rt);
-	const canvas = renderer.app.renderer.extract.canvas(probe) as HTMLCanvasElement;
+	// resolution: 1 — without it the extraction inherits the renderer's
+	// resolution (devicePixelRatio) and the exported PNG comes out larger
+	// than the document on scaled displays.
+	const canvas = renderer.app.renderer.extract.canvas({ target: probe, resolution: 1 }) as HTMLCanvasElement;
 
 	const blob = await canvasToBlob(canvas);
 	probe.destroy();

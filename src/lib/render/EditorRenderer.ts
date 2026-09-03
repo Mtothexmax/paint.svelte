@@ -218,16 +218,16 @@ export class EditorRenderer {
 	/** Reads a mask surface back to the CPU and returns its outline loops — used
 	 * for composite (add/subtract) selections that have no single geometric
 	 * shape, so the marching-ants outline can still be drawn around the exact
-	 * selected region. */
+	 * selected region. Readback is forced to resolution 1: the default would
+	 * inherit the renderer's resolution (devicePixelRatio), which silently
+	 * shifted the traced outline on scaled displays. */
 	computeMaskOutline(maskId: SurfaceId, width: number, height: number): Point[][] {
 		if (!this.app) return [];
 		const sprite = new Sprite(this.surfaces.getTexture(maskId));
-		const canvas = this.app.renderer.extract.canvas(sprite);
+		const extracted = this.app.renderer.extract.pixels({ target: sprite, resolution: 1 });
 		sprite.destroy();
-		const ctx = canvas.getContext('2d');
-		if (!ctx) return [];
-		const data = ctx.getImageData(0, 0, width, height).data;
-		return traceSelectionOutline(data, width, height);
+		if (extracted.width !== width || extracted.height !== height) return [];
+		return traceSelectionOutline(extracted.pixels, width, height);
 	}
 
 	/** Temporary live filter preview on the active layer (effect dialogs). */
