@@ -520,12 +520,7 @@
 				return;
 			}
 			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
-			const res = moveEngine.begin(imageFromScreen(screenPoint(e)));
-			if (res === 'composite') {
-				showNotice('Move is not supported on a combined selection yet.');
-				return;
-			}
-			if (res === 'ok') {
+			if (moveEngine.begin(imageFromScreen(screenPoint(e))) === 'ok') {
 				moving = true;
 				movePointerId = e.pointerId;
 				try {

@@ -11,6 +11,8 @@ import type { RGBA } from '../core/color';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import {
 	blitMaskedInto,
+	boundsOfLoops,
+	complementMaskSurface,
 	fillSelectionRegion,
 	fillShapeMask,
 	invertSelectionMask,
@@ -139,23 +141,39 @@ export function deselect(): void {
 }
 
 /**
- * Inverts the current selection (mask complement). The pooled mask surface is
- * rewritten in place; `rect`/`points` always describe the POSITIVE shape, and
- * `inverted` flips so the mask matches (positive vs complement). Inverting
- * again restores the original positive selection.
+ * Inverts the current selection (mask complement). Simple selections rewrite
+ * the pooled mask in place from their geometry (`rect`/`points` always
+ * describe the POSITIVE shape, `inverted` flips so the mask matches);
+ * inverting again restores the original positive selection. Combined
+ * (composite) selections have no single geometry — their mask is complemented
+ * GPU-side as a new surface and the ants/bounds are re-derived from the mask.
  */
 export function invertSelection(): boolean {
 	const doc = activeDoc();
 	if (!doc || !hasEditorRenderer()) return false;
 	const sel = doc.selection;
 	if (!sel.active || !sel.maskId) return false;
-	if (sel.composite) {
-		showNotice('Invert Selection is not supported on a combined selection yet.');
-		return false;
-	}
 
 	const renderer = getEditorRenderer();
 	const surfaces = renderer.surfaces;
+
+	if (sel.composite) {
+		const oldMaskId = sel.maskId;
+		const complement = complementMaskSurface(surfaces, oldMaskId, doc.width, doc.height);
+		const loops = renderer.computeMaskOutline(complement, doc.width, doc.height);
+		if (!loops.length) {
+			// the previous selection covered the whole document — nothing remains
+			surfaces.dispose(complement);
+			deselect();
+			return true;
+		}
+		sel.maskId = complement;
+		sel.outlineLoops = loops;
+		sel.bounds = boundsOfLoops(loops);
+		touch(doc);
+		if (surfaces.has(oldMaskId)) surfaces.dispose(oldMaskId);
+		return true;
+	}
 
 	if (!sel.inverted) {
 		// Positive -> complement (doc minus shape). A shape that covers the
@@ -236,7 +254,6 @@ export function applySelectionMode(
 	sel.maskId = newMask;
 	sel.composite = true;
 	sel.outlineLoops = renderer.computeMaskOutline(newMask, doc.width, doc.height);
-	console.info('[outline-debug] expected selection bounds', { bounds: sel.bounds, mode, kind });
 	sel.inverted = false;
 	sel.active = true;
 	sel.rect = kind === 'lasso' ? null : rect;
@@ -296,7 +313,6 @@ export function applySelectionRect(mode: 'replace' | 'add' | 'subtract', kind: '
 	sel.maskId = newMask;
 	sel.composite = true;
 	sel.outlineLoops = renderer.computeMaskOutline(newMask, doc.width, doc.height);
-	console.info('[outline-debug] expected selection bounds', { bounds: sel.bounds, mode, kind });
 	sel.inverted = false;
 	sel.active = true;
 	sel.rect = rect;
@@ -318,32 +334,23 @@ export function deleteSelection(label = 'Delete'): boolean {
 	const doc = activeDoc();
 	if (!doc || !hasEditorRenderer()) return false;
 	const sel = doc.selection;
-	if (!sel.active || !sel.maskId) return false;
-	if (sel.composite) {
-		showNotice('Delete is not supported on a combined selection yet.');
-		return false;
-	}
 	const layer = doc.activeLayer;
-	if (!layer) return false;
+	if (!doc || !sel.active || !sel.maskId || !layer) return false;
 
 	const renderer = getEditorRenderer();
 	const surfaces = renderer.surfaces;
+	if (!surfaces.has(sel.maskId) || !surfaces.has(layer.surfaceId)) return false;
 
 	// Surface-swap undo: never mutate the live layer surface in place.
 	const beforeId = layer.surfaceId;
 
-	// Build a "keep" mask = the pixels that must SURVIVE the delete (everything
-	// NOT in the current selection). Rebuilding the result onto a fresh
+	// "Keep" mask = the pixels that must SURVIVE the delete (the complement of
+	// the current selection MASK). Working from the mask surface itself covers
+	// every selection type uniformly: simple shapes, complements (donuts) and
+	// combined add/subtract regions. Rebuilding the result onto a fresh
 	// transparent surface from this mask guarantees the deleted region becomes
 	// exactly #00000000 — no premultiplied RGB residue from an 'erase' pass.
-	const keepId: SurfaceId = surfaces.create(doc.width, doc.height);
-	if (sel.inverted) {
-		// currently the complement is selected → keep the positive shape
-		fillShapeMask(surfaces, keepId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
-	} else {
-		// positive shape selected → keep the complement (doc minus shape)
-		invertSelectionMask(surfaces, keepId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
-	}
+	const keepId = complementMaskSurface(surfaces, sel.maskId, doc.width, doc.height);
 	const afterId: SurfaceId = surfaces.create(doc.width, doc.height); // fully transparent
 	blitMaskedInto(surfaces, keepId, beforeId, afterId, 'normal', doc.width, doc.height);
 	surfaces.dispose(keepId);

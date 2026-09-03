@@ -281,7 +281,12 @@ export class BrushEngine {
 		comp.blendMode = s.kind === 'eraser' ? 'erase' : 'normal';
 		comp.alpha = eff;
 		comp.tint = s.kind === 'eraser' ? 0xffffff : rgbToInt(s.color);
-		surfaces.renderInto(surfaces.getTexture(afterId), comp, false);
+		// Pixi v8: a blend mode on the render ROOT is ignored — nest the sprite
+		// one level so 'erase' (eraser) actually applies.
+		const blendHolder = new Container();
+		blendHolder.addChild(comp);
+		surfaces.renderInto(surfaces.getTexture(afterId), blendHolder, false);
+		blendHolder.destroy({ children: true });
 		comp.destroy();
 		clippedSprite?.destroy();
 		if (clippedTex) clippedTex.destroy(true);

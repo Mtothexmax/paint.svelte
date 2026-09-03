@@ -2,17 +2,17 @@
 // active layer into a floating preview (through the selection mask) and erases
 // them from the layer while the user drags; on release the gesture is committed
 // as ONE undoable step: layer pixels moved + selection (mask + geometry) moved
-// by the same offset. Works for positive and complement (donut) selections;
-// combined (add/subtract) selections are refused like Delete, for now.
+// by the same offset. Works for any selection the mask can express — simple
+// shapes, complements (donuts) and combined add/subtract regions.
 
 import type { Point, Rect } from '../core/geometry';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
 import type { Layer, SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
-import { blitMaskedInto, fillShapeMask, invertSelectionMask } from './selection';
+import { blitMaskedInto, boundsOfLoops, complementMaskSurface } from './selection';
 
-export type MoveBeginResult = 'ok' | 'composite' | 'none';
+export type MoveBeginResult = 'ok' | 'none';
 
 export class MoveEngine {
 	private renderer: EditorRenderer;
@@ -39,8 +39,7 @@ export class MoveEngine {
 	/**
 	 * Lifts the selection content of the active layer: the floating pixels are
 	 * shown at the selection bounds, the layer itself shows the erased "hole".
-	 * Returns why nothing was lifted: 'composite' (combined selection) or
-	 * 'none' (no doc / no selection / no mask).
+	 * Returns 'none' when there is nothing to move (no doc / no selection).
 	 */
 	begin(start: Point): MoveBeginResult {
 		if (this.active) this.cancel();
@@ -48,7 +47,6 @@ export class MoveEngine {
 		const sel = doc?.selection;
 		const layer = doc?.activeLayer;
 		if (!doc || !sel || !layer || !sel.active || !sel.maskId) return 'none';
-		if (sel.composite) return 'composite';
 		const surfaces = this.renderer.surfaces;
 		if (!surfaces.has(sel.maskId)) return 'none';
 
@@ -64,9 +62,7 @@ export class MoveEngine {
 
 		// 2) erased layer = "keep" content (everything NOT selected) — the same
 		//    exact-transparency path Delete uses (no premultiplied residue)
-		const keepId = surfaces.create(w, h);
-		if (sel.inverted) fillShapeMask(surfaces, keepId, w, h, sel.kind, sel.rect, sel.points);
-		else invertSelectionMask(surfaces, keepId, w, h, sel.kind, sel.rect, sel.points);
+		const keepId = complementMaskSurface(surfaces, sel.maskId, w, h);
 		const erasedId = surfaces.create(w, h);
 		blitMaskedInto(surfaces, keepId, layer.surfaceId, erasedId, 'normal', w, h);
 		surfaces.dispose(keepId);
@@ -162,7 +158,14 @@ export class MoveEngine {
 		sel.rect = movedRect;
 		sel.points = movedPoints;
 		sel.bounds = movedBounds;
-		sel.outlineLoops = null;
+		if (sel.composite) {
+			// combined selections have no single geometry — the ants and bounds
+			// must be re-derived from the moved mask surface
+			sel.outlineLoops = this.renderer.computeMaskOutline(newMaskId, w, h);
+			sel.bounds = boundsOfLoops(sel.outlineLoops) ?? movedBounds;
+		} else {
+			sel.outlineLoops = null;
+		}
 
 		layer.surfaceId = afterId;
 		this.renderer.rebuildActiveLayers();

@@ -314,6 +314,45 @@ export function subtractSelection(
 }
 
 /**
+ * Returns a NEW surface holding the COMPLEMENT of the given mask surface.
+ * Works for any mask — simple shapes, existing complements and combined
+ * (add/subtract) regions alike. Built GPU-side: an opaque white destination
+ * with the mask erased out of it (destination-out). In premultiplied space
+ * this yields exactly `alpha = 1 - mask.alpha` (and red = alpha), so the
+ * result is a clean mask with no RGB residue.
+ */
+export function complementMaskSurface(
+	surfaces: SurfaceStore,
+	maskId: SurfaceId,
+	width: number,
+	height: number
+): SurfaceId {
+	const inv = surfaces.create(width, height, WHITE);
+	surfaces.blitRegion(maskId, inv, 0, 0, 'erase', 1);
+	return inv;
+}
+
+/** Integer bounding box around all points of the given outline loops, or null
+ * when there are no loops. Used where only the traced mask outline is known
+ * (composite selections). */
+export function boundsOfLoops(loops: Point[][]): Rect | null {
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	for (const loop of loops) {
+		for (const p of loop) {
+			if (p.x < minX) minX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.x > maxX) maxX = p.x;
+			if (p.y > maxY) maxY = p.y;
+		}
+	}
+	if (minX > maxX || minY > maxY) return null;
+	return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/**
  * Traces the closed outline loops of a selection from its mask's alpha channel
  * (RGBA data, one pixel per 4 bytes). The mask region can be any composite of
  * add/subtract shapes, so we walk the axis-aligned pixel boundary between

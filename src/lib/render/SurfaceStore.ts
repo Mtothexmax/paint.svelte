@@ -97,6 +97,10 @@ export class SurfaceStore {
 	/**
 	 * Draws a (region-sized) surface into another surface at `x`,`y`, optionally
 	 * with a blend mode and an overall alpha.
+	 *
+	 * Pixi v8 quirk: a blend mode on the object that IS the render root is
+	 * silently ignored (falls back to `normal`) — so 'erase' must be nested one
+	 * level inside a Container to actually apply.
 	 */
 	blitRegion(srcId: SurfaceId, destId: SurfaceId, x: number, y: number, blend: BlendName = 'normal', alpha = 1): void {
 		const src = this.getTexture(srcId);
@@ -105,8 +109,10 @@ export class SurfaceStore {
 		sprite.position.set(x, y);
 		sprite.blendMode = blend;
 		sprite.alpha = alpha;
-		this.render(sprite, dest, false);
-		sprite.destroy();
+		const holder = new Container();
+		holder.addChild(sprite);
+		this.render(holder, dest, false);
+		holder.destroy({ children: true });
 	}
 
 	/** Renders a container into a target texture (used by the paint engine). */
