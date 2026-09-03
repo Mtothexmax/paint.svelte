@@ -8,8 +8,16 @@
 	import { screenToImage, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
+	import { MoveEngine } from '../../render/MoveEngine';
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
+	import {
+		copySelection,
+		cutSelection,
+		hasClipboardImage,
+		pasteAsNewLayer,
+		pasteBitmapAsLayer
+	} from '../../services/clipboardService';
 	import { dialog } from '../../services/dialogService';
 	import { commands } from '../../services/commandRegistry';
 	import {
@@ -35,7 +43,8 @@
 		selectionMode,
 		selectionRatio,
 		selectionFixedRatio,
-		selectionFixedSize
+		selectionFixedSize,
+		showNotice
 	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
 
@@ -73,6 +82,12 @@
 	let painting = $state(false);
 	let paintPointerId = -1;
 
+	// move-tool state (drag the selection content; commits on pointer-up)
+	let moveEngine: MoveEngine | null = null;
+	let moveArmed = $state(false);
+	let moving = $state(false);
+	let movePointerId = -1;
+
 	// selection-tool state (rect / ellipse / lasso drags)
 	let selectionArmed = $state(false);
 	let selecting = $state(false);
@@ -104,6 +119,8 @@
 	const cursorCss = $derived.by(() => {
 		if (panning) return '';
 		if (painting) return 'cursor: none;';
+		if (moving) return 'cursor: move;';
+		if (moveArmed) return pointerInside ? 'cursor: move;' : '';
 		if (!(paintArmed || selectionArmed)) return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
@@ -135,7 +152,14 @@
 		const hasDoc = !!documentRegistry.active;
 		paintArmed = PAINT_TOOLS.has(get(activeToolId)) && hasDoc;
 		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
+		moveArmed = get(activeToolId) === 'move' && hasDoc;
 		refreshRing();
+		// Switching away from the move tool mid-drag cancels the floating gesture.
+		if (moving && !moveArmed) {
+			moveEngine?.cancel();
+			moving = false;
+			movePointerId = -1;
+		}
 		// Debug: only log when the ACTIVE TOOL actually changed (not on every
 		// pointer event), so we can see why switching tools misbehaves.
 		if (lastLoggedTool !== get(activeToolId)) {
@@ -190,9 +214,20 @@
 				return;
 			}
 			if (selecting) cancelSelectDrag();
+			// Escape during a move drag aborts it (the selection stays where it was).
+			if (moving) {
+				moveEngine?.cancel();
+				moving = false;
+				movePointerId = -1;
+				return;
+			}
 			if (documentRegistry.active?.selection.active) deselect();
 			return;
 		}
+		// While a move drag is in flight the layer/selection are in a transient
+		// (lifted) state — no other keyboard action may interleave. Escape above
+		// is the only way out besides finishing/cancelling the drag.
+		if (moving) return;
 		// Enter finishes an in-progress polygon-lasso selection.
 		if (polyBuilding && e.key === 'Enter' && !typing && !get(dialog).kind) {
 			e.preventDefault();
@@ -241,6 +276,28 @@
 					e.stopPropagation();
 					if (e.shiftKey) commands.run('adjustments.invertColors');
 					else invertSelection();
+					return;
+				}
+				// Copy/Cut always act on the selection (or the whole layer when
+				// nothing is selected). Paste uses the internal clipboard; with an
+				// empty one the keydown is left alone so the native paste event
+				// (onPaste below) can pick up an OS-clipboard image.
+				if (key === 'c' && !e.shiftKey) {
+					e.preventDefault();
+					e.stopPropagation();
+					copySelection();
+					return;
+				}
+				if (key === 'x' && !e.shiftKey) {
+					e.preventDefault();
+					e.stopPropagation();
+					cutSelection();
+					return;
+				}
+				if (key === 'v' && hasClipboardImage()) {
+					e.preventDefault();
+					e.stopPropagation();
+					pasteAsNewLayer();
 					return;
 				}
 			}
@@ -452,6 +509,33 @@
 			getEditorRenderer().previewSelectionOutline(null, false);
 			return;
 		}
+		// Move tool: LEFT-drag lifts the selection content into a floating
+		// preview and moves it; the gesture commits (one undo step) on release.
+		if (e.button === 0 && moveArmed) {
+			const mdoc = documentRegistry.active;
+			if (!mdoc) return;
+			e.preventDefault();
+			if (!mdoc.selection.active) {
+				showNotice('Draw a selection first.');
+				return;
+			}
+			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
+			const res = moveEngine.begin(imageFromScreen(screenPoint(e)));
+			if (res === 'composite') {
+				showNotice('Move is not supported on a combined selection yet.');
+				return;
+			}
+			if (res === 'ok') {
+				moving = true;
+				movePointerId = e.pointerId;
+				try {
+					host.setPointerCapture(e.pointerId);
+				} catch {
+					/* ignore */
+				}
+			}
+			return;
+		}
 		// Paint with the LEFT button in the foreground colour and with the RIGHT
 		// button in the background colour (Paint.NET behaviour). Right-button
 		// painting also suppresses the context menu (preventDefault + the
@@ -499,6 +583,9 @@
 			if (painting && e.pointerId === paintPointerId && engine) {
 				engine.lineTo(imageFromScreen(sp));
 			}
+			if (moving && e.pointerId === movePointerId && moveEngine) {
+				moveEngine.moveTo(imageFromScreen(sp));
+			}
 			if (selecting && e.pointerId === selectPointerId && selStart) {
 				const img = imageFromScreen(sp);
 				if (get(activeToolId) === 'lasso') {
@@ -525,6 +612,16 @@
 			engine?.finish();
 			painting = false;
 			paintPointerId = -1;
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
+		if (moving && e.pointerId === movePointerId) {
+			moveEngine?.commit();
+			moving = false;
+			movePointerId = -1;
 			try {
 				host.releasePointerCapture(e.pointerId);
 			} catch {
@@ -588,6 +685,11 @@
 			painting = false;
 			paintPointerId = -1;
 		}
+		if (moving && e.pointerId === movePointerId) {
+			moveEngine?.cancel();
+			moving = false;
+			movePointerId = -1;
+		}
 		if (selecting && e.pointerId === selectPointerId) {
 			cancelSelectDrag();
 		}
@@ -603,6 +705,35 @@
 	function onDrop(e: DragEvent) {
 		e.preventDefault();
 		if (e.dataTransfer?.files?.length) void openFiles(e.dataTransfer.files);
+	}
+
+	/**
+	 * Native paste (Ctrl+V with an empty internal clipboard, or context-menu
+	 * paste): pastes an OS-clipboard IMAGE as a new layer of the active document
+	 * — or, with no document open, as a new tab. Text pastes are ignored.
+	 */
+	function onPaste(e: ClipboardEvent) {
+		if (isTextTarget(e.target) || get(dialog).kind) return;
+		const items = e.clipboardData?.items;
+		if (!items) return;
+		for (const item of Array.from(items)) {
+			if (!item.type.startsWith('image/')) continue;
+			const file = item.getAsFile();
+			if (!file) continue;
+			e.preventDefault();
+			void (async () => {
+				if (!documentRegistry.active) {
+					await openFiles([file]);
+					return;
+				}
+				try {
+					pasteBitmapAsLayer(await createImageBitmap(file));
+				} catch {
+					showNotice('Could not paste the clipboard image.', 'error');
+				}
+			})();
+			return;
+		}
 	}
 
 	function measure() {
@@ -659,6 +790,7 @@
 			host.addEventListener('drop', onDrop);
 			window.addEventListener('keydown', onKeyDown, true);
 			window.addEventListener('keyup', onKeyUp);
+			window.addEventListener('paste', onPaste);
 			disposers.push(() => {
 				host.removeEventListener('wheel', onWheel);
 				host.removeEventListener('pointerdown', onPointerDown);
@@ -671,6 +803,7 @@
 				host.removeEventListener('drop', onDrop);
 				window.removeEventListener('keydown', onKeyDown, true);
 				window.removeEventListener('keyup', onKeyUp);
+				window.removeEventListener('paste', onPaste);
 			});
 
 			updateStatus(documentRegistry.active);

@@ -308,10 +308,11 @@ export function applySelectionRect(mode: 'replace' | 'add' | 'subtract', kind: '
 
 /**
  * Deletes (erases to transparency) the active layer's pixels inside the
- * selection — one undoable surface swap, like a brush stroke. Returns false
- * when there is nothing to delete.
+ * selection — one undoable surface swap, like a brush stroke. `label` names
+ * the history entry ('Cut' reuses this path). Returns false when there is
+ * nothing to delete.
  */
-export function deleteSelection(): boolean {
+export function deleteSelection(label = 'Delete'): boolean {
 	const doc = activeDoc();
 	if (!doc || !hasEditorRenderer()) return false;
 	const sel = doc.selection;
@@ -351,7 +352,7 @@ export function deleteSelection(): boolean {
 	documentRegistry.notifyChange(doc);
 
 	doc.history.push({
-		label: 'Delete',
+		label,
 		memoryBytes: doc.width * doc.height * 4 * 2,
 		undo: () => {
 			if (layer.surfaceId === afterId) {

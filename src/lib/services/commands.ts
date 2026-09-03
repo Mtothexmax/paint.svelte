@@ -15,6 +15,7 @@ import {
 import type { ViewState } from '../core/document/ImageDocument';
 import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
+import { copySelection, cutSelection, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
 import { invertColorsScoped } from '../render/effects';
 
 function setStatusZoom(view: ViewState): void {
@@ -137,7 +138,9 @@ export function registerBuiltinCommands(): void {
 			shortcut: 'Ctrl+A',
 			// Ctrl+A is handled directly in EditorCanvas (capture phase +
 			// stopPropagation, so the shortcut service never double-fires).
-			run: () => selectAll(),
+			run: () => {
+				selectAll();
+			},
 			isEnabled: hasDoc
 		},
 		{
@@ -151,15 +154,52 @@ export function registerBuiltinCommands(): void {
 			id: 'edit.invertSelection',
 			label: 'Invert Selection',
 			shortcut: 'Ctrl+I',
-			run: () => invertSelection(),
+			run: () => {
+				invertSelection();
+			},
 			isEnabled: () => !!documentRegistry.active?.selection.active
 		},
 		{
 			id: 'edit.delete',
 			label: 'Delete',
 			shortcut: 'Del',
-			run: () => deleteSelection(),
+			run: () => {
+				deleteSelection();
+			},
 			isEnabled: () => !!documentRegistry.active?.selection.active
+		}
+	]);
+
+	commands.registerMany([
+		{
+			id: 'edit.copy',
+			label: 'Copy',
+			shortcut: 'Ctrl+C',
+			// Ctrl+C/X/V are handled directly in EditorCanvas (capture phase +
+			// stopPropagation, like Ctrl+Z/A/D), so the shortcut service never
+			// double-fires.
+			run: () => {
+				copySelection();
+			},
+			isEnabled: hasDoc
+		},
+		{
+			id: 'edit.cut',
+			label: 'Cut',
+			shortcut: 'Ctrl+X',
+			run: () => {
+				cutSelection();
+			},
+			isEnabled: hasDoc
+		},
+		{
+			id: 'edit.paste',
+			label: 'Paste as New Layer',
+			shortcut: 'Ctrl+V',
+			run: () => {
+				pasteAsNewLayer();
+			},
+			isEnabled: () => hasDoc() && hasClipboardImage()
 		}
 	]);
 

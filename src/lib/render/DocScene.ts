@@ -77,6 +77,10 @@ export class DocScene {
 	private ants = new Graphics();
 	/** Translucent blue veil showing exactly what is selected (mask texture). */
 	private tintSprite: Sprite | null = null;
+	/** Floating "moved selection" content preview (image space). Rendered
+	 * between the blue tint and the ants outline while the Move tool drags the
+	 * selected pixels around. */
+	private floating: Sprite | null = null;
 	/** Outline currently displayed (image-space loops); re-stroked on zoom. */
 	private outlineLoops: Point[][] | null = null;
 	private outlineDashed = true;
@@ -290,6 +294,29 @@ export class DocScene {
 		} else {
 			this.tintSprite.texture = texture;
 		}
+	}
+
+	/**
+	 * Shows/hides the floating content of a selection being moved (Move tool).
+	 * `texture` is a bounds-sized surface; `x`/`y` place it in image px. The
+	 * sprite sits above the blue tint but below the ants outline.
+	 */
+	setFloatingTexture(texture: Texture | null, x = 0, y = 0): void {
+		if (!texture) {
+			if (this.floating) {
+				this.top.removeChild(this.floating);
+				this.floating.destroy();
+				this.floating = null;
+			}
+			return;
+		}
+		if (!this.floating) {
+			this.floating = new Sprite(texture);
+			this.top.addChildAt(this.floating, this.top.getChildIndex(this.ants));
+			this.raiseTop();
+		}
+		this.floating.texture = texture;
+		this.floating.position.set(x, y);
 	}
 
 	/**

@@ -2,7 +2,7 @@
 // surface store and view reconciliation. This is the ONLY place pixi is wired
 // to the app lifecycle.
 
-import { Application, Sprite } from 'pixi.js';
+import { Application, Sprite, type Texture } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry, RegistryEvents } from '../core/document/registry';
 import type { Point } from '../core/geometry';
@@ -168,6 +168,26 @@ export class EditorRenderer {
 	 */
 	previewSelectionOutline(loops: Point[][] | null, dashed = false): void {
 		if (this.activeScene) this.activeScene.showSelectionOutline(loops, dashed);
+	}
+
+	/** Shows/hides the floating moved-selection content on the ACTIVE scene
+	 * (Move tool). `texture` is a bounds-sized surface placed at image `x/y`. */
+	setActiveFloating(texture: Texture | null, x = 0, y = 0): void {
+		this.activeScene?.setFloatingTexture(texture, x, y);
+	}
+
+	/** Live ants preview shifted by (dx,dy) — drawn while the Move tool drags
+	 * the selection content, so the outline travels with the floating pixels
+	 * until the commit refreshes the selection from the model. */
+	previewMovedSelectionOutline(dx: number, dy: number): void {
+		const doc = documentRegistry.active;
+		if (!doc || !this.activeScene) return;
+		const loops = this.selectionOutlineLoops(doc);
+		if (!loops) return;
+		this.activeScene.showSelectionOutline(
+			loops.map((loop) => loop.map((p) => ({ x: p.x + dx, y: p.y + dy }))),
+			true
+		);
 	}
 
 	/** Closed outline loops describing the active selection (mask is the
