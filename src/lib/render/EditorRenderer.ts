@@ -45,6 +45,9 @@ export class EditorRenderer {
 		});
 		this.app = app;
 		this.surfaces.attach(app);
+		// DEBUG (temporary): console handle so the selection-outline read-back can
+		// be inspected live from devtools (see computeMaskOutline debug output).
+		(window as unknown as Record<string, unknown>).__paintRenderer = this;
 		this.wireRegistry();
 		// Render any documents that were already registered before init finished.
 		for (const doc of documentRegistry.all) this.addDoc(doc);
@@ -226,8 +229,58 @@ export class EditorRenderer {
 		const sprite = new Sprite(this.surfaces.getTexture(maskId));
 		const extracted = this.app.renderer.extract.pixels({ target: sprite, resolution: 1 });
 		sprite.destroy();
-		if (extracted.width !== width || extracted.height !== height) return [];
-		return traceSelectionOutline(extracted.pixels, width, height);
+
+		// --- DEBUG (temporary): prove where the outline data comes from -------
+		// maskAlphaBBox is measured directly from the read-back pixels; if the
+		// ants are visually shifted, compare it with the selection's bounds:
+		//   maskAlphaBBox wrong  → the GPU read-back is the problem
+		//   maskAlphaBBox right  → the drawing of the loops is the problem
+		const px = extracted.pixels;
+		const w = extracted.width;
+		const h = extracted.height;
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -1;
+		let maxY = -1;
+		for (let y = 0; y < h; y++) {
+			const row = y * w * 4;
+			for (let x = 0; x < w; x++) {
+				if (px[row + x * 4 + 3] > 80) {
+					if (x < minX) minX = x;
+					if (x > maxX) maxX = x;
+					if (y < minY) minY = y;
+					if (y > maxY) maxY = y;
+				}
+			}
+		}
+		console.info('[outline-debug] mask read-back', {
+			devicePixelRatio: window.devicePixelRatio,
+			rendererResolution: this.app.renderer.resolution,
+			doc: { width, height },
+			extracted: { width: w, height: h, bytes: px.length },
+			maskAlphaBBox: maxX < 0 ? null : { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 }
+		});
+		// -----------------------------------------------------------------------
+
+		if (w !== width || h !== height) return [];
+		const loops = traceSelectionOutline(px, width, height);
+		console.info(
+			'[outline-debug] traced loops',
+			loops.map((loop) => {
+				let lx0 = Infinity;
+				let ly0 = Infinity;
+				let lx1 = -Infinity;
+				let ly1 = -Infinity;
+				for (const p of loop) {
+					if (p.x < lx0) lx0 = p.x;
+					if (p.y < ly0) ly0 = p.y;
+					if (p.x > lx1) lx1 = p.x;
+					if (p.y > ly1) ly1 = p.y;
+				}
+				return { x: lx0, y: ly0, width: lx1 - lx0, height: ly1 - ly0, points: loop.length };
+			})
+		);
+		return loops;
 	}
 
 	/** Temporary live filter preview on the active layer (effect dialogs). */

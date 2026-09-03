@@ -236,6 +236,7 @@ export function applySelectionMode(
 	sel.maskId = newMask;
 	sel.composite = true;
 	sel.outlineLoops = renderer.computeMaskOutline(newMask, doc.width, doc.height);
+	console.info('[outline-debug] expected selection bounds', { bounds: sel.bounds, mode, kind });
 	sel.inverted = false;
 	sel.active = true;
 	sel.rect = kind === 'lasso' ? null : rect;
@@ -295,6 +296,7 @@ export function applySelectionRect(mode: 'replace' | 'add' | 'subtract', kind: '
 	sel.maskId = newMask;
 	sel.composite = true;
 	sel.outlineLoops = renderer.computeMaskOutline(newMask, doc.width, doc.height);
+	console.info('[outline-debug] expected selection bounds', { bounds: sel.bounds, mode, kind });
 	sel.inverted = false;
 	sel.active = true;
 	sel.rect = rect;
