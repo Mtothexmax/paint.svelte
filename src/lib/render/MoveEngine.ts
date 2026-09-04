@@ -236,9 +236,15 @@ export class MoveEngine {
 			// The pivot marker is displayed at pivot + offset. Keep the
 			// transform offset fixed so moving this UI control does not move
 			// the selected pixels.
+			const dx = p.x - (start.pivot.x + start.offset.x);
+			const dy = p.y - (start.pivot.y + start.offset.y);
+			const cos = Math.cos(start.rotation);
+			const sin = Math.sin(start.rotation);
+			const scaledX = dx * cos + dy * sin;
+			const scaledY = -dx * sin + dy * cos;
 			this.pivot = {
-				x: Math.round(p.x - start.offset.x),
-				y: Math.round(p.y - start.offset.y)
+				x: start.pivot.x + scaledX / (start.scaleX || 1),
+				y: start.pivot.y + scaledY / (start.scaleY || 1)
 			};
 			this.offset = this.offsetForPivot(this.pivot, start.pivot, start.offset);
 		} else if (this.transformHandle === 'rotate') {
