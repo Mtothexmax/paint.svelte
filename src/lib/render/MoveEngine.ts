@@ -215,6 +215,7 @@ export class MoveEngine {
 				y: Math.round(p.y - start.offset.y)
 			};
 			this.offset = { ...start.offset };
+			return;
 		} else if (this.transformHandle === 'rotate') {
 			const center = {
 				x: this.pivot.x + this.offset.x,
