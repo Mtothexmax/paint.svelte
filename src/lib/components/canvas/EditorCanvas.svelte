@@ -26,10 +26,9 @@
 		fillSelection,
 		invertSelection,
 		selectAll,
-		applySelectionMode,
-		applySelectionRect,
-		setLassoSelection
-	} from '../../services/selectionService';
+	applySelectionMode,
+	applySelectionRect
+} from '../../services/selectionService';
 	import {
 		activeToolId,
 		statusBar,
@@ -100,6 +99,10 @@
 	// polygon-lasso state (click to place vertices)
 	let polyPts: Point[] = [];
 	let polyBuilding = false;
+	let polyLastClick: { pt: Point; time: number } | null = null;
+	/** Selection mode captured from the FIRST click of the polygon being built
+	 * (ctrl/shift = add, alt / right button = subtract, else options strip). */
+	let polyMode: 'replace' | 'add' | 'subtract' = 'replace';
 
 	// Paint.NET-style brush preview: an outline circle of the brush size (scaled
 	// with the current zoom) follows the pointer. While it is shown the OS
@@ -435,28 +438,47 @@
 		getEditorRenderer().previewSelectionOutline(pts.length >= 2 ? [pts] : null, false);
 	}
 
-	/** Adds a vertex on a (single) click. A double-click finishes the polygon. */
+	/** Adds a vertex on a (single) click. A double-click (two quick clicks at
+	 * ~the same point) finishes the polygon. `e.detail` is deliberately NOT
+	 * used — pointer events do not carry a reliable click count in all
+	 * browsers, so the double-click is detected by time + distance instead. */
 	function polyClick(e: PointerEvent): void {
+		const doc = documentRegistry.active;
 		const img = imageFromScreen(screenPoint(e));
-		// A double click = finishing gesture; do NOT add its point as a vertex.
-		if (polyBuilding && e.detail >= 2 && polyPts.length >= 2) {
+		const now = performance.now();
+		const nearLast = !!polyLastClick && Math.hypot(img.x - polyLastClick.pt.x, img.y - polyLastClick.pt.y) < 8 / Math.max(doc?.view.zoom ?? 1, 1e-4);
+		if (polyBuilding && polyPts.length >= 2 && polyLastClick && nearLast && now - polyLastClick.time < 500) {
 			finishPolygon();
 			return;
 		}
+		polyLastClick = { pt: img, time: now };
 		if (!polyBuilding) {
 			polyPts = [];
 			polyBuilding = true;
+			// the mode of the FIRST click applies to the whole polygon gesture
+			polyMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey || e.shiftKey ? 'add' : get(selectionMode);
 			getEditorRenderer().previewSelectionOutline(null, false);
 		}
 		polyPts.push(img);
 		showPolyOutline();
 	}
 
-	/** Commits the polygon as a lasso selection and clears the draft. */
+	/** Commits the polygon as a lasso selection (honouring the captured mode —
+	 * add/subtract build a composite selection) and clears the draft. */
 	function finishPolygon(): void {
-		if (polyPts.length >= 2) setLassoSelection(polyPts);
+		// the finishing double-click re-clicked the last vertex — drop that
+		// duplicate so the polygon has no zero-length closing edge
+		while (polyPts.length >= 2) {
+			const a = polyPts[polyPts.length - 1];
+			const b = polyPts[polyPts.length - 2];
+			if (Math.hypot(a.x - b.x, a.y - b.y) < 1) polyPts.pop();
+			else break;
+		}
+		const pts = polyPts;
+		const mode = polyMode;
 		polyPts = [];
 		polyBuilding = false;
+		if (pts.length >= 2) applySelectionMode(mode, 'lasso', pts[0], pts[0], pts);
 		if (ready) getEditorRenderer().refreshActiveSelection();
 	}
 
@@ -498,17 +520,20 @@
 			}
 			return;
 		}
-		// Polygon lasso: left clicks place vertices; double-click finishes.
-		if (e.button === 0 && selectionArmed && isPolyTool()) {
+		// Polygon lasso: clicks place vertices (left = chosen mode with
+		// Ctrl/Shift = add, Alt = subtract; right button always subtracts);
+		// a double-click finishes the polygon.
+		if ((e.button === 0 || e.button === 2) && selectionArmed && isPolyTool()) {
 			e.preventDefault();
 			polyClick(e);
 			return;
 		}
-		// Selection tools: a LEFT drag selects with the chosen mode (Ctrl = add,
-		// Alt = subtract, else the options-strip mode); a RIGHT-button drag always
-		// subtracts. The draft outline is shown live and committed on pointer-up.
+		// Selection tools: a LEFT drag selects with the chosen mode (Ctrl or
+		// Shift = add, Alt = subtract, else the options-strip mode); a
+		// RIGHT-button drag always subtracts. The draft outline is shown live
+		// and committed on pointer-up.
 		if ((e.button === 0 || e.button === 2) && selectionArmed && selectionToolKind()) {
-			dragMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey ? 'add' : get(selectionMode);
+			dragMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey || e.shiftKey ? 'add' : get(selectionMode);
 			console.log('[editor] pointerdown: selection tool', get(activeToolId), 'kind', selectionToolKind(), 'mode', dragMode);
 			e.preventDefault();
 			selecting = true;
