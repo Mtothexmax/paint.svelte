@@ -101,6 +101,28 @@ export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
 	});
 }
 
+export interface BrightContSettings {
+	/** brightness factor: 100 = unchanged, 0 = black, 200 = double */
+	brightness: number;
+	/** contrast factor: 100 = unchanged, 0 = flat grey, 200 = maximum */
+	contrast: number;
+}
+
+/**
+ * Brightness / Contrast adjustment via a composed ColorMatrixFilter.
+ * Brightness is applied first, then contrast.
+ */
+export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: BrightContSettings): boolean {
+	const brightness = Math.max(0, s.brightness) / 100;
+	const contrast = Math.max(0, s.contrast) / 100;
+	return applyFilterSwap(renderer, 'Brightness / Contrast', () => {
+		const cm = new ColorMatrixFilter();
+		cm.brightness(brightness, true);
+		cm.contrast(contrast, true);
+		return cm;
+	});
+}
+
 /** Renders an inverted (negative) copy of surface `srcId` into a NEW owned
  * surface and returns its id (the original is left untouched). */
 function invertSurfaceCopy(renderer: EditorRenderer, srcId: SurfaceId, width: number, height: number): SurfaceId {

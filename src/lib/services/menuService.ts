@@ -79,10 +79,8 @@ export const MENUS: MenuDef[] = [
 		enabled: true,
 		entries: [
 			{ type: 'command', commandId: 'adjustments.hueSat' },
-			{ type: 'command', commandId: 'adjustments.invertColors' },
-			{ type: 'separator' },
-			{ type: 'disabled', label: 'Brightness…' },
-			{ type: 'disabled', label: 'Contrast…' }
+				{ type: 'command', commandId: 'adjustments.brightCont' },
+				{ type: 'command', commandId: 'adjustments.invertColors' }
 		]
 	},
 	{

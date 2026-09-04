@@ -214,11 +214,17 @@ export function registerBuiltinCommands(): void {
 
 	commands.registerMany([
 		{
-			id: 'adjustments.hueSat',
-			label: 'Hue / Saturation…',
-			run: () => openDialog('hueSat'),
-			isEnabled: hasDoc
-		}
+				id: 'adjustments.hueSat',
+				label: 'Hue / Saturation…',
+				run: () => openDialog('hueSat'),
+				isEnabled: hasDoc
+			},
+			{
+				id: 'adjustments.brightCont',
+				label: 'Brightness / Contrast…',
+				run: () => openDialog('brightCont'),
+				isEnabled: hasDoc
+			}
 	]);
 
 	commands.registerMany([

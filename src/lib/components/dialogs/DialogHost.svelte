@@ -4,6 +4,7 @@
 	import NewImageDialog from './NewImageDialog.svelte';
 	import BlurDialog from './BlurDialog.svelte';
 	import HueSatDialog from './HueSatDialog.svelte';
+	import BrightContDialog from './BrightContDialog.svelte';
 </script>
 
 {#if $dialog.kind === 'newImage'}
@@ -12,4 +13,6 @@
 	<BlurDialog />
 {:else if $dialog.kind === 'hueSat'}
 	<HueSatDialog />
+{:else if $dialog.kind === 'brightCont'}
+	<BrightContDialog />
 {/if}
