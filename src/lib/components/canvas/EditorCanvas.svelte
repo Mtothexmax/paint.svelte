@@ -683,6 +683,43 @@
 		return null;
 	}
 
+	function logTransformCursor(img: Point): void {
+		const t = moveEngine?.transformState ?? transformUi;
+		const doc = documentRegistry.active;
+		if (!t || !doc || get(activeToolId) !== 'move-pixels') return;
+		const b = t.bounds;
+		const cos = Math.cos(t.rotation);
+		const sin = Math.sin(t.rotation);
+		const point = (x: number, y: number): Point => {
+			const sx = (x - t.pivot.x) * t.scaleX;
+			const sy = (y - t.pivot.y) * t.scaleY;
+			return {
+				x: t.pivot.x + t.offset.x + sx * cos - sy * sin,
+				y: t.pivot.y + t.offset.y + sx * sin + sy * cos
+			};
+		};
+		const pivot = { x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y };
+		const corners = [point(b.x, b.y), point(b.x + b.width, b.y), point(b.x + b.width, b.y + b.height), point(b.x, b.y + b.height)];
+		const outside = !pointInPolygon(img, corners);
+		console.log('[transform-cursor]', {
+			mouse: img,
+			selection: { bounds: b, pivot, offset: t.offset, scaleX: t.scaleX, scaleY: t.scaleY, rotation: t.rotation },
+			corners,
+			outside,
+			handle: transformHandleAt(img)
+		});
+	}
+
+	function pointInPolygon(p: Point, polygon: Point[]): boolean {
+		let inside = false;
+		for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+			const a = polygon[i];
+			const b = polygon[j];
+			if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+		}
+		return inside;
+	}
+
 	function beginTransformDrag(e: PointerEvent, img: Point, handle: TransformHandle): void {
 		if (!moveEngine) return;
 		moveEngine.beginTransform(handle, img);
@@ -863,6 +900,7 @@
 		const sp = screenPoint(e);
 		const doc = documentRegistry.active;
 		if (ready && doc) {
+			logTransformCursor(imageFromScreen(sp));
 			if (polyBuilding && isPolyTool() && !panning) {
 				showPolyOutline(imageFromScreen(sp)); // live polygon preview follows the pointer
 			}
