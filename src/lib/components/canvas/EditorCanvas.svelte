@@ -8,7 +8,7 @@
 	import { screenToImage, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
-	import { MoveEngine } from '../../render/MoveEngine';
+	import { MoveEngine, type TransformHandle } from '../../render/MoveEngine';
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import {
@@ -84,8 +84,127 @@
 	// move-tool state (drag the selection content; commits on pointer-up)
 	let moveEngine: MoveEngine | null = null;
 	let moveArmed = $state(false);
+	let moveToolSelected = $state(false);
 	let moving = $state(false);
 	let movePointerId = -1;
+	let transformHandle: TransformHandle | null = null;
+	let transformUi = $state<{
+		bounds: { x: number; y: number; width: number; height: number };
+		pivot: Point;
+		offset: Point;
+		scaleX: number;
+		scaleY: number;
+		rotation: number;
+	} | null>(null);
+	let transformRevision = $state(0);
+	let handleBounds = $state<{ x: number; y: number; width: number; height: number } | null>(null);
+
+	const transformPoints = $derived.by(() => {
+		const t = transformUi;
+		if (!t) return [];
+		const b = t.bounds;
+		const ox = t.offset.x;
+		const oy = t.offset.y;
+		const cos = Math.cos(t.rotation);
+		const sin = Math.sin(t.rotation);
+		const point = (x: number, y: number) => {
+			const sx = (x - t.pivot.x) * t.scaleX;
+			const sy = (y - t.pivot.y) * t.scaleY;
+			return { x: t.pivot.x + t.offset.x + sx * cos - sy * sin, y: t.pivot.y + t.offset.y + sx * sin + sy * cos };
+		};
+		return [
+			{ handle: 'nw' as TransformHandle, x: b.x + ox, y: b.y + oy },
+			{ handle: 'n' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y + oy },
+			{ handle: 'ne' as TransformHandle, x: b.x + b.width + ox, y: b.y + oy },
+			{ handle: 'e' as TransformHandle, x: b.x + b.width + ox, y: b.y + b.height / 2 + oy },
+			{ handle: 'se' as TransformHandle, x: b.x + b.width + ox, y: b.y + b.height + oy },
+			{ handle: 's' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y + b.height + oy },
+			{ handle: 'sw' as TransformHandle, x: b.x + ox, y: b.y + b.height + oy },
+			{ handle: 'w' as TransformHandle, x: b.x + ox, y: b.y + b.height / 2 + oy },
+			{ handle: 'rotate' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y - 24 + oy },
+			{ handle: 'pivot' as TransformHandle, x: t.pivot.x, y: t.pivot.y }
+		].map((p) => {
+			const screen = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
+			const transformed = point(p.x - (p.handle === 'pivot' ? 0 : ox), p.y - (p.handle === 'pivot' ? 0 : oy));
+			return { ...p, sx: screen.panX + transformed.x * screen.zoom, sy: screen.panY + transformed.y * screen.zoom };
+		});
+	});
+
+	function syncTransformUi(): void {
+		transformRevision++;
+		const doc = documentRegistry.active;
+		const selectionBounds =
+			(ready ? getEditorRenderer().getActiveSelectionBounds() : null) ??
+			doc?.selection.bounds ??
+			doc?.selection.rect ??
+			(doc?.selection.points?.length
+				? (() => {
+						const xs = doc.selection.points.map((p) => p.x);
+						const ys = doc.selection.points.map((p) => p.y);
+						return {
+							x: Math.min(...xs),
+							y: Math.min(...ys),
+							width: Math.max(...xs) - Math.min(...xs),
+							height: Math.max(...ys) - Math.min(...ys)
+						};
+					})()
+				: null) ??
+			(doc?.selection.outlineLoops?.length
+				? (() => {
+						const points = doc.selection.outlineLoops.flat();
+						const xs = points.map((p) => p.x);
+						const ys = points.map((p) => p.y);
+						return {
+							x: Math.min(...xs),
+							y: Math.min(...ys),
+							width: Math.max(...xs) - Math.min(...xs),
+							height: Math.max(...ys) - Math.min(...ys)
+						};
+					})()
+				: null);
+		if (!doc || !selectionBounds) {
+			transformUi = null;
+			handleBounds = null;
+			return;
+		}
+		handleBounds = { ...selectionBounds };
+
+		const state = moveEngine?.transformState;
+		if (state) {
+			transformUi = { bounds: state.bounds, pivot: state.pivot, offset: state.offset, scaleX: state.scaleX, scaleY: state.scaleY, rotation: state.rotation };
+		} else {
+			const bounds = { ...selectionBounds };
+			transformUi = {
+				bounds,
+				pivot: { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
+				offset: { x: 0, y: 0 },
+				scaleX: 1,
+				scaleY: 1,
+				rotation: 0
+			};
+		}
+	}
+
+	function visibleTransformPoints(): Array<{ handle: TransformHandle; sx: number; sy: number }> {
+		transformRevision;
+		const doc = documentRegistry.active;
+		if (get(activeToolId) !== 'move') return [];
+		if (!doc || (!transformUi && !handleBounds)) return [];
+		if (transformUi) {
+			return transformPoints;
+		}
+		const bounds = handleBounds;
+		if (!bounds) return [];
+		const zoom = doc.view.zoom;
+		const points: Array<[TransformHandle, number, number]> = [
+			['nw', bounds.x, bounds.y], ['n', bounds.x + bounds.width / 2, bounds.y],
+			['ne', bounds.x + bounds.width, bounds.y], ['e', bounds.x + bounds.width, bounds.y + bounds.height / 2],
+			['se', bounds.x + bounds.width, bounds.y + bounds.height], ['s', bounds.x + bounds.width / 2, bounds.y + bounds.height],
+			['sw', bounds.x, bounds.y + bounds.height], ['w', bounds.x, bounds.y + bounds.height / 2],
+			['pivot', bounds.x + bounds.width / 2, bounds.y + bounds.height / 2]
+		];
+		return points.map(([handle, x, y]) => ({ handle, sx: doc.view.panX + x * zoom, sy: doc.view.panY + y * zoom }));
+	}
 
 	// selection-tool state (rect / ellipse / lasso drags)
 	let selectionArmed = $state(false);
@@ -156,6 +275,8 @@
 		paintArmed = PAINT_TOOLS.has(get(activeToolId)) && hasDoc;
 		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
 		moveArmed = get(activeToolId) === 'move' && hasDoc;
+		syncTransformUi();
+		if (ready) getEditorRenderer().setTransformHandlesVisible(moveArmed);
 		refreshRing();
 		// Switching away from the move tool drops (applies) a floating selection.
 		if (moveEngine?.floating && !moveArmed) moveEngine.drop();
@@ -491,7 +612,48 @@
 
 	/** Starts (or continues) a floating-selection drag gesture. */
 	function startMoveDrag(e: PointerEvent, img: Point): void {
-		moveEngine?.beginDrag(img);
+		moveEngine?.beginTransform('move', img);
+		moving = true;
+		movePointerId = e.pointerId;
+		try {
+			host.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
+	}
+
+	function transformHandleAt(img: Point): TransformHandle | null {
+		const t = transformUi;
+		const doc = documentRegistry.active;
+		if (!t || !doc) return null;
+		const b = t.bounds;
+		const threshold = 10 / Math.max(doc.view.zoom, 0.01);
+		const cos = Math.cos(t.rotation);
+		const sin = Math.sin(t.rotation);
+		const transformed = (x: number, y: number): Point => {
+			const sx = (x - t.pivot.x) * t.scaleX;
+			const sy = (y - t.pivot.y) * t.scaleY;
+			return { x: t.pivot.x + t.offset.x + sx * cos - sy * sin, y: t.pivot.y + t.offset.y + sx * sin + sy * cos };
+		};
+		const pivot = { x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y };
+		if (Math.hypot(img.x - pivot.x, img.y - pivot.y) <= threshold) return 'pivot';
+		const points: Array<[TransformHandle, Point]> = [
+			['nw', transformed(b.x, b.y)], ['n', transformed(b.x + b.width / 2, b.y)], ['ne', transformed(b.x + b.width, b.y)],
+			['e', transformed(b.x + b.width, b.y + b.height / 2)], ['se', transformed(b.x + b.width, b.y + b.height)],
+			['s', transformed(b.x + b.width / 2, b.y + b.height)], ['sw', transformed(b.x, b.y + b.height)],
+			['w', transformed(b.x, b.y + b.height / 2)]
+		];
+		for (const [handle, p] of points) if (Math.hypot(img.x - p.x, img.y - p.y) <= threshold) return handle;
+		const topCenter = transformed(b.x + b.width / 2, b.y - 24);
+		const outside = Math.hypot(img.x - pivot.x, img.y - pivot.y) > Math.min(b.width, b.height) / 2;
+		if (outside && Math.hypot(img.x - topCenter.x, img.y - topCenter.y) <= 24 / Math.max(doc.view.zoom, 0.01)) return 'rotate';
+		return null;
+	}
+
+	function beginTransformDrag(e: PointerEvent, img: Point, handle: TransformHandle): void {
+		if (!moveEngine) return;
+		moveEngine.beginTransform(handle, img);
+		transformHandle = handle;
 		moving = true;
 		movePointerId = e.pointerId;
 		try {
@@ -556,8 +718,10 @@
 			e.preventDefault();
 			const img = imageFromScreen(screenPoint(e));
 			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
+			const handle = transformHandleAt(img);
 			if (moveEngine.floating) {
-				if (moveEngine.pointInSelection(img)) startMoveDrag(e, img);
+				if (handle) beginTransformDrag(e, img, handle);
+				else if (moveEngine.pointInSelection(img)) startMoveDrag(e, img);
 				else moveEngine.drop();
 				return;
 			}
@@ -567,7 +731,12 @@
 				showNotice('Draw a selection first.');
 				return;
 			}
-			if (moveEngine.pointInSelection(img) && moveEngine.begin() === 'ok') startMoveDrag(e, img);
+			if (moveEngine.begin() === 'ok') {
+				const activeHandle = handle ?? 'move';
+				if (activeHandle === 'move' && !moveEngine.pointInSelection(img)) {
+					moveEngine.cancel();
+				} else beginTransformDrag(e, img, activeHandle);
+			}
 			return;
 		}
 		// Any other tool/action first drops a floating selection (Paint.NET
@@ -607,6 +776,7 @@
 	function onPointerMove(e: PointerEvent) {
 		const sp = screenPoint(e);
 		const doc = documentRegistry.active;
+		if (moveArmed) syncTransformUi();
 		if (ready && doc) {
 			if (polyBuilding && isPolyTool() && !panning) {
 				showPolyOutline(imageFromScreen(sp)); // live polygon preview follows the pointer
@@ -621,7 +791,9 @@
 				engine.lineTo(imageFromScreen(sp));
 			}
 			if (moving && e.pointerId === movePointerId && moveEngine) {
-				moveEngine.moveTo(imageFromScreen(sp));
+				if (transformHandle) moveEngine.transformTo(imageFromScreen(sp), e.shiftKey, e.altKey);
+				else moveEngine.moveTo(imageFromScreen(sp));
+				syncTransformUi();
 			}
 			if (selecting && e.pointerId === selectPointerId && selStart) {
 				const img = imageFromScreen(sp);
@@ -660,6 +832,7 @@
 			// until it is dropped (click outside / Enter / tool switch)
 			moving = false;
 			movePointerId = -1;
+			transformHandle = null;
 			try {
 				host.releasePointerCapture(e.pointerId);
 			} catch {
@@ -799,7 +972,16 @@
 					updateArmed();
 				})
 			);
-			const unTool = activeToolId.subscribe(() => updateArmed());
+			disposers.push(
+				documentRegistry.events.on(RegistryEvents.changed, () => {
+					syncTransformUi();
+				})
+			);
+			const unTool = activeToolId.subscribe((tool) => {
+				moveToolSelected = tool === 'move';
+				updateArmed();
+				syncTransformUi();
+			});
 			const unSize = brushSize.subscribe(() => refreshRing());
 			// Polygon-lasso options strip → finish/cancel requests.
 			const unPoly = polygonAction.subscribe((a) => {
@@ -812,6 +994,7 @@
 
 			const onEnter = () => {
 				pointerInside = true;
+				syncTransformUi();
 			};
 			const onLeave = () => {
 				pointerInside = false;
@@ -871,4 +1054,11 @@
 			style="left:{pointerX - ringR}px; top:{pointerY - ringR}px; width:{ringR * 2}px; height:{ringR * 2}px;"
 		></div>
 	{/if}
+	{#each visibleTransformPoints() as point}
+		<div
+			class="pointer-events-none absolute z-20 box-border border border-white bg-blue-500 shadow-[0_0_0_1px_#1e3a8a]"
+			class:rounded-full={point.handle === 'pivot' || point.handle === 'rotate'}
+			style="left:{point.sx - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; top:{point.sy - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; width:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px; height:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px;"
+		></div>
+	{/each}
 </div>

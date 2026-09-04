@@ -75,6 +75,7 @@ export class DocScene {
 	private top = new Container();
 	/** Dashed ants / transient tool-draft outline (image space). */
 	private ants = new Graphics();
+	private transformHandles = new Graphics();
 	/** Translucent blue veil showing exactly what is selected (mask texture). */
 	private tintSprite: Sprite | null = null;
 	/** Floating "moved selection" content preview (image space). Rendered
@@ -101,6 +102,7 @@ export class DocScene {
 		this.root.addChild(this.checker);
 		this.rebuildLayers(surfaces);
 		this.top.addChild(this.ants);
+		this.top.addChild(this.transformHandles);
 		this.root.addChild(this.top);
 		this.raiseTop();
 		this.applyView(doc.view.zoom, doc.view.panX, doc.view.panY);
@@ -257,6 +259,7 @@ export class DocScene {
 				if (this.outlineDashed) addDashedLoop(this.ants, loop, ANT_DASH_ON_SCREEN / z, ANT_DASH_OFF_SCREEN / z);
 				else addClosedLoop(this.ants, loop);
 			}
+
 			this.ants.stroke({
 				width: widthScreen / z,
 				color,
@@ -267,6 +270,31 @@ export class DocScene {
 		};
 		pass(0xffffff, ANT_HALO_SCREEN); // white halo underneath
 		pass(0x111111, ANT_CORE_SCREEN); // dark core on top
+	}
+
+	showTransformHandles(bounds: { x: number; y: number; width: number; height: number } | null): void {
+		this.transformHandles.clear();
+		this.transformHandles.visible = !!bounds;
+		if (!bounds) return;
+		const size = 8 / this.zoom;
+		const half = size / 2;
+		const points = [
+			[bounds.x, bounds.y],
+			[bounds.x + bounds.width / 2, bounds.y],
+			[bounds.x + bounds.width, bounds.y],
+			[bounds.x + bounds.width, bounds.y + bounds.height / 2],
+			[bounds.x + bounds.width, bounds.y + bounds.height],
+			[bounds.x + bounds.width / 2, bounds.y + bounds.height],
+			[bounds.x, bounds.y + bounds.height],
+			[bounds.x, bounds.y + bounds.height / 2]
+		];
+		for (const [x, y] of points) {
+			this.transformHandles.rect(x - half, y - half, size, size).fill(0x3b82f6).stroke({ color: 0xffffff, width: 1 / this.zoom });
+		}
+		this.transformHandles
+			.circle(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, size * 0.7)
+			.fill(0x3b82f6)
+			.stroke({ color: 0xffffff, width: 1 / this.zoom });
 	}
 
 	/**
@@ -296,13 +324,32 @@ export class DocScene {
 		}
 		// a fresh mask texture is anchored at the origin — any offset applied
 		// while a floating selection was dragged no longer applies
+		this.tintSprite.anchor.set(0, 0);
 		this.tintSprite.position.set(0, 0);
+		this.tintSprite.scale.set(1, 1);
+		this.tintSprite.rotation = 0;
 	}
 
 	/** Offsets the blue veil (image px) so it travels with a floating selection
 	 * while the Move tool drags it; reset by the next setSelectionTint call. */
 	setSelectionTintOffset(x: number, y: number): void {
 		if (this.tintSprite) this.tintSprite.position.set(x, y);
+	}
+
+	setSelectionTintTransform(
+		pivotX: number,
+		pivotY: number,
+		offsetX: number,
+		offsetY: number,
+		scaleX: number,
+		scaleY: number,
+		rotation: number
+	): void {
+		if (!this.tintSprite) return;
+		this.tintSprite.anchor.set(pivotX / this.doc.width, pivotY / this.doc.height);
+		this.tintSprite.position.set(pivotX + offsetX, pivotY + offsetY);
+		this.tintSprite.scale.set(scaleX, scaleY);
+		this.tintSprite.rotation = rotation;
 	}
 
 	/**
@@ -326,6 +373,25 @@ export class DocScene {
 		}
 		this.floating.texture = texture;
 		this.floating.position.set(x, y);
+	}
+
+	/** Applies the current floating-selection transform in image space. */
+	setFloatingTransform(
+		pivotLocalX: number,
+		pivotLocalY: number,
+		pivotX: number,
+		pivotY: number,
+		offsetX: number,
+		offsetY: number,
+		scaleX: number,
+		scaleY: number,
+		rotation: number
+	): void {
+		if (!this.floating) return;
+		this.floating.anchor.set(pivotLocalX / this.floating.texture.width, pivotLocalY / this.floating.texture.height);
+		this.floating.position.set(pivotX + offsetX, pivotY + offsetY);
+		this.floating.scale.set(scaleX, scaleY);
+		this.floating.rotation = rotation;
 	}
 
 	/**

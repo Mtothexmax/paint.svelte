@@ -7,55 +7,64 @@
 	import rulerSvg from '@fluentui-emoji/svg/icons/flat/straight-ruler.svg';
 	import moveSvg from '@fluentui-emoji/svg/icons/flat/left-right-arrow.svg';
 	import lassoIcon from '../../assets/lasso.svg';
+	import zoomSvg from '@fluentui-emoji/svg/icons/flat/magnifying-glass-tilted-left.svg';
+	import panSvg from '@fluentui-emoji/svg/icons/flat/hand-with-fingers-splayed-default.svg';
+	import curlySvg from '@fluentui-emoji/svg/icons/flat/curly-loop.svg';
 
-	import { activeToolId } from '../../state/ui';
+	import { activeToolId, showNotice } from '../../state/ui';
 
 	interface ToolConfig {
 		id: string;
 		label: string;
 		src?: string;
 		glyph?: string;
-		group: number;
+		placeholder?: boolean;
 	}
 
 	const tools: ToolConfig[] = [
-		{ id: 'move', label: 'Move', src: moveSvg, group: 1 },
-		{ id: 'brush', label: 'Brush', src: paintbrushSvg, group: 2 },
-		{ id: 'pencil', label: 'Pencil', glyph: '✏️', group: 2 },
-		{ id: 'eraser', label: 'Eraser', glyph: '🧽', group: 2 },
-		{ id: 'eyedropper', label: 'Eyedropper', src: dropletSvg, group: 2 },
-		{ id: 'select-rect', label: 'Rect Select', glyph: '🔲', group: 3 },
-		{ id: 'select-ellipse', label: 'Ellipse Select', glyph: '⭕', group: 3 },
-		{ id: 'lasso', label: 'Lasso Select', src: lassoIcon, group: 3 },
-		{ id: 'wand', label: 'Magic Wand', src: wandSvg, group: 3 },
-		{ id: 'bucket', label: 'Paint Bucket', src: bucketSvg, group: 4 },
-		{ id: 'shape', label: 'Shapes', src: rulerSvg, group: 5 },
-		{ id: 'text', label: 'Text', glyph: '🅰️', group: 5 },
-		{ id: 'gradient', label: 'Gradient', glyph: '🌈', group: 5 }
+			{ id: 'select-rect', label: 'Rectangle Select', glyph: '▭' },
+			{ id: 'move', label: 'Move Selected Pixels', src: moveSvg },
+			{ id: 'lasso', label: 'Lasso Select', src: lassoIcon },
+			{ id: 'move-selection', label: 'Move Selection', glyph: '⤢', placeholder: true },
+			{ id: 'select-ellipse', label: 'Ellipse Select', glyph: '◯' },
+			{ id: 'zoom', label: 'Zoom', src: zoomSvg, placeholder: true },
+			{ id: 'wand', label: 'Magic Wand', src: wandSvg },
+			{ id: 'pan', label: 'Pan', src: panSvg, placeholder: true },
+			{ id: 'bucket', label: 'Paint Bucket', src: bucketSvg },
+			{ id: 'gradient', label: 'Gradient', glyph: '🌈' },
+			{ id: 'brush', label: 'Paintbrush', src: paintbrushSvg },
+			{ id: 'eraser', label: 'Eraser', glyph: '🧽' },
+			{ id: 'pencil', label: 'Pencil', glyph: '✏️' },
+			{ id: 'eyedropper', label: 'Color Picker', src: dropletSvg },
+			{ id: 'clone-stamp', label: 'Clone Stamp', glyph: '🖌', placeholder: true },
+			{ id: 'recolor', label: 'Recolor', glyph: '🎨', placeholder: true },
+			{ id: 'text', label: 'Text', glyph: '🅰️' },
+			{ id: 'line', label: 'Line / Curve', src: curlySvg, placeholder: true },
+			{ id: 'shape', label: 'Shapes', src: rulerSvg }
 	];
 
-	// Compute separators between groups.
-	const rendered = tools.map((tool, i) => ({
-		tool,
-		sep: i > 0 && tool.group !== tools[i - 1].group
-	}));
+	function pickTool(id: string, label: string, placeholder?: boolean): void {
+		if (placeholder) showNotice(`${label} is not implemented yet.`, 'info');
+		activeToolId.set(id);
+	}
 </script>
 
-<div
-		class="grid w-full content-start select-none"
+<div class="toolbar-flex select-none">
+	<div
+	class="grid w-full flex-none content-start"
 	style="grid-template-columns:repeat(2, 40px); justify-content:center; gap:4px; padding:4px;"
->
-	{#each rendered as { tool, sep } (tool.id)}
-		{#if sep}<div class="tool-sep col-span-2"></div>{/if}
-		<button
-			class="tool-btn"
-			class:active={$activeToolId === tool.id}
-			title={tool.label}
-			aria-label={tool.label}
-			onclick={() => {
-				console.log('[toolbar] click →', tool.id, '(was', $activeToolId + ')');
-				activeToolId.set(tool.id);
-			}}
+	>
+	{#each tools as tool (tool.id)}
+	<button
+		class="tool-btn"
+		class:active={$activeToolId === tool.id}
+		class:placeholder={tool.placeholder}
+		title={tool.placeholder ? `${tool.label} (placeholder)` : tool.label}
+		aria-label={tool.label}
+		onclick={() => {
+			console.log('[toolbar] click →', tool.id, '(was', $activeToolId + ')');
+			pickTool(tool.id, tool.label, tool.placeholder);
+		}}
 		>
 			{#if tool.src}
 				<img src={tool.src} alt={tool.label} class="h-6 w-6" draggable="false" />
@@ -64,4 +73,5 @@
 			{/if}
 		</button>
 	{/each}
+	</div>
 </div>

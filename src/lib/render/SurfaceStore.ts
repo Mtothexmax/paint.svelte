@@ -115,6 +115,33 @@ export class SurfaceStore {
 		holder.destroy({ children: true });
 	}
 
+	/** Draws a surface with an affine transform around an image-space pivot. */
+	blitTransformed(
+		srcId: SurfaceId,
+		destId: SurfaceId,
+		sourcePivotX: number,
+		sourcePivotY: number,
+		worldPivotX: number,
+		worldPivotY: number,
+		offsetX: number,
+		offsetY: number,
+		scaleX: number,
+		scaleY: number,
+		rotation: number,
+		blend: BlendName = 'normal'
+	): void {
+		const sprite = new Sprite(this.getTexture(srcId));
+		sprite.anchor.set(sourcePivotX / sprite.texture.width, sourcePivotY / sprite.texture.height);
+		sprite.position.set(worldPivotX + offsetX, worldPivotY + offsetY);
+		sprite.scale.set(scaleX, scaleY);
+		sprite.rotation = rotation;
+		sprite.blendMode = blend;
+		const holder = new Container();
+		holder.addChild(sprite);
+		this.render(holder, this.getTexture(destId), false);
+		holder.destroy({ children: true });
+	}
+
 	/** Renders a container into a target texture (used by the paint engine). */
 	renderInto(target: RenderTexture, container: Container, clear = false): void {
 		this.render(container, target, clear);

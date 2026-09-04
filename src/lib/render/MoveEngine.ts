@@ -17,6 +17,7 @@ import type { EditorRenderer } from './EditorRenderer';
 import { blitMaskedInto, boundsOfLoops, complementMaskSurface } from './selection';
 
 export type MoveBeginResult = 'ok' | 'none';
+export type TransformHandle = 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'pivot' | 'rotate';
 
 export class MoveEngine {
 	private renderer: EditorRenderer;
@@ -29,6 +30,10 @@ export class MoveEngine {
 	private floatingId: SurfaceId | null = null;
 	private bounds: Rect | null = null;
 	private offset: Point = { x: 0, y: 0 };
+	private pivot: Point = { x: 0, y: 0 };
+	private scaleX = 1;
+	private scaleY = 1;
+	private rotation = 0;
 
 	// drag-in-flight state
 	private origin: Point | null = null; // press point of the current drag
@@ -42,6 +47,18 @@ export class MoveEngine {
 	/** True while a lifted (floating) selection exists — dropped only via drop(). */
 	get floating(): boolean {
 		return this.active;
+	}
+
+	get transformState(): { bounds: Rect; pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number } | null {
+		if (!this.bounds) return null;
+		return {
+			bounds: { ...this.bounds },
+			pivot: { ...this.pivot },
+			offset: { ...this.offset },
+			scaleX: this.scaleX,
+			scaleY: this.scaleY,
+			rotation: this.rotation
+		};
 	}
 
 	/** True when the current selection mask covers the given image point. A 1×1
@@ -102,6 +119,10 @@ export class MoveEngine {
 		this.floatingId = floatingId;
 		this.bounds = bounds;
 		this.offset = { x: 0, y: 0 };
+		this.pivot = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+		this.scaleX = 1;
+		this.scaleY = 1;
+		this.rotation = 0;
 		this.baseOffset = { x: 0, y: 0 };
 		this.origin = null;
 		this.active = true;
@@ -130,8 +151,142 @@ export class MoveEngine {
 		const surfaces = this.renderer.surfaces;
 		if (!this.floatingId || !surfaces.has(this.floatingId)) return;
 		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + dx, this.bounds.y + dy);
-		this.renderer.previewMovedSelectionOutline(dx, dy);
-		this.renderer.setActiveTintOffset(dx, dy);
+		this.applyFloatingTransform();
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.setActiveTintTransform(
+			this.pivot.x,
+			this.pivot.y,
+			this.offset.x,
+			this.offset.y,
+			this.scaleX,
+			this.scaleY,
+			this.rotation
+		);
+	}
+
+	/** Starts a resize, pivot move, or rotation gesture. */
+	beginTransform(handle: TransformHandle, p: Point): void {
+		if (!this.active || !this.bounds) return;
+		this.origin = { ...p };
+		this.baseOffset = { ...this.offset };
+		this.transformHandle = handle;
+		this.transformStart = {
+			offset: { ...this.offset },
+			pivot: { ...this.pivot },
+			scaleX: this.scaleX,
+			scaleY: this.scaleY,
+			rotation: this.rotation
+		};
+	}
+
+	private transformHandle: TransformHandle = 'move';
+	private transformStart = {
+		offset: { x: 0, y: 0 },
+		pivot: { x: 0, y: 0 },
+		scaleX: 1,
+		scaleY: 1,
+		rotation: 0
+	};
+
+	transformTo(p: Point, shift = false, alt = false): void {
+		if (!this.active || !this.bounds || !this.origin) return;
+		const start = this.transformStart;
+		const b = this.bounds;
+		if (this.transformHandle === 'move') {
+			this.offset = {
+				x: start.offset.x + Math.round(p.x - this.origin.x),
+				y: start.offset.y + Math.round(p.y - this.origin.y)
+			};
+		} else if (this.transformHandle === 'pivot') {
+			const nextWorldPivot = { x: Math.round(p.x), y: Math.round(p.y) };
+			const cos = Math.cos(start.rotation);
+			const sin = Math.sin(start.rotation);
+			const ax = start.scaleX * cos;
+			const ay = start.scaleX * sin;
+			const bx = -start.scaleY * sin;
+			const by = start.scaleY * cos;
+			const rhsX = nextWorldPivot.x - start.offset.x + ax * start.pivot.x + bx * start.pivot.y;
+			const rhsY = nextWorldPivot.y - start.offset.y + ay * start.pivot.x + by * start.pivot.y;
+			const m00 = 1 + ax;
+			const m01 = bx;
+			const m10 = ay;
+			const m11 = 1 + by;
+			const determinant = m00 * m11 - m01 * m10;
+			const nextPivot =
+				Math.abs(determinant) > 1e-6
+					? {
+							x: (rhsX * m11 - m01 * rhsY) / determinant,
+							y: (m00 * rhsY - rhsX * m10) / determinant
+						}
+					: { x: nextWorldPivot.x - start.offset.x, y: nextWorldPivot.y - start.offset.y };
+			this.pivot = nextPivot;
+			this.offset = {
+				x: nextWorldPivot.x - nextPivot.x,
+				y: nextWorldPivot.y - nextPivot.y
+			};
+		} else if (this.transformHandle === 'rotate') {
+			const center = {
+				x: this.pivot.x + this.offset.x,
+				y: this.pivot.y + this.offset.y
+			};
+			const angle = Math.atan2(p.y - center.y, p.x - center.x);
+			const startAngle = Math.atan2(this.origin.y - center.y, this.origin.x - center.x);
+			let next = start.rotation + angle - startAngle;
+			if (shift) next = Math.round((next * 180) / Math.PI / 10) * (Math.PI / 18);
+			this.rotation = next;
+		} else {
+			const anchorX = this.transformHandle.includes('w') ? b.x + b.width : this.transformHandle.includes('e') ? b.x : b.x + b.width / 2;
+			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
+			const movingX = this.transformHandle.includes('w') ? p.x : this.transformHandle.includes('e') ? p.x : b.x + b.width / 2;
+			const movingY = this.transformHandle.includes('n') ? p.y : this.transformHandle.includes('s') ? p.y : b.y + b.height / 2;
+			const baseX = this.transformHandle.includes('w') ? -b.width : this.transformHandle.includes('e') ? b.width : 1;
+			const baseY = this.transformHandle.includes('n') ? -b.height : this.transformHandle.includes('s') ? b.height : 1;
+			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e') ? (movingX - anchorX) / baseX : 1;
+			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s') ? (movingY - anchorY) / baseY : 1;
+			if (shift) {
+				const magnitude = Math.max(Math.abs(sx), Math.abs(sy));
+				if (this.transformHandle === 'n' || this.transformHandle === 's') sx = Math.sign(sx || 1) * Math.abs(sy);
+				else if (this.transformHandle === 'e' || this.transformHandle === 'w') sy = Math.sign(sy || 1) * Math.abs(sx);
+				else {
+					sx = Math.sign(sx || 1) * magnitude;
+					sy = Math.sign(sy || 1) * magnitude;
+				}
+			}
+			this.scaleX = Math.abs(sx) < 0.001 ? (sx < 0 ? -0.001 : 0.001) : sx;
+			this.scaleY = Math.abs(sy) < 0.001 ? (sy < 0 ? -0.001 : 0.001) : sy;
+			if (alt) {
+				this.offset = { ...start.offset };
+			} else {
+				this.offset = {
+					x: start.offset.x + anchorX - (this.pivot.x + (anchorX - this.pivot.x) * this.scaleX),
+					y: start.offset.y + anchorY - (this.pivot.y + (anchorY - this.pivot.y) * this.scaleY)
+				};
+			}
+		}
+		this.applyFloatingTransform();
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.setActiveTintTransform(
+			this.pivot.x,
+			this.pivot.y,
+			this.offset.x,
+			this.offset.y,
+			this.scaleX,
+			this.scaleY,
+			this.rotation
+		);
+	}
+
+	private applyFloatingTransform(): void {
+		if (!this.floatingId) return;
+		this.renderer.setActiveFloatingTransform(
+			this.pivot.x,
+			this.pivot.y,
+			this.offset.x,
+			this.offset.y,
+			this.scaleX,
+			this.scaleY,
+			this.rotation
+		);
 	}
 
 	/**
@@ -164,7 +319,7 @@ export class MoveEngine {
 		}
 		const dx = this.offset.x;
 		const dy = this.offset.y;
-		if (dx === 0 && dy === 0) {
+		if (dx === 0 && dy === 0 && this.scaleX === 1 && this.scaleY === 1 && this.rotation === 0) {
 			this.cancel();
 			return false;
 		}
@@ -178,17 +333,33 @@ export class MoveEngine {
 
 		// after = erased layer + floating content at the new position
 		const afterId = surfaces.copyRegion(erasedId, { x: 0, y: 0, width: w, height: h });
-		surfaces.blitRegion(floatingId, afterId, bounds.x + dx, bounds.y + dy, 'normal', 1);
+		surfaces.blitTransformed(
+			floatingId,
+			afterId,
+			this.pivot.x - bounds.x,
+			this.pivot.y - bounds.y,
+			this.pivot.x,
+			this.pivot.y,
+			dx,
+			dy,
+			this.scaleX,
+			this.scaleY,
+			this.rotation
+		);
 
 		// move the selection (mask surface + geometry) by the same offset
 		const sel = doc.selection;
 		const oldMaskId = sel.maskId;
 		const newMaskId = surfaces.create(w, h);
-		if (oldMaskId && surfaces.has(oldMaskId)) surfaces.blitRegion(oldMaskId, newMaskId, dx, dy, 'normal', 1);
+		if (oldMaskId && surfaces.has(oldMaskId))
+			surfaces.blitTransformed(oldMaskId, newMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation);
 
 		const origRect = sel.rect ? { ...sel.rect } : null;
 		const origPoints = sel.points?.map((pt) => ({ ...pt })) ?? null;
 		const origBounds = sel.bounds ? { ...sel.bounds } : null;
+		const origComposite = sel.composite;
+		const origInverted = sel.inverted;
+		const origOutlineLoops = sel.outlineLoops?.map((loop) => loop.map((pt) => ({ ...pt }))) ?? null;
 		const movedRect = origRect ? { x: origRect.x + dx, y: origRect.y + dy, width: origRect.width, height: origRect.height } : null;
 		const movedPoints = origPoints?.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })) ?? null;
 		const movedBounds = origBounds ? { x: origBounds.x + dx, y: origBounds.y + dy, width: origBounds.width, height: origBounds.height } : null;
@@ -197,7 +368,12 @@ export class MoveEngine {
 		sel.rect = movedRect;
 		sel.points = movedPoints;
 		sel.bounds = movedBounds;
-		if (sel.composite) {
+		if (this.scaleX !== 1 || this.scaleY !== 1 || this.rotation !== 0) {
+			sel.composite = true;
+			sel.inverted = false;
+			sel.outlineLoops = this.renderer.computeMaskOutline(newMaskId, w, h);
+			sel.bounds = boundsOfLoops(sel.outlineLoops) ?? movedBounds;
+		} else if (sel.composite) {
 			// combined selections have no single geometry — the ants and bounds
 			// must be re-derived from the moved mask surface
 			sel.outlineLoops = this.renderer.computeMaskOutline(newMaskId, w, h);
@@ -205,6 +381,12 @@ export class MoveEngine {
 		} else {
 			sel.outlineLoops = null;
 		}
+		const afterRect = sel.rect ? { ...sel.rect } : null;
+		const afterPoints = sel.points?.map((pt) => ({ ...pt })) ?? null;
+		const afterBounds = sel.bounds ? { ...sel.bounds } : null;
+		const afterComposite = sel.composite;
+		const afterInverted = sel.inverted;
+		const afterOutlineLoops = sel.outlineLoops?.map((loop) => loop.map((pt) => ({ ...pt }))) ?? null;
 
 		layer.surfaceId = afterId;
 		this.renderer.rebuildActiveLayers();
@@ -228,6 +410,9 @@ export class MoveEngine {
 					sel.rect = origRect;
 					sel.points = origPoints;
 					sel.bounds = origBounds;
+					sel.composite = origComposite;
+					sel.inverted = origInverted;
+					sel.outlineLoops = origOutlineLoops;
 					this.renderer.refreshActiveSelection();
 				}
 			},
@@ -238,9 +423,12 @@ export class MoveEngine {
 				}
 				if (sel.maskId === oldMaskId) {
 					sel.maskId = newMaskId;
-					sel.rect = movedRect;
-					sel.points = movedPoints;
-					sel.bounds = movedBounds;
+					sel.rect = afterRect;
+					sel.points = afterPoints;
+					sel.bounds = afterBounds;
+					sel.composite = afterComposite;
+					sel.inverted = afterInverted;
+					sel.outlineLoops = afterOutlineLoops;
 					this.renderer.refreshActiveSelection();
 				}
 			},
@@ -294,6 +482,10 @@ export class MoveEngine {
 		this.origin = null;
 		this.baseOffset = { x: 0, y: 0 };
 		this.offset = { x: 0, y: 0 };
+		this.pivot = { x: 0, y: 0 };
+		this.scaleX = 1;
+		this.scaleY = 1;
+		this.rotation = 0;
 		this.active = false;
 	}
 }
