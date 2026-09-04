@@ -1056,6 +1056,10 @@ body {
 	border-radius: 4px;
 	pointer-events: none;
 }
+.fsl-gradient-fade {
+	mask-image: linear-gradient(to right, black 0%, rgba(0,0,0,0.2) 100%);
+	-webkit-mask-image: linear-gradient(to right, black 0%, rgba(0,0,0,0.2) 100%);
+}
 .fsl-range {
 	flex: 1 1 auto;
 	min-width: 0;

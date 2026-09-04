@@ -16,10 +16,12 @@
 		default: number;
 		/** CSS background value (gradient or colour) painted behind the track */
 		gradient?: string;
+		/** Extra CSS class for the gradient bar (e.g. mask-image fade) */
+		gradientClass?: string;
 		oninput?: () => void;
 		onCommit?: () => void;
 	}
-	let { label, value = $bindable(), min, max, step = 1, default: dflt, gradient, oninput, onCommit }: Props = $props();
+	let { label, value = $bindable(), min, max, step = 1, default: dflt, gradient, gradientClass, oninput, onCommit }: Props = $props();
 
 	function reset(): void {
 		value = dflt;
@@ -47,7 +49,7 @@
 	<span class="fsl-row">
 		<span class="fsl-track-wrap">
 			{#if gradient}
-				<span class="fsl-gradient" style="background:{gradient}"></span>
+				<span class="fsl-gradient {gradientClass ?? ''}" style="background:{gradient}"></span>
 			{/if}
 			<input
 				class="fsl-range"

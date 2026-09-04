@@ -20,7 +20,7 @@
 	const renderer = () => getEditorRenderer();
 
 	const blurGradient =
-		'linear-gradient(90deg, rgba(42,123,155,1) 1%, rgba(87,199,133,1) 2%, rgba(42,123,155,1) 7%, rgba(87,199,133,1) 18%, rgba(42,123,155,1) 31%, rgba(87,199,133,1) 44%, rgba(42,123,155,1) 57%, rgba(87,199,133,1) 77%)';
+		'repeating-linear-gradient(90deg, #2A7B9B 0 10px, #57C785 10px 20px)';
 
 	function preview() {
 		if (previewOn && prefs.strength > 0)
@@ -67,6 +67,7 @@
 			bind:value={prefs.strength}
 			oninput={preview}
 			gradient={blurGradient}
+			gradientClass="fsl-gradient-fade"
 		/>
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
