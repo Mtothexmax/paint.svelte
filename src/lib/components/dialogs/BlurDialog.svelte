@@ -19,6 +19,9 @@
 	let previewOn = $state(true);
 	const renderer = () => getEditorRenderer();
 
+	const blurGradient =
+		'linear-gradient(90deg, rgba(42,123,155,1) 1%, rgba(87,199,133,1) 2%, rgba(42,123,155,1) 7%, rgba(87,199,133,1) 18%, rgba(42,123,155,1) 31%, rgba(87,199,133,1) 44%, rgba(42,123,155,1) 57%, rgba(87,199,133,1) 77%)';
+
 	function preview() {
 		if (previewOn && prefs.strength > 0)
 			renderer().setActiveLayerFilterPreview(new BlurFilter({ strength: prefs.strength, resolution: 1 }));
@@ -55,15 +58,16 @@
 </script>
 
 <MovableDialog title="Gaussian Blur" onClose={cancel} width={380}>
-	<FilterSlider
-		label="Blur strength"
-		min={0}
-		max={50}
-		step={1}
-		default={8}
-		bind:value={prefs.strength}
-		oninput={preview}
-	/>
+		<FilterSlider
+			label="Blur strength"
+			min={0}
+			max={50}
+			step={1}
+			default={8}
+			bind:value={prefs.strength}
+			oninput={preview}
+			gradient={blurGradient}
+		/>
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
 		Preview

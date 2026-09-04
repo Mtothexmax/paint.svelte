@@ -1043,10 +1043,62 @@ body {
 	align-items: center;
 	gap: 8px;
 }
+.fsl-track-wrap {
+	flex: 1 1 auto;
+	min-width: 0;
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+.fsl-gradient {
+	position: absolute;
+	inset: 0;
+	border-radius: 4px;
+	pointer-events: none;
+}
 .fsl-range {
 	flex: 1 1 auto;
 	min-width: 0;
 	accent-color: var(--accent);
+}
+/* When a gradient bar is present the native track is made transparent so the
+   colour gradient shows through. The thumb keeps the accent colour. */
+.fsl-range-grad {
+	-webkit-appearance: none;
+	appearance: none;
+	background: transparent;
+	height: 20px;
+}
+.fsl-range-grad::-webkit-slider-runnable-track {
+	background: transparent;
+	height: 20px;
+	border-radius: 4px;
+}
+.fsl-range-grad::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--accent);
+	border: 2px solid #fff;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	margin-top: -0px;
+	cursor: pointer;
+}
+.fsl-range-grad::-moz-range-track {
+	background: transparent;
+	height: 20px;
+	border-radius: 4px;
+}
+.fsl-range-grad::-moz-range-thumb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--accent);
+	border: 2px solid #fff;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	cursor: pointer;
 }
 .fsl-num {
 	width: 60px;

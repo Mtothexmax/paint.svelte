@@ -3,6 +3,9 @@
 	// with the value shown as an EDITABLE number field on the right, plus an
 	// icon-only reset button that restores the default value. Changes flow up
 	// through `oninput`/`onCommit` so the caller can live-preview + persist.
+	//
+	// When a `gradient` CSS string is given it is painted behind the track
+	// (the native track is made transparent so the colour bar shows through).
 	interface Props {
 		label: string;
 		value: number;
@@ -11,10 +14,12 @@
 		step?: number;
 		/** the value the reset button restores the slider to */
 		default: number;
+		/** CSS background value (gradient or colour) painted behind the track */
+		gradient?: string;
 		oninput?: () => void;
 		onCommit?: () => void;
 	}
-	let { label, value = $bindable(), min, max, step = 1, default: dflt, oninput, onCommit }: Props = $props();
+	let { label, value = $bindable(), min, max, step = 1, default: dflt, gradient, oninput, onCommit }: Props = $props();
 
 	function reset(): void {
 		value = dflt;
@@ -40,16 +45,22 @@
 <label class="fsl">
 	<span class="fsl-label">{label}</span>
 	<span class="fsl-row">
-		<input
-			class="fsl-range"
-			type="range"
-			min={min}
-			max={max}
-			step={step}
-			bind:value
-			oninput={oninput}
-			onchange={oninput}
-		/>
+		<span class="fsl-track-wrap">
+			{#if gradient}
+				<span class="fsl-gradient" style="background:{gradient}"></span>
+			{/if}
+			<input
+				class="fsl-range"
+				class:fsl-range-grad={!!gradient}
+				type="range"
+				min={min}
+				max={max}
+				step={step}
+				bind:value
+				oninput={oninput}
+				onchange={oninput}
+			/>
+		</span>
 		<input
 			class="fsl-num"
 			type="number"

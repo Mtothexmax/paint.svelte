@@ -21,6 +21,22 @@
 	let previewOn = $state(true);
 	const renderer = () => getEditorRenderer();
 
+	/** Hue track: light-blue on the left, then the full hue spectrum. */
+	const hueGradient =
+		'linear-gradient(90deg, hsl(200,80%,70%) 0%, hsl(0,100%,50%) 8.33%, hsl(60,100%,50%) 25%, hsl(120,100%,50%) 41.67%, hsl(180,100%,50%) 58.33%, hsl(240,100%,50%) 75%, hsl(300,100%,50%) 91.67%, hsl(360,100%,50%) 100%)';
+
+	/** Saturation track: desaturated on the left (same hue & lightness, zero
+	 *  saturation) → fully saturated on the right. The base hue is taken from
+	 *  the current hue shift so the bar reflects the adjusted colour. */
+	const satGradient = $derived(() => {
+		const baseHue = 200 + prefs.hue; // approximate starting hue (200 ≈ light blue)
+		const lightPct = Math.round(prefs.light * 50 / 100); // 100 → 50%
+		return `linear-gradient(90deg, hsl(${baseHue},0%,${lightPct}%) 0%, hsl(${baseHue},100%,${lightPct}%) 100%)`;
+	});
+
+	/** Lightness track: black → white. */
+	const lightGradient = 'linear-gradient(90deg, #000 0%, #fff 100%)';
+
 	function makeFilter() {
 		const cm = new ColorMatrixFilter();
 		cm.saturate(Math.max(0, prefs.sat) / 100, true);
@@ -65,9 +81,9 @@
 </script>
 
 <MovableDialog title="Hue / Saturation" onClose={cancel} width={400}>
-	<FilterSlider label="Hue" min={-180} max={180} step={1} default={0} bind:value={prefs.hue} oninput={preview} />
-	<FilterSlider label="Saturation" min={0} max={200} step={1} default={100} bind:value={prefs.sat} oninput={preview} />
-	<FilterSlider label="Lightness" min={0} max={200} step={1} default={100} bind:value={prefs.light} oninput={preview} />
+	<FilterSlider label="Hue" min={-180} max={180} step={1} default={0} bind:value={prefs.hue} oninput={preview} gradient={hueGradient} />
+	<FilterSlider label="Saturation" min={0} max={200} step={1} default={100} bind:value={prefs.sat} oninput={preview} gradient={satGradient()} />
+	<FilterSlider label="Lightness" min={0} max={200} step={1} default={100} bind:value={prefs.light} oninput={preview} gradient={lightGradient} />
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
 		Preview
@@ -78,4 +94,3 @@
 		<button class="btn-primary" onclick={apply}>Apply</button>
 	{/snippet}
 </MovableDialog>
-
