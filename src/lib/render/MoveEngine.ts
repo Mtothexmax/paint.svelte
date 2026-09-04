@@ -281,10 +281,14 @@ export class MoveEngine {
 			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
 			const localPointer = this.inverseTransformPoint(p, start);
 			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e')
-				? (localPointer.x - anchorX) / (this.transformHandle.includes('w') ? -b.width : b.width)
+				? start.scaleX +
+					(localPointer.x - (this.transformHandle.includes('w') ? b.x : b.x + b.width)) /
+						(this.transformHandle.includes('w') ? -b.width : b.width)
 				: start.scaleX;
 			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s')
-				? (localPointer.y - anchorY) / (this.transformHandle.includes('n') ? -b.height : b.height)
+				? start.scaleY +
+					(localPointer.y - (this.transformHandle.includes('n') ? b.y : b.y + b.height)) /
+						(this.transformHandle.includes('n') ? -b.height : b.height)
 				: start.scaleY;
 			if (shift) {
 				const magnitude = Math.max(Math.abs(sx), Math.abs(sy));
