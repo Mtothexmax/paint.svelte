@@ -210,12 +210,13 @@
 				return;
 			}
 			if (selecting) cancelSelectDrag();
-			// Escape aborts a floating move: the content returns to its source.
+			// Escape always ends with NO selection: a floating move is first
+			// cancelled (content returns to its source), then the selection —
+			// if any — is dropped.
 			if (moveEngine?.floating) {
 				moveEngine.cancel();
 				moving = false;
 				movePointerId = -1;
-				return;
 			}
 			if (documentRegistry.active?.selection.active) deselect();
 			return;
