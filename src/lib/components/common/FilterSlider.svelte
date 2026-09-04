@@ -4,8 +4,9 @@
 	// icon-only reset button that restores the default value. Changes flow up
 	// through `oninput`/`onCommit` so the caller can live-preview + persist.
 	//
-	// When a `gradient` CSS string is given it is painted behind the track
-	// (the native track is made transparent so the colour bar shows through).
+	// When a `gradient` CSS string is given it is painted as the background of
+	// the range input itself (the native track is made transparent, the thumb
+	// is styled as a white circle on top of the gradient).
 	interface Props {
 		label: string;
 		value: number;
@@ -14,14 +15,12 @@
 		step?: number;
 		/** the value the reset button restores the slider to */
 		default: number;
-		/** CSS background value (gradient or colour) painted behind the track */
+		/** CSS background value (gradient or colour) painted on the track */
 		gradient?: string;
-		/** Extra CSS class for the gradient bar (e.g. mask-image fade) */
-		gradientClass?: string;
 		oninput?: () => void;
 		onCommit?: () => void;
 	}
-	let { label, value = $bindable(), min, max, step = 1, default: dflt, gradient, gradientClass, oninput, onCommit }: Props = $props();
+	let { label, value = $bindable(), min, max, step = 1, default: dflt, gradient, oninput, onCommit }: Props = $props();
 
 	function reset(): void {
 		value = dflt;
@@ -47,22 +46,18 @@
 <label class="fsl">
 	<span class="fsl-label">{label}</span>
 	<span class="fsl-row">
-		<span class="fsl-track-wrap">
-			{#if gradient}
-				<span class="fsl-gradient {gradientClass ?? ''}" style="background:{gradient}"></span>
-			{/if}
-			<input
-				class="fsl-range"
-				class:fsl-range-grad={!!gradient}
-				type="range"
-				min={min}
-				max={max}
-				step={step}
-				bind:value
-				oninput={oninput}
-				onchange={oninput}
-			/>
-		</span>
+		<input
+			class="fsl-range"
+			class:fsl-range-grad={!!gradient}
+			type="range"
+			min={min}
+			max={max}
+			step={step}
+			bind:value
+			oninput={oninput}
+			onchange={oninput}
+			style={gradient ? `background:${gradient}` : undefined}
+		/>
 		<input
 			class="fsl-num"
 			type="number"
