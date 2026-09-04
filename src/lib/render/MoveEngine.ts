@@ -202,6 +202,17 @@ export class MoveEngine {
 		};
 	}
 
+	private inverseTransformPoint(p: Point, state: typeof this.transformStart): Point {
+		const dx = p.x - state.pivot.x - state.offset.x;
+		const dy = p.y - state.pivot.y - state.offset.y;
+		const cos = Math.cos(state.rotation);
+		const sin = Math.sin(state.rotation);
+		return {
+			x: state.pivot.x + (dx * cos + dy * sin) / (state.scaleX || 1),
+			y: state.pivot.y + (-dx * sin + dy * cos) / (state.scaleY || 1)
+		};
+	}
+
 	setTransformState(state: { pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number }): void {
 		if (!this.active) return;
 		this.pivot = { ...state.pivot };
@@ -258,27 +269,14 @@ export class MoveEngine {
 			if (shift) next = Math.round((next * 180) / Math.PI / 10) * (Math.PI / 18);
 			this.rotation = next;
 		} else {
-			const deltaX = p.x - this.origin.x;
-			const deltaY = p.y - this.origin.y;
 			const anchorX = this.transformHandle.includes('w') ? b.x + b.width : this.transformHandle.includes('e') ? b.x : b.x + b.width / 2;
 			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
-			const movingX = this.transformHandle.includes('w')
-				? b.x + deltaX
-				: this.transformHandle.includes('e')
-					? b.x + b.width + deltaX
-					: b.x + b.width / 2;
-			const movingY = this.transformHandle.includes('n')
-				? b.y + deltaY
-				: this.transformHandle.includes('s')
-					? b.y + b.height + deltaY
-					: b.y + b.height / 2;
-			const baseX = this.transformHandle.includes('w') ? -b.width : this.transformHandle.includes('e') ? b.width : 1;
-			const baseY = this.transformHandle.includes('n') ? -b.height : this.transformHandle.includes('s') ? b.height : 1;
+			const localPointer = this.inverseTransformPoint(p, start);
 			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e')
-				? start.scaleX + (movingX - anchorX) / baseX
+				? (localPointer.x - anchorX) / (this.transformHandle.includes('w') ? -b.width : b.width)
 				: start.scaleX;
 			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s')
-				? start.scaleY + (movingY - anchorY) / baseY
+				? (localPointer.y - anchorY) / (this.transformHandle.includes('n') ? -b.height : b.height)
 				: start.scaleY;
 			if (shift) {
 				const magnitude = Math.max(Math.abs(sx), Math.abs(sy));
