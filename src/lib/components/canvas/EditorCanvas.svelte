@@ -770,6 +770,10 @@
 				return;
 			}
 			if (moveEngine.begin() === 'ok') {
+				const shownTransform = transformUi;
+				if (shownTransform) {
+					moveEngine.setTransformState(shownTransform);
+				}
 				const activeHandle = handle ?? 'move';
 				if (activeHandle === 'move' && !moveEngine.pointInSelection(img)) {
 					moveEngine.cancel();

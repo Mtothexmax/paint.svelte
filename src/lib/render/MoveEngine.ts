@@ -188,6 +188,18 @@ export class MoveEngine {
 		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
 	}
 
+	setTransformState(state: { pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number }): void {
+		if (!this.active) return;
+		this.pivot = { ...state.pivot };
+		this.offset = { ...state.offset };
+		this.scaleX = state.scaleX;
+		this.scaleY = state.scaleY;
+		this.rotation = state.rotation;
+		this.applyFloatingTransform();
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+	}
+
 	private transformHandle: TransformHandle = 'move';
 	private transformStart = {
 		offset: { x: 0, y: 0 },
