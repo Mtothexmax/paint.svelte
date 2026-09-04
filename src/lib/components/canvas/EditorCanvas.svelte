@@ -12,6 +12,8 @@
 	import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
 	import type { TransformHandle } from '../../render/MoveEngine';
 	import { logTransformDebug } from '../../render/transformDebug';
+	import rotateClockwiseCursor from '../../assets/rotate-clockwise.svg';
+	import rotateCounterclockwiseCursor from '../../assets/rotate-counterclockwise.svg';
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import {
@@ -255,7 +257,12 @@
 		if (moveArmed) {
 			if (!pointerInside) return '';
 			const img = imageFromScreen({ x: pointerX, y: pointerY });
-			return transformHandleAt(img) === 'rotate' ? 'cursor: grab;' : 'cursor: move;';
+			if (transformHandleAt(img) === 'rotate') {
+				const pivot = moveEngine?.transformState?.pivot ?? transformUi?.pivot;
+				const cursor = pivot && img.x < pivot.x ? rotateCounterclockwiseCursor : rotateClockwiseCursor;
+				return `cursor: url("${cursor}") 12 12, grab;`;
+			}
+			return 'cursor: move;';
 		}
 		if (moveSelArmed) return pointerInside ? 'cursor: move;' : '';
 		if (!(paintArmed || selectionArmed)) return '';
