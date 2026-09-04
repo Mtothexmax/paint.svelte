@@ -90,6 +90,7 @@
 	let moving = $state(false);
 	let movePointerId = -1;
 	let transformHandle: TransformHandle | null = null;
+	let lastTransformClick = { handle: null as TransformHandle | null, time: 0 };
 	let transformUi = $state<{
 		bounds: { x: number; y: number; width: number; height: number };
 		pivot: Point;
@@ -683,6 +684,16 @@
 		}
 	}
 
+	function resetPivotToCenter(): void {
+		const state = moveEngine?.transformState;
+		if (!state || !moveEngine) return;
+		moveEngine.setPivot({
+			x: state.bounds.x + state.bounds.width / 2,
+			y: state.bounds.y + state.bounds.height / 2
+		});
+		syncTransformUi();
+	}
+
 	function onPointerDown(e: PointerEvent) {
 		if (!ready) return;
 		movePointer(screenPoint(e));
@@ -739,6 +750,13 @@
 			const img = imageFromScreen(screenPoint(e));
 			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
 			const handle = transformHandleAt(img);
+			const now = performance.now();
+			if (handle === 'pivot' && lastTransformClick.handle === 'pivot' && now - lastTransformClick.time < 400) {
+				resetPivotToCenter();
+				lastTransformClick = { handle: null, time: 0 };
+				return;
+			}
+			lastTransformClick = { handle, time: now };
 			if (moveEngine.floating) {
 				if (handle) beginTransformDrag(e, img, handle);
 				else if (moveEngine.pointInSelection(img)) startMoveDrag(e, img);

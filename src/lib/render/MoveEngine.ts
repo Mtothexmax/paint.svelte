@@ -180,6 +180,14 @@ export class MoveEngine {
 		};
 	}
 
+	setPivot(p: Point): void {
+		if (!this.active || !this.bounds) return;
+		this.pivot = { ...p };
+		this.applyFloatingTransform();
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+	}
+
 	private transformHandle: TransformHandle = 'move';
 	private transformStart = {
 		offset: { x: 0, y: 0 },
