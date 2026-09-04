@@ -78,6 +78,10 @@ export class DocScene {
 	private transformHandles = new Graphics();
 	/** Translucent blue veil showing exactly what is selected (mask texture). */
 	private tintSprite: Sprite | null = null;
+	/** Shape-based blue veil for simple rect/ellipse/lasso selections. Unlike
+	 * the mask sprite this can extend outside the document, so moving a
+	 * selection off-canvas and back restores the full region. */
+	private tintShape = new Graphics();
 	/** Floating "moved selection" content preview (image space). Rendered
 	 * between the blue tint and the ants outline while the Move tool drags the
 	 * selected pixels around. */
@@ -101,6 +105,7 @@ export class DocScene {
 		this.checker.roundPixels = false;
 		this.root.addChild(this.checker);
 		this.rebuildLayers(surfaces);
+		this.top.addChild(this.tintShape);
 		this.top.addChild(this.ants);
 		this.top.addChild(this.transformHandles);
 		this.root.addChild(this.top);
@@ -137,6 +142,14 @@ export class DocScene {
 	resync(surfaces: SurfaceStore): void {
 		this.rebuildLayers(surfaces);
 		this.setCrisp(this.crisp);
+	}
+
+	setActiveLayerPreview(texture: Texture | null, fallback: Texture | null = null): void {
+		const idx = this.doc.layers.findIndex((layer) => layer.id === this.doc.activeLayerId);
+		const sprite = idx >= 0 ? this.layerSprites[idx] : null;
+		if (!sprite) return;
+		if (texture) sprite.texture = texture;
+		else if (fallback) sprite.texture = fallback;
 	}
 
 	/** Lazily allocates the pooled stroke buffer + overlay (doc-sized). */
@@ -304,6 +317,7 @@ export class DocScene {
 	 * donut/complement selections obvious.
 	 */
 	setSelectionTint(texture: Texture | null): void {
+		this.tintShape.clear();
 		if (!texture) {
 			if (this.tintSprite) {
 				this.top.removeChild(this.tintSprite);
@@ -328,6 +342,25 @@ export class DocScene {
 		this.tintSprite.position.set(0, 0);
 		this.tintSprite.scale.set(1, 1);
 		this.tintSprite.rotation = 0;
+	}
+
+	/** Fills the blue veil from selection geometry (image space). Used for
+	 * simple shapes so the overlay is not clipped to the document-sized mask. */
+	setSelectionTintFromLoops(loops: Point[][] | null): void {
+		if (this.tintSprite) {
+			this.top.removeChild(this.tintSprite);
+			this.tintSprite.destroy();
+			this.tintSprite = null;
+		}
+		this.tintShape.clear();
+		if (!loops?.length) return;
+		let filled = false;
+		for (const loop of loops) {
+			if (!loop || loop.length < 3) continue;
+			this.tintShape.poly(loop, true);
+			filled = true;
+		}
+		if (filled) this.tintShape.fill({ color: 0x8fc7ff, alpha: 0.32 });
 	}
 
 	/** Offsets the blue veil (image px) so it travels with a floating selection

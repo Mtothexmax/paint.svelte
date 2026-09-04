@@ -70,6 +70,7 @@
 	const SELECT_DRAG_MIN = 3;
 	// debug: last tool id that was logged (avoid console spam)
 	let lastLoggedTool: string | null = null;
+	let lastTransformCursorDebug = '';
 
 	let host: HTMLDivElement;
 	let canvasEl: HTMLCanvasElement;
@@ -175,7 +176,9 @@
 		}
 		handleBounds = { ...selectionBounds };
 
-		const state = moveEngine?.transformState;
+		const state = get(activeToolId) === 'move-selection'
+			? moveSelEngine?.transformState
+			: moveEngine?.transformState;
 		if (state) {
 			transformUi = { bounds: state.bounds, pivot: state.pivot, offset: state.offset, scaleX: state.scaleX, scaleY: state.scaleY, rotation: state.rotation };
 		} else {
@@ -189,12 +192,15 @@
 				rotation: 0
 			};
 		}
+		if (get(activeToolId) === 'move-selection' && moveSelEngine?.dragging) {
+			moveSelEngine.refreshPreview();
+		}
 	}
 
 	function visibleTransformPoints(): Array<{ handle: TransformHandle; sx: number; sy: number }> {
 		transformRevision;
 		const doc = documentRegistry.active;
-		if (get(activeToolId) !== 'move-pixels') return [];
+		if (get(activeToolId) !== 'move-pixels' && get(activeToolId) !== 'move-selection') return [];
 		if (!doc || (!transformUi && !handleBounds)) return [];
 		if (transformUi) {
 			return transformPoints;
@@ -254,7 +260,6 @@
 		if (panning) return '';
 		if (painting) return 'cursor: none;';
 		if (moving) return 'cursor: move;';
-		if (movingSelection) return 'cursor: move;';
 		if (moveArmed) {
 			if (!pointerInside) return '';
 			const img = imageFromScreen({ x: pointerX, y: pointerY });
@@ -265,7 +270,22 @@
 			}
 			return moveEngine?.floating && moveEngine.pointInSelection(img) ? 'cursor: default;' : 'cursor: move;';
 		}
-		if (moveSelArmed) return pointerInside ? 'cursor: move;' : '';
+		if (moveSelArmed) {
+			if (!pointerInside) return '';
+			const img = imageFromScreen({ x: pointerX, y: pointerY });
+			const handle = transformHandleAt(img);
+			if (handle === 'rotate') {
+				const pivot = moveSelEngine?.transformState?.pivot ?? transformUi?.pivot;
+				const cursor = pivot && img.x < pivot.x ? rotateCounterclockwiseCursor : rotateClockwiseCursor;
+				return `cursor: url("${cursor}") 12 12, grab;`;
+			}
+			if (handle === 'nw' || handle === 'se') return 'cursor: nwse-resize;';
+			if (handle === 'ne' || handle === 'sw') return 'cursor: nesw-resize;';
+			if (handle === 'n' || handle === 's') return 'cursor: ns-resize;';
+			if (handle === 'e' || handle === 'w') return 'cursor: ew-resize;';
+			if (handle === 'pivot') return 'cursor: crosshair;';
+			return pointInTransformSelection(img, moveSelEngine?.transformState ?? transformUi) ? 'cursor: move;' : 'cursor: default;';
+		}
 		if (!(paintArmed || selectionArmed)) return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
@@ -423,6 +443,7 @@
 					e.preventDefault();
 					e.stopPropagation();
 					selectAll();
+					syncTransformUi();
 					return;
 				}
 				if (key === 'd') {
@@ -498,6 +519,7 @@
 		const factor = Math.exp(-e.deltaY * 0.0015);
 		doc.view = zoomBy(doc.view, anchor, factor);
 		renderer.refreshActiveView();
+		syncTransformUi();
 		updateStatus(doc);
 		refreshRing(); // zoom changed the on-screen brush size
 	}
@@ -512,6 +534,15 @@
 	function selectionToolKind(): 'rect' | 'ellipse' | 'lasso' | null {
 		const kind = SELECT_KIND[get(activeToolId)];
 		return kind ?? null;
+	}
+
+	function clampSelectionPoint(point: Point): Point {
+		const doc = documentRegistry.active;
+		if (!doc) return point;
+		return {
+			x: Math.max(0, Math.min(doc.width, point.x)),
+			y: Math.max(0, Math.min(doc.height, point.y))
+		};
 	}
 
 	/** Returns the opposite (drag) corner for the RECTANGLE tool according to the
@@ -549,10 +580,12 @@
 	 * current pointer position in image px. */
 	function showSelectDraft(cur: Point): void {		if (!ready) return;
 		const kind = selectionToolKind();
-		const start = selStart;
+		const start = selStart ? clampSelectionPoint(selStart) : null;
+		const boundedCur = clampSelectionPoint(cur);
 		if (!kind || !start) return;
 		if (kind === 'lasso') {
-			if (lassoPts.length >= 2) getEditorRenderer().previewSelectionOutline([lassoPts], false);
+			const boundedPoints = lassoPts.map(clampSelectionPoint);
+			if (boundedPoints.length >= 2) getEditorRenderer().previewSelectionOutline([boundedPoints], false);
 			return;
 		}
 		// rect/ellipse: outline follows the current pointer position (rectangle
@@ -560,9 +593,9 @@
 		// free-floating box with its top-left under the pointer).
 		let rect: { x: number; y: number; width: number; height: number };
 		if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {
-			rect = fixedRectAt(cur);
+			rect = fixedRectAt(boundedCur);
 		} else {
-			const eff = kind === 'rect' ? constrainRectCorner(start, cur) : cur;
+			const eff = kind === 'rect' ? constrainRectCorner(start, boundedCur) : boundedCur;
 			rect = {
 				x: Math.min(start.x, eff.x),
 				y: Math.min(start.y, eff.y),
@@ -656,7 +689,10 @@
 	}
 
 	function transformHandleAt(img: Point): TransformHandle | null {
-		const t = moveEngine?.transformState ?? transformUi;
+		const activeTool = get(activeToolId);
+		const t = activeTool === 'move-selection'
+			? moveSelEngine?.transformState ?? transformUi
+			: moveEngine?.transformState ?? transformUi;
 		const doc = documentRegistry.active;
 		if (!t || !doc) return null;
 		const b = t.bounds;
@@ -683,10 +719,22 @@
 		return null;
 	}
 
+	function pointInTransformSelection(img: Point, t: { bounds: { x: number; y: number; width: number; height: number }; pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number } | null): boolean {
+		if (!t) return false;
+		const cos = Math.cos(t.rotation);
+		const sin = Math.sin(t.rotation);
+		const dx = img.x - t.pivot.x - t.offset.x;
+		const dy = img.y - t.pivot.y - t.offset.y;
+		const localX = t.pivot.x + (dx * cos + dy * sin) / (t.scaleX || 1);
+		const localY = t.pivot.y + (-dx * sin + dy * cos) / (t.scaleY || 1);
+		const b = t.bounds;
+		return localX >= b.x && localX <= b.x + b.width && localY >= b.y && localY <= b.y + b.height;
+	}
+
 	function logTransformCursor(img: Point): void {
 		const t = moveEngine?.transformState ?? transformUi;
 		const doc = documentRegistry.active;
-		if (!t || !doc || get(activeToolId) !== 'move-pixels') return;
+		if (!t || !doc || (get(activeToolId) !== 'move-pixels' && get(activeToolId) !== 'move-selection')) return;
 		const b = t.bounds;
 		const cos = Math.cos(t.rotation);
 		const sin = Math.sin(t.rotation);
@@ -701,13 +749,23 @@
 		const pivot = { x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y };
 		const corners = [point(b.x, b.y), point(b.x + b.width, b.y), point(b.x + b.width, b.y + b.height), point(b.x, b.y + b.height)];
 		const outside = !pointInPolygon(img, corners);
-		console.log('[transform-cursor]', {
+		const debugEntry = {
 			mouse: img,
 			selection: { bounds: b, pivot, offset: t.offset, scaleX: t.scaleX, scaleY: t.scaleY, rotation: t.rotation },
 			corners,
 			outside,
 			handle: transformHandleAt(img)
+		};
+		console.log('[transform-cursor]', debugEntry);
+		const signature = JSON.stringify({
+			handle: debugEntry.handle,
+			outside: debugEntry.outside,
+			mouse: { x: Math.round(img.x), y: Math.round(img.y) }
 		});
+		if (signature !== lastTransformCursorDebug) {
+			lastTransformCursorDebug = signature;
+			logTransformDebug('cursor', debugEntry);
+		}
 	}
 
 	function pointInPolygon(p: Point, polygon: Point[]): boolean {
@@ -721,8 +779,13 @@
 	}
 
 	function beginTransformDrag(e: PointerEvent, img: Point, handle: TransformHandle): void {
-		if (!moveEngine) return;
-		moveEngine.beginTransform(handle, img);
+		if (get(activeToolId) === 'move-selection') {
+			if (!moveSelEngine) return;
+			moveSelEngine.beginTransform(handle, img);
+		} else {
+			if (!moveEngine) return;
+			moveEngine.beginTransform(handle, img);
+		}
 		transformHandle = handle;
 		moving = true;
 		movePointerId = e.pointerId;
@@ -781,7 +844,7 @@
 			selecting = true;
 			selectPointerId = e.pointerId;
 			selDownClient = { x: e.clientX, y: e.clientY };
-			selStart = imageFromScreen(screenPoint(e));
+			selStart = clampSelectionPoint(imageFromScreen(screenPoint(e)));
 			lassoPts = [selStart];
 			try {
 				host.setPointerCapture(e.pointerId);
@@ -849,6 +912,15 @@
 			if (!moveSelEngine) moveSelEngine = new MoveSelectionEngine(getEditorRenderer());
 			const img = imageFromScreen(screenPoint(e));
 			if (moveSelEngine.begin(img)) {
+				syncTransformUi();
+				const handle = transformHandleAt(img);
+				logTransformDebug('canvas.selectionPointerdown', {
+					pointer: img,
+					handle,
+					transform: moveSelEngine.transformState
+				});
+				transformHandle = handle;
+				if (handle) moveSelEngine.beginTransform(handle, img);
 				movingSelection = true;
 				moveSelPointerId = e.pointerId;
 				try {
@@ -908,6 +980,7 @@
 				doc.view.panX = panStartView.panX + (e.clientX - panStart.x);
 				doc.view.panY = panStartView.panY + (e.clientY - panStart.y);
 				getEditorRenderer().refreshActiveView();
+				syncTransformUi();
 				return;
 			}
 			if (painting && e.pointerId === paintPointerId && engine) {
@@ -919,7 +992,9 @@
 				syncTransformUi();
 			}
 			if (movingSelection && e.pointerId === moveSelPointerId && moveSelEngine) {
-				moveSelEngine.moveTo(imageFromScreen(sp));
+				if (transformHandle) moveSelEngine.transformTo(imageFromScreen(sp), e.shiftKey);
+				else moveSelEngine.moveTo(imageFromScreen(sp));
+				syncTransformUi();
 			}
 			if (selecting && e.pointerId === selectPointerId && selStart) {
 				const img = imageFromScreen(sp);
@@ -973,6 +1048,7 @@
 			moveSelEngine?.commit();
 			movingSelection = false;
 			moveSelPointerId = -1;
+			transformHandle = null;
 			try {
 				host.releasePointerCapture(e.pointerId);
 			} catch {
@@ -1012,7 +1088,7 @@
 			if (ready) getEditorRenderer().refreshActiveSelection();
 			return;
 		}
-		const upRaw = imageFromScreen(screenPoint(e));
+		const upRaw = clampSelectionPoint(imageFromScreen(screenPoint(e)));
 		const up =
 			kind === 'rect' && get(selectionRatio) !== 'fixedSize' ? constrainRectCorner(start, upRaw) : upRaw;
 		if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {

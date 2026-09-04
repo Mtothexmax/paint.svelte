@@ -20,6 +20,7 @@ declare global {
 		paintTransformDebug?: {
 			read: () => Array<Record<string, unknown>>;
 			clear: () => void;
+			download: () => void;
 		};
 	}
 }

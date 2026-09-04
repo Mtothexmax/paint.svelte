@@ -36,6 +36,11 @@ export class SurfaceStore {
 		return id;
 	}
 
+	/** Clears an owned surface to transparent. */
+	clear(id: SurfaceId): void {
+		this.render(new Container(), this.getTexture(id), true);
+	}
+
 	/** Uploads an ImageBitmap into an owned surface (GPU copy). */
 	createFromBitmap(bitmap: ImageBitmap): SurfaceId {
 		const texture = Texture.from(bitmap);

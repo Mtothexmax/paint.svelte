@@ -191,7 +191,19 @@ export function invertSelection(): boolean {
 		}
 		invertSelectionMask(surfaces, sel.maskId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
 		sel.inverted = true;
-		sel.bounds = { x: 0, y: 0, width: doc.width, height: doc.height };
+		if (sel.outlineLoops?.length) {
+			const points = sel.outlineLoops.flat();
+			const xs = points.map((point) => point.x);
+			const ys = points.map((point) => point.y);
+			sel.bounds = {
+				x: Math.min(...xs),
+				y: Math.min(...ys),
+				width: Math.max(...xs) - Math.min(...xs),
+				height: Math.max(...ys) - Math.min(...ys)
+			};
+		} else {
+			sel.bounds = null;
+		}
 	} else {
 		// Complement -> restore the positive shape.
 		fillShapeMask(surfaces, sel.maskId, doc.width, doc.height, sel.kind, sel.rect, sel.points);
@@ -258,7 +270,19 @@ export function applySelectionMode(
 	sel.active = true;
 	sel.rect = kind === 'lasso' ? null : rect;
 	sel.points = kind === 'lasso' ? geomPts : null;
-	sel.bounds = { x: 0, y: 0, width: doc.width, height: doc.height };
+	if (sel.outlineLoops?.length) {
+		const points = sel.outlineLoops.flat();
+		const xs = points.map((point) => point.x);
+		const ys = points.map((point) => point.y);
+		sel.bounds = {
+			x: Math.min(...xs),
+			y: Math.min(...ys),
+			width: Math.max(...xs) - Math.min(...xs),
+			height: Math.max(...ys) - Math.min(...ys)
+		};
+	} else {
+		sel.bounds = null;
+	}
 
 	touch(doc);
 	if (cur !== newMask && surfaces.has(cur)) surfaces.dispose(cur);
@@ -317,7 +341,19 @@ export function applySelectionRect(mode: 'replace' | 'add' | 'subtract', kind: '
 	sel.active = true;
 	sel.rect = rect;
 	sel.points = null;
-	sel.bounds = { x: 0, y: 0, width: doc.width, height: doc.height };
+	if (sel.outlineLoops?.length) {
+		const points = sel.outlineLoops.flat();
+		const xs = points.map((point) => point.x);
+		const ys = points.map((point) => point.y);
+		sel.bounds = {
+			x: Math.min(...xs),
+			y: Math.min(...ys),
+			width: Math.max(...xs) - Math.min(...xs),
+			height: Math.max(...ys) - Math.min(...ys)
+		};
+	} else {
+		sel.bounds = null;
+	}
 
 	touch(doc);
 	if (cur !== newMask && surfaces.has(cur)) surfaces.dispose(cur);

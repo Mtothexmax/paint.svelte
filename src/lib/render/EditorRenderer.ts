@@ -139,6 +139,10 @@ export class EditorRenderer {
 		if (this.activeScene) this.activeScene.resync(this.surfaces);
 	}
 
+	setActiveLayerPreview(texture: Texture | null, fallback: Texture | null = null): void {
+		this.activeScene?.setActiveLayerPreview(texture, fallback);
+	}
+
 	/**
 	 * Shows/hides the selection overlay on the ACTIVE scene and (re)attaches
 	 * the selection mask as the stroke-overlay clip. Called whenever the active
@@ -178,7 +182,8 @@ export class EditorRenderer {
 		scene.showTransformHandles(null);
 		const maskTex = sel.maskId && this.surfaces.has(sel.maskId) ? this.surfaces.getTexture(sel.maskId) : null;
 		scene.setStrokeClipTexture(maskTex);
-		scene.setSelectionTint(maskTex);
+		if (this.usesGeometryTint(sel)) scene.setSelectionTintFromLoops(loops);
+		else scene.setSelectionTint(maskTex);
 	}
 
 	getActiveSelectionBounds(): { x: number; y: number; width: number; height: number } | null {
@@ -262,6 +267,11 @@ export class EditorRenderer {
 		this.activeScene?.setSelectionTintTransform(pivotX, pivotY, offsetX, offsetY, scaleX, scaleY, rotation);
 	}
 
+	setSelectionPreviewMask(maskId: SurfaceId): void {
+		if (!this.activeScene || !this.surfaces.has(maskId)) return;
+		this.activeScene.setSelectionTint(this.surfaces.getTexture(maskId));
+	}
+
 	/** Live ants preview shifted by (dx,dy) — drawn while the Move tool drags
 	 * the selection content, so the outline travels with the floating pixels
 	 * until the commit refreshes the selection from the model. */
@@ -270,10 +280,9 @@ export class EditorRenderer {
 		if (!doc || !this.activeScene) return;
 		const loops = this.selectionOutlineLoops(doc);
 		if (!loops) return;
-		this.activeScene.showSelectionOutline(
-			loops.map((loop) => loop.map((p) => ({ x: p.x + dx, y: p.y + dy }))),
-			true
-		);
+		const moved = loops.map((loop) => loop.map((p) => ({ x: p.x + dx, y: p.y + dy })));
+		this.activeScene.showSelectionOutline(moved, true);
+		if (this.usesGeometryTint(doc.selection)) this.activeScene.setSelectionTintFromLoops(moved);
 	}
 
 	previewTransformedSelectionOutline(
@@ -294,7 +303,13 @@ export class EditorRenderer {
 			const y = (p.y - pivot.y) * scaleY;
 			return { x: pivot.x + offset.x + x * cos - y * sin, y: pivot.y + offset.y + x * sin + y * cos };
 		};
-		this.activeScene.showSelectionOutline(loops.map((loop) => loop.map(transform)), true);
+		const transformed = loops.map((loop) => loop.map(transform));
+		this.activeScene.showSelectionOutline(transformed, true);
+		if (this.usesGeometryTint(doc.selection)) this.activeScene.setSelectionTintFromLoops(transformed);
+	}
+
+	private usesGeometryTint(sel: { composite: boolean; inverted: boolean }): boolean {
+		return !sel.composite && !sel.inverted;
 	}
 
 	/** Closed outline loops describing the active selection (mask is the

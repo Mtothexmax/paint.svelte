@@ -78,14 +78,19 @@
 	>
 		{#each tools as tool (tool.id)}
 			<button
+				type="button"
+				tabindex="-1"
 				class="tool-btn"
 				class:active={$activeToolId === tool.id}
 				class:placeholder={tool.placeholder}
 				title={tool.placeholder ? `${tool.label} (placeholder)` : tool.label}
 				aria-label={tool.label}
+				onmousedown={(event) => event.preventDefault()}
+				onfocus={(event) => event.currentTarget.blur()}
 				onclick={() => {
 					console.log('[toolbar] click →', tool.id, '(was', $activeToolId + ')');
 					pickTool(tool.id, tool.label, tool.placeholder);
+					(document.activeElement as HTMLElement | null)?.blur();
 				}}
 			>
 				{#if tool.src}

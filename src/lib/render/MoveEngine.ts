@@ -29,6 +29,7 @@ export class MoveEngine {
 	private beforeId: SurfaceId | null = null;
 	private erasedId: SurfaceId | null = null;
 	private floatingId: SurfaceId | null = null;
+	private previewId: SurfaceId | null = null;
 	private bounds: Rect | null = null;
 	private offset: Point = { x: 0, y: 0 };
 	private pivot: Point = { x: 0, y: 0 };
@@ -133,6 +134,10 @@ export class MoveEngine {
 		layer.surfaceId = erasedId;
 		this.renderer.rebuildActiveLayers();
 		this.renderer.setActiveFloating(surfaces.getTexture(floatingId), bounds.x, bounds.y);
+		this.applyFloatingTransform();
+		this.renderer.refreshActiveSelection();
+		this.applyPreviewTransform();
+		this.updateLivePreview();
 		return 'ok';
 	}
 
@@ -149,12 +154,37 @@ export class MoveEngine {
 		if (!this.active || !this.doc || !this.bounds || !this.origin) return;
 		const dx = this.baseOffset.x + Math.round(p.x - this.origin.x);
 		const dy = this.baseOffset.y + Math.round(p.y - this.origin.y);
-		if (dx === this.offset.x && dy === this.offset.y) return;
+		if (dx === this.offset.x && dy === this.offset.y) {
+			this.updateLivePreview();
+			this.applyPreviewTransform();
+			return;
+		}
 		this.offset = { x: dx, y: dy };
 		const surfaces = this.renderer.surfaces;
 		if (!this.floatingId || !surfaces.has(this.floatingId)) return;
 		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + dx, this.bounds.y + dy);
 		this.applyFloatingTransform();
+		this.updateLivePreview();
+		this.applyPreviewTransform();
+	}
+
+	private updateLivePreview(): void {
+		if (!this.active || !this.erasedId || !this.floatingId || !this.bounds) return;
+		const surfaces = this.renderer.surfaces;
+		const previewId = surfaces.copyRegion(this.erasedId, { x: 0, y: 0, width: this.doc?.width ?? 0, height: this.doc?.height ?? 0 });
+		const maskId = this.doc?.selection.maskId;
+		if (maskId && surfaces.has(maskId)) {
+			const movedMaskId = surfaces.create(this.doc!.width, this.doc!.height);
+			surfaces.blitTransformed(maskId, movedMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+			eraseSelectionRegion(surfaces, movedMaskId, previewId, this.doc!.width, this.doc!.height);
+			surfaces.dispose(movedMaskId);
+		}
+		this.renderer.setActiveLayerPreview(surfaces.getTexture(previewId));
+		if (this.previewId && surfaces.has(this.previewId)) surfaces.dispose(this.previewId);
+		this.previewId = previewId;
+	}
+
+	private applyPreviewTransform(): void {
 		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
 		this.renderer.setActiveTintTransform(
 			this.pivot.x,
@@ -195,6 +225,7 @@ export class MoveEngine {
 		this.applyFloatingTransform();
 		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
 		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+		this.updateLivePreview();
 	}
 
 	private offsetForPivot(nextPivot: Point, previousPivot: Point, offset: Point): Point {
@@ -231,6 +262,7 @@ export class MoveEngine {
 		this.applyFloatingTransform();
 		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
 		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+		this.updateLivePreview();
 	}
 
 	private transformHandle: TransformHandle = 'move';
@@ -323,6 +355,7 @@ export class MoveEngine {
 			this.scaleY,
 			this.rotation
 		);
+		this.updateLivePreview();
 		logTransformDebug('engine.transformTo', {
 			handle: this.transformHandle,
 			pointer: p,
@@ -391,9 +424,14 @@ export class MoveEngine {
 		// after = erased layer + floating content at the new position
 		const afterId = surfaces.copyRegion(erasedId, { x: 0, y: 0, width: w, height: h });
 
-		// move the selection (mask surface + geometry) by the same offset
+		// Clear the transformed destination from the mask itself. Transparent
+		// source pixels must still create a hole on this layer.
 		const sel = doc.selection;
 		const oldMaskId = sel.maskId;
+		if (oldMaskId && surfaces.has(oldMaskId))
+			surfaces.blitTransformed(oldMaskId, afterId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation, 'erase');
+
+		// move the selection (mask surface + geometry) by the same offset
 		const newMaskId = surfaces.create(w, h);
 		if (oldMaskId && surfaces.has(oldMaskId))
 			surfaces.blitTransformed(oldMaskId, newMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation);
@@ -451,6 +489,7 @@ export class MoveEngine {
 		layer.surfaceId = afterId;
 		this.renderer.rebuildActiveLayers();
 		this.renderer.setActiveFloating(null);
+		if (this.previewId && surfaces.has(this.previewId)) surfaces.dispose(this.previewId);
 		surfaces.dispose(erasedId);
 		surfaces.dispose(floatingId);
 		const layerId = layer.id;
@@ -536,6 +575,9 @@ export class MoveEngine {
 		if (this.erasedId && surfaces.has(this.erasedId)) surfaces.dispose(this.erasedId);
 		if (this.floatingId && surfaces.has(this.floatingId)) surfaces.dispose(this.floatingId);
 		this.renderer.setActiveFloating(null);
+		if (this.previewId && surfaces.has(this.previewId)) surfaces.dispose(this.previewId);
+		if (this.beforeId && surfaces.has(this.beforeId))
+			this.renderer.setActiveLayerPreview(null, surfaces.getTexture(this.beforeId));
 		this.reset();
 		this.renderer.refreshActiveSelection();
 	}

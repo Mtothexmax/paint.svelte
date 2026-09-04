@@ -29,9 +29,21 @@ export function clearTransformDebug(): void {
 	window.localStorage.removeItem(STORAGE_KEY);
 }
 
+export function downloadTransformDebug(): void {
+	if (typeof window === 'undefined') return;
+	const blob = new Blob([JSON.stringify(readTransformDebug(), null, 2)], { type: 'application/json' });
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = `paint-transform-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+	link.click();
+	URL.revokeObjectURL(url);
+}
+
 if (typeof window !== 'undefined') {
 	window.paintTransformDebug = {
 		read: readTransformDebug,
-		clear: clearTransformDebug
+		clear: clearTransformDebug,
+		download: downloadTransformDebug
 	};
 }
