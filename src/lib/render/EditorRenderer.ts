@@ -18,6 +18,7 @@ export class EditorRenderer {
 	readonly surfaces = new SurfaceStore();
 	private scenes = new Map<DocId, DocScene>();
 	private activeScene: DocScene | null = null;
+	private transformHandlesVisible = false;
 	private cssWidth = 0;
 	private cssHeight = 0;
 	private disposed = false;
@@ -151,15 +152,51 @@ export class EditorRenderer {
 		const sel = doc.selection;
 		if (!sel.active) {
 			scene.showSelectionOutline(null, true);
+			scene.showTransformHandles(null);
 			scene.setStrokeClipTexture(null);
 			scene.setSelectionTint(null);
 			return;
 		}
 		const loops = this.selectionOutlineLoops(doc);
 		scene.showSelectionOutline(loops, true);
+		const bounds =
+			sel.bounds ??
+			sel.rect ??
+			(loops?.length
+				? (() => {
+						const points = loops.flat();
+						const xs = points.map((p) => p.x);
+						const ys = points.map((p) => p.y);
+						return {
+							x: Math.min(...xs),
+							y: Math.min(...ys),
+							width: Math.max(...xs) - Math.min(...xs),
+							height: Math.max(...ys) - Math.min(...ys)
+						};
+					})()
+				: null);
+		scene.showTransformHandles(null);
 		const maskTex = sel.maskId && this.surfaces.has(sel.maskId) ? this.surfaces.getTexture(sel.maskId) : null;
 		scene.setStrokeClipTexture(maskTex);
 		scene.setSelectionTint(maskTex);
+	}
+
+	getActiveSelectionBounds(): { x: number; y: number; width: number; height: number } | null {
+		const doc = documentRegistry.active;
+		if (!doc?.selection.active) return null;
+		const bounds = doc.selection.bounds ?? doc.selection.rect;
+		if (bounds) return bounds;
+		const loops = this.selectionOutlineLoops(doc);
+		if (!loops?.length) return null;
+		const points = loops.flat();
+		const xs = points.map((p) => p.x);
+		const ys = points.map((p) => p.y);
+		return {
+			x: Math.min(...xs),
+			y: Math.min(...ys),
+			width: Math.max(...xs) - Math.min(...xs),
+			height: Math.max(...ys) - Math.min(...ys)
+		};
 	}
 
 	/**
@@ -177,10 +214,52 @@ export class EditorRenderer {
 		this.activeScene?.setFloatingTexture(texture, x, y);
 	}
 
+	setActiveFloatingTransform(
+		pivotX: number,
+		pivotY: number,
+		offsetX: number,
+		offsetY: number,
+		scaleX: number,
+		scaleY: number,
+		rotation: number
+	): void {
+		const doc = documentRegistry.active;
+		const bounds = doc?.selection.bounds;
+		if (!bounds) return;
+		this.activeScene?.setFloatingTransform(
+			pivotX - bounds.x,
+			pivotY - bounds.y,
+			pivotX,
+			pivotY,
+			offsetX,
+			offsetY,
+			scaleX,
+			scaleY,
+			rotation
+		);
+	}
+
+	setTransformHandlesVisible(visible: boolean): void {
+		this.transformHandlesVisible = visible;
+		this.activeScene?.showTransformHandles(null);
+	}
+
 	/** Offsets the blue selection veil so it travels with the floating
 	 * selection while the Move tool drags it. */
 	setActiveTintOffset(x: number, y: number): void {
 		this.activeScene?.setSelectionTintOffset(x, y);
+	}
+
+	setActiveTintTransform(
+		pivotX: number,
+		pivotY: number,
+		offsetX: number,
+		offsetY: number,
+		scaleX: number,
+		scaleY: number,
+		rotation: number
+	): void {
+		this.activeScene?.setSelectionTintTransform(pivotX, pivotY, offsetX, offsetY, scaleX, scaleY, rotation);
 	}
 
 	/** Live ants preview shifted by (dx,dy) — drawn while the Move tool drags
@@ -195,6 +274,27 @@ export class EditorRenderer {
 			loops.map((loop) => loop.map((p) => ({ x: p.x + dx, y: p.y + dy }))),
 			true
 		);
+	}
+
+	previewTransformedSelectionOutline(
+		pivot: Point,
+		offset: Point,
+		scaleX: number,
+		scaleY: number,
+		rotation: number
+	): void {
+		const doc = documentRegistry.active;
+		if (!doc || !this.activeScene) return;
+		const loops = this.selectionOutlineLoops(doc);
+		if (!loops) return;
+		const cos = Math.cos(rotation);
+		const sin = Math.sin(rotation);
+		const transform = (p: Point): Point => {
+			const x = (p.x - pivot.x) * scaleX;
+			const y = (p.y - pivot.y) * scaleY;
+			return { x: pivot.x + offset.x + x * cos - y * sin, y: pivot.y + offset.y + x * sin + y * cos };
+		};
+		this.activeScene.showSelectionOutline(loops.map((loop) => loop.map(transform)), true);
 	}
 
 	/** Closed outline loops describing the active selection (mask is the
