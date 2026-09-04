@@ -9,6 +9,7 @@
 	import lassoIcon from '../../assets/lasso.svg';
 
 	import { activeToolId } from '../../state/ui';
+	import ToolbarColorPicker from './ToolbarColorPicker.svelte';
 
 	interface ToolConfig {
 		id: string;
@@ -41,27 +42,30 @@
 	}));
 </script>
 
-<div
-		class="grid w-full content-start select-none"
-	style="grid-template-columns:repeat(2, 40px); justify-content:center; gap:4px; padding:4px;"
->
-	{#each rendered as { tool, sep } (tool.id)}
-		{#if sep}<div class="tool-sep col-span-2"></div>{/if}
-		<button
-			class="tool-btn"
-			class:active={$activeToolId === tool.id}
-			title={tool.label}
-			aria-label={tool.label}
-			onclick={() => {
-				console.log('[toolbar] click →', tool.id, '(was', $activeToolId + ')');
-				activeToolId.set(tool.id);
-			}}
-		>
-			{#if tool.src}
-				<img src={tool.src} alt={tool.label} class="h-6 w-6" draggable="false" />
-			{:else}
-				<span class="tool-glyph">{tool.glyph}</span>
-			{/if}
-		</button>
-	{/each}
+<div class="toolbar-flex select-none">
+	<div
+		class="grid w-full flex-none content-start"
+		style="grid-template-columns:repeat(2, 40px); justify-content:center; gap:4px; padding:4px;"
+	>
+		{#each rendered as { tool, sep } (tool.id)}
+			{#if sep}<div class="tool-sep col-span-2"></div>{/if}
+			<button
+				class="tool-btn"
+				class:active={$activeToolId === tool.id}
+				title={tool.label}
+				aria-label={tool.label}
+				onclick={() => {
+					console.log('[toolbar] click →', tool.id, '(was', $activeToolId + ')');
+					activeToolId.set(tool.id);
+				}}
+			>
+				{#if tool.src}
+					<img src={tool.src} alt={tool.label} class="h-6 w-6" draggable="false" />
+				{:else}
+					<span class="tool-glyph">{tool.glyph}</span>
+				{/if}
+			</button>
+		{/each}
+	</div>
+	<ToolbarColorPicker />
 </div>

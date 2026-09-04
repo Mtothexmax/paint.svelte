@@ -127,69 +127,73 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 	const w = doc.width;
 	const h = doc.height;
 
-	// Compute the per-pixel lookup table (Pinta algorithm)
 	const brightness = s.brightness;
 	const contrast = s.contrast;
 	const multiply = contrast < 0 ? contrast + 100 : contrast > 0 ? 100 : 1;
 	const divide = contrast < 0 ? 100 : contrast > 0 ? 100 - contrast : 1;
 
-		// Read the source surface
-		const srcSprite = new Sprite(surfaces.getTexture(beforeId));
-		const px = renderer.app.renderer.extract.pixels({ target: srcSprite, resolution: 1 });
-		srcSprite.destroy();
-		const src = px.pixels;
+	// Read source pixels (Pixi v8 extract.pixels returns premultiplied alpha)
+	const srcSprite = new Sprite(surfaces.getTexture(beforeId));
+	const px = renderer.app.renderer.extract.pixels({ target: srcSprite, resolution: 1 });
+	srcSprite.destroy();
+	const src = px.pixels;
 
-		// Build result buffer
-		const afterId = surfaces.create(w, h);
+	// Build unpremultiplied output buffer, apply contrast algorithm in
+	// straight-alpha space so that the luminance intensity is correct.
+	const out = new Uint8ClampedArray(w * h * 4);
 
-		if (divide === 0) {
-			// Maximum contrast: threshold at 128 → pure black or white
-			for (let i = 0; i < src.length; i += 4) {
-				if (src[i + 3] === 0) continue;
-				const intensity = Math.round(src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114);
-				const val = (intensity + brightness < 128) ? 0 : 255;
-				src[i] = val;
-				src[i + 1] = val;
-				src[i + 2] = val;
-			}
-		} else if (divide === 100) {
-			for (let i = 0; i < src.length; i += 4) {
-				if (src[i + 3] === 0) continue;
-				const r = src[i], g = src[i + 1], b = src[i + 2];
-				const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
-				const shift = Math.round((intensity - 127) * multiply / divide + 127 - intensity + brightness);
-				src[i] = clampByte(r + shift);
-				src[i + 1] = clampByte(g + shift);
-				src[i + 2] = clampByte(b + shift);
-			}
+	for (let i = 0; i < src.length; i += 4) {
+		const a = src[i + 3];
+		if (a === 0) continue; // leave out[i..+3] as 0
+
+		// Unpremultiply source
+		let r: number, g: number, b: number;
+		if (a < 255) {
+			const inv = 255 / a;
+			r = Math.min(255, Math.round(src[i] * inv));
+			g = Math.min(255, Math.round(src[i + 1] * inv));
+			b = Math.min(255, Math.round(src[i + 2] * inv));
 		} else {
-			for (let i = 0; i < src.length; i += 4) {
-				if (src[i + 3] === 0) continue;
-				const r = src[i], g = src[i + 1], b = src[i + 2];
-				const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
-				const shift = Math.round((intensity - 127 + brightness) * multiply / divide + 127 - intensity);
-				src[i] = clampByte(r + shift);
-				src[i + 1] = clampByte(g + shift);
-				src[i + 2] = clampByte(b + shift);
-			}
+			r = src[i]; g = src[i + 1]; b = src[i + 2];
 		}
 
-		// Upload processed pixels: write into a regular <canvas>, create a
-		// texture from it (same pattern as checkerboard.ts), then render onto
-		// the target RenderTexture.
-		const canvas = document.createElement('canvas');
-		canvas.width = w;
-		canvas.height = h;
-		const ctx = canvas.getContext('2d')!;
-		const imgData = ctx.createImageData(w, h);
-		imgData.data.set(src);
-		ctx.putImageData(imgData, 0, 0);
-		const uploadTex = Texture.from(canvas);
-		const uploadSprite = new Sprite(uploadTex);
-		renderer.app.renderer.render({ container: uploadSprite, target: surfaces.getTexture(afterId), clear: true });
-		uploadSprite.destroy();
-		uploadTex.destroy(true);
-		canvas.remove();
+		// Pinta contrast algorithm (operates on straight-alpha values)
+		if (divide === 0) {
+			// Maximum contrast: threshold → pure black or white
+			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+			const val = (intensity + brightness < 128) ? 0 : 255;
+			r = val; g = val; b = val;
+		} else if (divide === 100) {
+			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+			const shift = Math.round((intensity - 127) * multiply / divide + 127 - intensity + brightness);
+			r = clampByte(r + shift);
+			g = clampByte(g + shift);
+			b = clampByte(b + shift);
+		} else {
+			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+			const shift = Math.round((intensity - 127 + brightness) * multiply / divide + 127 - intensity);
+			r = clampByte(r + shift);
+			g = clampByte(g + shift);
+			b = clampByte(b + shift);
+		}
+
+		out[i] = r; out[i + 1] = g; out[i + 2] = b; out[i + 3] = a;
+	}
+
+	const afterId = surfaces.create(w, h);
+	const canvas = document.createElement('canvas');
+	canvas.width = w;
+	canvas.height = h;
+	const ctx = canvas.getContext('2d')!;
+	const imgData = ctx.createImageData(w, h);
+	imgData.data.set(out);
+	ctx.putImageData(imgData, 0, 0);
+	const uploadTex = Texture.from(canvas);
+	const uploadSprite = new Sprite(uploadTex);
+	renderer.app.renderer.render({ container: uploadSprite, target: surfaces.getTexture(afterId), clear: true });
+	uploadSprite.destroy();
+	uploadTex.destroy(true);
+	canvas.remove();
 
 	layer.surfaceId = afterId;
 	renderer.rebuildActiveLayers();

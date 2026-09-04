@@ -44,8 +44,9 @@ export class EditorRenderer {
 			resolution: Math.max(window.devicePixelRatio || 1, 1)
 		});
 		this.app = app;
-		this.surfaces.attach(app);
-		this.wireRegistry();
+			this.surfaces.attach(app);
+			(window as unknown as Record<string, unknown>).__renderer = this;
+			this.wireRegistry();
 		// Render any documents that were already registered before init finished.
 		for (const doc of documentRegistry.all) this.addDoc(doc);
 		this.attachActive();

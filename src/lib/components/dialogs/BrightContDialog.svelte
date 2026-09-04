@@ -36,7 +36,7 @@
 		// Approximate Pinta contrast: at contrast=100 the Pinta algorithm
 		// thresholds to black/white; we approximate with a high linear factor.
 		const c = prefs.contrast;
-		const factor = c < 0 ? (100 + c) / 100 : c === 0 ? 1 : 1 + c * c / (100 * (100 - c));
+		const factor = c < 0 ? (100 + c) / 100 : c === 0 ? 1 : c >= 100 ? 100 : 1 + c * c / (100 * (100 - c));
 		cm.contrast(Math.max(0, factor), true);
 		return cm;
 	}

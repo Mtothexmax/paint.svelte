@@ -73,8 +73,19 @@ body {
 	flex: 0 0 auto;
 	background: var(--panel);
 	border-right: 1px solid var(--border);
-	overflow-y: auto;
+	overflow-y: hidden;
 	overflow-x: hidden;
+	display: flex;
+	flex-direction: column;
+}
+/* Fills the toolbar column: buttons keep their size, the colour picker below
+   absorbs all remaining vertical space (and collapses when there is none). */
+.toolbar-flex {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
 }
 .sidebar-col {
 	width: 230px;
