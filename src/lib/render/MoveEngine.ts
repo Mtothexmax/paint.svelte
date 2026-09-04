@@ -226,10 +226,20 @@ export class MoveEngine {
 			if (shift) next = Math.round((next * 180) / Math.PI / 10) * (Math.PI / 18);
 			this.rotation = next;
 		} else {
+			const deltaX = p.x - this.origin.x;
+			const deltaY = p.y - this.origin.y;
 			const anchorX = this.transformHandle.includes('w') ? b.x + b.width : this.transformHandle.includes('e') ? b.x : b.x + b.width / 2;
 			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
-			const movingX = this.transformHandle.includes('w') ? p.x : this.transformHandle.includes('e') ? p.x : b.x + b.width / 2;
-			const movingY = this.transformHandle.includes('n') ? p.y : this.transformHandle.includes('s') ? p.y : b.y + b.height / 2;
+			const movingX = this.transformHandle.includes('w')
+				? b.x - deltaX
+				: this.transformHandle.includes('e')
+					? b.x + b.width + deltaX
+					: b.x + b.width / 2;
+			const movingY = this.transformHandle.includes('n')
+				? b.y - deltaY
+				: this.transformHandle.includes('s')
+					? b.y + b.height + deltaY
+					: b.y + b.height / 2;
 			const baseX = this.transformHandle.includes('w') ? -b.width : this.transformHandle.includes('e') ? b.width : 1;
 			const baseY = this.transformHandle.includes('n') ? -b.height : this.transformHandle.includes('s') ? b.height : 1;
 			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e') ? (movingX - anchorX) / baseX : 1;
