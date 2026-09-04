@@ -351,6 +351,7 @@ export class MoveEngine {
 	 * Returns false when nothing was committed.
 	 */
 	drop(): boolean {
+		logTransformDebug('engine.drop.begin', { transform: this.transformState });
 		if (!this.active || !this.doc || !this.layer || !this.bounds) {
 			this.cancel();
 			return false;
@@ -448,6 +449,13 @@ export class MoveEngine {
 		surfaces.dispose(erasedId);
 		surfaces.dispose(floatingId);
 		const layerId = layer.id;
+		logTransformDebug('engine.drop.complete', {
+			offset: { ...this.offset },
+			scaleX: this.scaleX,
+			scaleY: this.scaleY,
+			rotation: this.rotation,
+			selectionBounds: sel.bounds
+		});
 		this.reset();
 
 		doc.setDirty(true);
@@ -504,6 +512,7 @@ export class MoveEngine {
 
 	/** Aborts the session: restores the untouched layer and drops the previews. */
 	cancel(): void {
+		logTransformDebug('engine.cancel', { active: this.active, transform: this.transformState });
 		if (!this.active) {
 			this.reset();
 			return;
@@ -527,6 +536,7 @@ export class MoveEngine {
 	}
 
 	private reset(): void {
+		logTransformDebug('engine.reset');
 		this.doc = null;
 		this.layer = null;
 		this.beforeId = null;
