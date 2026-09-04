@@ -14,7 +14,7 @@ import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
 import type { Layer, SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
-import { blitMaskedInto, boundsOfLoops, complementMaskSurface } from './selection';
+import { blitMaskedInto, boundsOfLoops, complementMaskSurface, eraseSelectionRegion } from './selection';
 import { logTransformDebug } from './transformDebug';
 
 export type MoveBeginResult = 'ok' | 'none';
@@ -390,6 +390,16 @@ export class MoveEngine {
 
 		// after = erased layer + floating content at the new position
 		const afterId = surfaces.copyRegion(erasedId, { x: 0, y: 0, width: w, height: h });
+
+		// move the selection (mask surface + geometry) by the same offset
+		const sel = doc.selection;
+		const oldMaskId = sel.maskId;
+		const newMaskId = surfaces.create(w, h);
+		if (oldMaskId && surfaces.has(oldMaskId))
+			surfaces.blitTransformed(oldMaskId, newMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation);
+		// A floating selection is a cut/paste operation, not just a normal
+		// alpha blend: transparent selected pixels must clear the destination.
+		eraseSelectionRegion(surfaces, newMaskId, afterId, w, h);
 		surfaces.blitTransformed(
 			floatingId,
 			afterId,
@@ -403,13 +413,6 @@ export class MoveEngine {
 			this.scaleY,
 			this.rotation
 		);
-
-		// move the selection (mask surface + geometry) by the same offset
-		const sel = doc.selection;
-		const oldMaskId = sel.maskId;
-		const newMaskId = surfaces.create(w, h);
-		if (oldMaskId && surfaces.has(oldMaskId))
-			surfaces.blitTransformed(oldMaskId, newMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation);
 
 		const origRect = sel.rect ? { ...sel.rect } : null;
 		const origPoints = sel.points?.map((pt) => ({ ...pt })) ?? null;
