@@ -841,7 +841,6 @@
 	function onPointerMove(e: PointerEvent) {
 		const sp = screenPoint(e);
 		const doc = documentRegistry.active;
-		if (moveArmed) syncTransformUi();
 		if (ready && doc) {
 			if (polyBuilding && isPolyTool() && !panning) {
 				showPolyOutline(imageFromScreen(sp)); // live polygon preview follows the pointer
