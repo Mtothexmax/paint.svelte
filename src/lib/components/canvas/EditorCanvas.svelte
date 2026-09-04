@@ -106,6 +106,7 @@
 	let handleBounds = $state<{ x: number; y: number; width: number; height: number } | null>(null);
 
 	const transformPoints = $derived.by(() => {
+		transformRevision;
 		const t = transformUi;
 		if (!t) return [];
 		const b = t.bounds;
@@ -262,7 +263,7 @@
 				const cursor = pivot && img.x < pivot.x ? rotateCounterclockwiseCursor : rotateClockwiseCursor;
 				return `cursor: url("${cursor}") 12 12, grab;`;
 			}
-			return moveEngine?.floating && moveEngine.pointInSelection(img) ? '' : 'cursor: move;';
+			return moveEngine?.floating && moveEngine.pointInSelection(img) ? 'cursor: default;' : 'cursor: move;';
 		}
 		if (moveSelArmed) return pointerInside ? 'cursor: move;' : '';
 		if (!(paintArmed || selectionArmed)) return '';
