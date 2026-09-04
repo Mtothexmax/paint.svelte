@@ -21,13 +21,14 @@
 	let previewOn = $state(true);
 	const renderer = () => getEditorRenderer();
 
-	/** Hue track: desaturated grey on the left → fully saturated hue spectrum
-	 *  on the right (increasing saturation as hue advances). */
+	/** Hue track: fully saturated rainbow (100% saturation throughout). */
 	const hueGradient =
-		'linear-gradient(90deg, hsl(0,0%,50%) 0%, hsl(60,17%,50%) 16.6%, hsl(120,33%,50%) 33.3%, hsl(180,50%,50%) 50%, hsl(240,67%,50%) 66.6%, hsl(300,83%,50%) 83.3%, hsl(360,100%,50%) 100%)';
+		'linear-gradient(90deg, hsl(0,100%,50%) 0%, hsl(60,100%,50%) 16.6%, hsl(120,100%,50%) 33.3%, hsl(180,100%,50%) 50%, hsl(240,100%,50%) 66.6%, hsl(300,100%,50%) 83.3%, hsl(360,100%,50%) 100%)';
 
-	/** Saturation track: same gradient — grey on the left, vivid on the right. */
-	const satGradient = hueGradient;
+	/** Saturation track: grey on the left (0% sat) → vivid on the right,
+	 *  with saturation increasing linearly across the hue spectrum. */
+	const satGradient =
+		'linear-gradient(90deg, hsl(0,0%,50%) 0%, hsl(60,17%,50%) 16.6%, hsl(120,33%,50%) 33.3%, hsl(180,50%,50%) 50%, hsl(240,67%,50%) 66.6%, hsl(300,83%,50%) 83.3%, hsl(360,100%,50%) 100%)';
 
 	/** Lightness track: black → white. */
 	const lightGradient = 'linear-gradient(90deg, #000 0%, #fff 100%)';
