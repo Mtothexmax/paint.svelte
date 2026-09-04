@@ -749,6 +749,9 @@
 			e.preventDefault();
 			const img = imageFromScreen(screenPoint(e));
 			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
+			// Refresh the handle geometry before hit-testing. The engine is
+			// authoritative while a floating selection is being transformed.
+			syncTransformUi();
 			const handle = transformHandleAt(img);
 			const now = performance.now();
 			if (handle === 'pivot' && lastTransformClick.handle === 'pivot' && now - lastTransformClick.time < 400) {
@@ -909,6 +912,7 @@
 			} catch {
 				/* ignore */
 			}
+			syncTransformUi();
 		}
 		if (movingSelection && e.pointerId === moveSelPointerId) {
 			// pointer-up commits the move as a single history entry (no-op when
