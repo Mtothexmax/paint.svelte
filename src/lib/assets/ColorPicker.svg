@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <g transform="rotate(-45 12 12)">
+    <!-- Rubber Bulb -->
+    <path 
+      d="M 10,4 C 10,2.8 14,2.8 14,4 V 8 H 10 Z" 
+      fill="#38BDF8" 
+      stroke="#FFFFFF" 
+      stroke-width="1.2" 
+      stroke-linejoin="round"
+    />
+    
+    <!-- Collar Ring -->
+    <path 
+      d="M 9,8 H 15 V 10 H 9 Z" 
+      fill="#FFFFFF" 
+      stroke="#FFFFFF" 
+      stroke-width="1" 
+      stroke-linejoin="round"
+    />
+    
+    <!-- Glass Barrel & Tip -->
+    <path 
+      d="M 10,10 H 14 V 16 L 12,19.5 L 10,16 Z" 
+      fill="#F8FAFC" 
+      stroke="#FFFFFF" 
+      stroke-width="1.2" 
+      stroke-linejoin="round"
+    />
+    
+    <!-- Fluid Color Drop in Tip -->
+    <path 
+      d="M 10.5,15 H 13.5 L 12,18.5 Z" 
+      fill="#38BDF8" 
+    />
+  </g>
+</svg>

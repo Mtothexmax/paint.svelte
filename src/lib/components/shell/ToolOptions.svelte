@@ -22,6 +22,7 @@
 
 	const paintTools = new Set(['brush', 'pencil', 'eraser']);
 	const isPaint = $derived(paintTools.has($activeToolId));
+	const isPencil = $derived($activeToolId === 'pencil');
 
 	const selectionTools = new Set(['select-rect', 'select-ellipse', 'lasso', 'select-poly']);
 	const isSelection = $derived(selectionTools.has($activeToolId));
@@ -94,13 +95,15 @@
 </script>
 
 	<div class="flex h-full w-full items-center gap-4 px-2 text-xs select-none" style="color:var(--text-dim);">
-	{#if isPaint}
+	{#if isPaint && !isPencil}
 		<PdnSlider label="Size" min={1} max={300} step={1} bind:value={$brushSize} />
 		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$brushOpacity} />
 		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$brushHardness} />
 		<PdnSlider label="Spacing" min={1} max={300} step={1} unit="%" bind:value={$brushSpacing} />
 		<span class="aa-label">Anti-alias:</span>
 		<IconSplitButton options={AA_OPTIONS} bind:value={aa} title="Anti-aliased rendering" />
+	{:else if isPencil}
+		<span class="tooloptions-placeholder">Pencil — 1 px, hard-edged, foreground color only.</span>
 	{:else if isSelection}
 		<span class="aa-label">Mode:</span>
 		<div class="seg">

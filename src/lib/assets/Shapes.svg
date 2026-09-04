@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="16" viewBox="0 0 32 16">
+  <!-- Circle (Blue) -->
+  <circle 
+    cx="6.5" 
+    cy="8" 
+    r="5" 
+    fill="#3B82F6" 
+    stroke="#FFFFFF" 
+    stroke-width="1"
+  />
+
+  <!-- Triangle (Amber) -->
+  <path 
+    d="M 16.5 3 L 11 13 L 22 13 Z" 
+    fill="#FBBF24" 
+    stroke="#FFFFFF" 
+    stroke-width="1" 
+    stroke-linejoin="round"
+  />
+
+  <!-- Square (Emerald Green) -->
+  <rect 
+    x="24" 
+    y="3" 
+    width="7" 
+    height="10" 
+    rx="1" 
+    fill="#10B981" 
+    stroke="#FFFFFF" 
+    stroke-width="1"
+  />
+</svg>

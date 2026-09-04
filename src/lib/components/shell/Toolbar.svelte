@@ -8,14 +8,19 @@
 	import paintbrushSvg from '@fluentui-emoji/svg/icons/flat/paintbrush.svg';
 	import bucketSvg from '@fluentui-emoji/svg/icons/flat/bucket.svg';
 	import wandSvg from '@fluentui-emoji/svg/icons/flat/magic-wand.svg';
-	import dropletSvg from '@fluentui-emoji/svg/icons/flat/droplet.svg';
-	import rulerSvg from '@fluentui-emoji/svg/icons/flat/straight-ruler.svg';
-	import moveSvg from '@fluentui-emoji/svg/icons/flat/left-right-arrow.svg';
+	import ShapesIcon from '../../assets/Shapes.svg';
+	import moveSvg from '../../assets/MoveSelectedPixels.svg';
+	import moveSelectionIcon from '../../assets/MoveSelection.svg';
 	import lassoIcon from '../../assets/lasso.svg';
-	import moveSelectionIcon from '../../assets/move-selection.svg';
+	import CloneBrushIcon from '../../assets/CloneBrush.svg';
+	import RecolorIcon from '../../assets/ColorTransfer.svg';
+	import ColorPickerIcon from '../../assets/ColorPicker.svg';
+	import GradientFillIcon from '../../assets/GradientFill.svg';
+	import EraserIcon from '../../assets/Eraser.svg';
+	import TextIcon from '../../assets/Text.svg';
 	import zoomSvg from '@fluentui-emoji/svg/icons/flat/magnifying-glass-tilted-left.svg';
 	import panSvg from '@fluentui-emoji/svg/icons/flat/hand-with-fingers-splayed-default.svg';
-	import curlySvg from '@fluentui-emoji/svg/icons/flat/curly-loop.svg';
+	import curlySvg from '../../assets/Line.svg';
 
 	import { activeToolId, showNotice } from '../../state/ui';
 	import ToolbarColorPicker from './ToolbarColorPicker.svelte';
@@ -40,27 +45,27 @@
 		{ id: 'move-selection', label: 'Move Selection', src: moveSelectionIcon },
 		// Row 3
 		{ id: 'select-ellipse', label: 'Ellipse Select', glyph: '◯' },
-		{ id: 'zoom', label: 'Zoom', src: zoomSvg, placeholder: true },
+		{ id: 'zoom', label: 'Zoom', src: zoomSvg },
 		// Row 4
 		{ id: 'wand', label: 'Magic Wand', src: wandSvg },
-		{ id: 'pan', label: 'Pan', src: panSvg, placeholder: true },
+		{ id: 'pan', label: 'Pan', src: panSvg },
 		// Row 5
 		{ id: 'bucket', label: 'Paint Bucket', src: bucketSvg },
-		{ id: 'gradient', label: 'Gradient', glyph: '🌈' },
+		{ id: 'gradient', label: 'Gradient', src: GradientFillIcon },
 		// Row 6
 		{ id: 'brush', label: 'Paintbrush', src: paintbrushSvg },
-		{ id: 'eraser', label: 'Eraser', glyph: '🧽' },
+		{ id: 'eraser', label: 'Eraser', src: EraserIcon },
 		// Row 7
 		{ id: 'pencil', label: 'Pencil', glyph: '✏️' },
-		{ id: 'eyedropper', label: 'Color Picker', src: dropletSvg },
+		{ id: 'eyedropper', label: 'Color Picker', src: ColorPickerIcon },
 		// Row 8
-		{ id: 'clone-stamp', label: 'Clone Stamp', glyph: '🖌', placeholder: true },
-		{ id: 'recolor', label: 'Recolor', glyph: '🎨', placeholder: true },
+		{ id: 'clone-stamp', label: 'Clone Stamp', src: CloneBrushIcon, placeholder: true },
+		{ id: 'recolor', label: 'Recolor', src: RecolorIcon, placeholder: true },
 		// Row 9
-		{ id: 'text', label: 'Text', glyph: '🅰️' },
+		{ id: 'text', label: 'Text', src: TextIcon },
 		{ id: 'line', label: 'Line / Curve', src: curlySvg, placeholder: true },
 		// Row 10 (Shapes sits alone in the left column, like Paint.NET).
-		{ id: 'shape', label: 'Shapes', src: rulerSvg }
+		{ id: 'shape', label: 'Shapes', src: ShapesIcon }
 	];
 
 	function pickTool(id: string, label: string, placeholder?: boolean): void {

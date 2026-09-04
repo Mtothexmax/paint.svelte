@@ -82,6 +82,10 @@
 	let panStart = { x: 0, y: 0 };
 	let panStartView = { panX: 0, panY: 0 };
 
+	let panArmed = $state(false);
+	let zoomArmed = $state(false);
+	let zoomRightHeld = $state(false);
+
 	// painting state
 	let engine: BrushEngine | null = null;
 	let painting = $state(false);
@@ -250,15 +254,21 @@
 	let paintArmed = $state(false);
 	let ringR = $state(0);
 
-	const showRing = $derived(paintArmed && !panning && (pointerInside || painting));
+	const isPencil = () => get(activeToolId) === 'pencil' && !!documentRegistry.active;
+	const showRing = $derived(paintArmed && !panning && !isPencil() && (pointerInside || painting));
 
 	// OS pointer over the canvas: crosshair (the system "plus" cursor) while a
 	// paint tool OR a selection tool is armed and NOT painting; fully hidden
 	// while painting (only the preview ring + painted stroke are visible, like
 	// Paint.NET). The brush preview ring itself only ever shows for paint tools.
 	const cursorCss = $derived.by(() => {
-		if (panning) return '';
-		if (painting) return 'cursor: none;';
+		if (panning) return 'cursor: grabbing;';
+		if (panArmed) return pointerInside ? 'cursor: grab;' : '';
+		if (zoomArmed) {
+			if (!pointerInside) return '';
+			return zoomRightHeld ? 'cursor: zoom-out;' : 'cursor: zoom-in;';
+		}
+		if (painting && !isPencil()) return 'cursor: none;';
 		if (moving) return 'cursor: move;';
 		if (moveArmed) {
 			if (!pointerInside) return '';
@@ -315,6 +325,10 @@
 	/** Re-evaluates whether a paint tool is armed (tool + open document). */
 	function updateArmed(): void {
 		const hasDoc = !!documentRegistry.active;
+		panArmed = get(activeToolId) === 'pan' && hasDoc;
+		const wasZoomArmed = zoomArmed;
+		zoomArmed = get(activeToolId) === 'zoom' && hasDoc;
+		if (!zoomArmed && wasZoomArmed) zoomRightHeld = false;
 		paintArmed = PAINT_TOOLS.has(get(activeToolId)) && hasDoc;
 		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
 		moveArmed = get(activeToolId) === 'move-pixels' && hasDoc;
@@ -809,7 +823,7 @@
 	function onPointerDown(e: PointerEvent) {
 		if (!ready) return;
 		movePointer(screenPoint(e));
-		const wantsPan = e.button === 1 || (e.button === 0 && spaceHeld);
+		const wantsPan = e.button === 1 || (e.button === 0 && (spaceHeld || panArmed));
 		if (wantsPan) {
 			e.preventDefault();
 			const doc = documentRegistry.active;
@@ -823,6 +837,22 @@
 			} catch {
 				/* ignore */
 			}
+			return;
+		}
+		// Zoom tool: left click zooms in (×1.5), right click zooms out (÷1.5),
+		// anchored at the pointer so the image pixel under the cursor stays put.
+		if (zoomArmed && (e.button === 0 || e.button === 2)) {
+			e.preventDefault();
+			if (e.button === 2) zoomRightHeld = true;
+			const doc = documentRegistry.active;
+			if (!doc || !ready) return;
+			const anchor = screenPoint(e);
+			const factor = e.button === 0 ? 1.5 : 1 / 1.5;
+			doc.view = zoomBy(doc.view, anchor, factor);
+			getEditorRenderer().refreshActiveView();
+			syncTransformUi();
+			updateStatus(doc);
+			refreshRing();
 			return;
 		}
 		// Polygon lasso: clicks place vertices (left = chosen mode with
@@ -952,17 +982,31 @@
 			}
 			if (!engine) engine = new BrushEngine(getEditorRenderer());
 			const img = imageFromScreen(screenPoint(e));
-			const color = e.button === 2 ? get(backgroundColor) : get(foregroundColor);
+			const toolId = get(activeToolId);
+			const isPencilStroke = toolId === 'pencil';
+			const kind = KIND[toolId] ?? 'brush';
+			const rawColor = e.button === 2 ? get(backgroundColor) : get(foregroundColor);
+			const color = rawColor;
 			engine.begin(
-				{
-					kind: KIND[get(activeToolId)] ?? 'brush',
-					size: get(brushSize),
-					opacity: get(brushOpacity) / 100,
-					hardness: get(brushHardness) / 100,
-					spacingRatio: get(brushSpacing) / 100,
-					antiAlias: get(antiAliasMode) === 'smooth',
-					color
-				},
+				isPencilStroke
+					? {
+							kind: 'pencil',
+							size: 1,
+							opacity: 1,
+							hardness: 1,
+							spacingRatio: 0,
+							antiAlias: false,
+							color
+						}
+					: {
+							kind,
+							size: get(brushSize),
+							opacity: get(brushOpacity) / 100,
+							hardness: get(brushHardness) / 100,
+							spacingRatio: get(brushSpacing) / 100,
+							antiAlias: get(antiAliasMode) === 'smooth',
+							color
+						},
 				img
 			);
 		}
@@ -1018,6 +1062,7 @@
 	}
 
 	function endPointer(e: PointerEvent) {
+		zoomRightHeld = false;
 		if (painting && e.pointerId === paintPointerId) {
 			engine?.finish();
 			painting = false;
@@ -1107,6 +1152,7 @@
 	}
 
 	function cancelPointer(e: PointerEvent) {
+		zoomRightHeld = false;
 		if (painting && e.pointerId === paintPointerId) {
 			engine?.cancel();
 			painting = false;
@@ -1220,6 +1266,7 @@
 			};
 			const onLeave = () => {
 				pointerInside = false;
+				zoomRightHeld = false;
 			};
 
 			host.addEventListener('wheel', onWheel, { passive: false });

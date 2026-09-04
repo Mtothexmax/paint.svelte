@@ -116,6 +116,27 @@ function getDabTexture(size: number, hardness: number, antiAlias: boolean): Text
 	return cached;
 }
 
+const PENCIL_TRACE = true;
+const pencilStrokeLogs: Array<{
+	phase: 'begin' | 'lineTo' | 'rasterize' | 'finish' | 'cancel';
+	t: number;
+	pathLen: number;
+	lastPt?: Point;
+	bresCount?: number;
+	dirtyRect?: Rect;
+	dim?: { dw: number; dh: number; dx: number; dy: number };
+	path?: Point[];
+}> = [];
+function tracePencil(entry: typeof pencilStrokeLogs[number]): void {
+	if (!PENCIL_TRACE) return;
+	pencilStrokeLogs.push(entry);
+	if (pencilStrokeLogs.length > 800) pencilStrokeLogs.shift();
+}
+// Exposed on window for manual inspection in devtools
+if (typeof window !== 'undefined') {
+	(window as unknown as { __pencilStrokeLogs?: typeof pencilStrokeLogs }).__pencilStrokeLogs = pencilStrokeLogs;
+}
+
 export class BrushEngine {
 	private renderer: EditorRenderer;
 
@@ -129,6 +150,7 @@ export class BrushEngine {
 	private path: Point[] = [];
 	private dirtyRect: Rect | null = null;
 	private rafPending = false;
+	private strokeId = 0;
 
 	constructor(renderer: EditorRenderer) {
 		this.renderer = renderer;
@@ -152,6 +174,16 @@ export class BrushEngine {
 		this.path = [];
 		this.dirtyRect = null;
 		this.rafPending = false;
+		this.strokeId++;
+		const isP = settings.kind === 'pencil';
+		if (isP && PENCIL_TRACE) {
+			tracePencil({ phase: 'begin', t: performance.now(), pathLen: 0, lastPt: start });
+			if (settings.kind === 'pencil') {
+				console.log('[pencil] stroke #%s begin color=r%s_g%s_b%s_a%s size=%s aa=%s start=%o',
+					this.strokeId, settings.color.r, settings.color.g, settings.color.b, settings.color.a,
+					settings.size, settings.antiAlias, start);
+			}
+		}
 
 		stroke.overlay.visible = true;
 		const eff = settings.kind === 'eraser' ? 0.45 : settings.opacity * (settings.color.a / 255);
@@ -170,15 +202,31 @@ export class BrushEngine {
 		if (!this.bufferActive) return;
 		const q = { x: Math.round(p.x), y: Math.round(p.y) };
 		const last = this.path[this.path.length - 1];
-		const ratio = Math.max(0.02, this.settings?.spacingRatio ?? 0.15);
-		const thin = Math.max(0.5, (this.settings!.size || 4) * ratio);
-		if (!last || Math.hypot(q.x - last.x, q.y - last.y) >= thin) {
-			this.path.push(q);
+		const isPencilStroke = this.settings?.kind === 'pencil';
+		if (isPencilStroke) {
+			if (!last || q.x !== last.x || q.y !== last.y) {
+				this.path.push(q);
+				if (PENCIL_TRACE) tracePencil({ phase: 'lineTo', t: performance.now(), pathLen: this.path.length, lastPt: q });
+				if (PENCIL_TRACE && this.path.length % 50 === 0) {
+					console.log('[pencil] stroke #%s lineTo #%s point %o (prev %o, dist %s)',
+						this.strokeId, this.path.length, q, last,
+						last ? Math.hypot(q.x - last.x, q.y - last.y).toFixed(2) : 0);
+				}
+			}
+		} else {
+			const ratio = Math.max(0.02, this.settings?.spacingRatio ?? 0.15);
+			const thin = Math.max(0.5, (this.settings!.size || 4) * ratio);
+			if (!last || Math.hypot(q.x - last.x, q.y - last.y) >= thin) {
+				this.path.push(q);
+			}
 		}
 		if (!this.rafPending) {
 			this.rafPending = true;
 			requestAnimationFrame(() => {
 				this.rafPending = false;
+				if (PENCIL_TRACE && isPencilStroke) {
+					console.log('[pencil] stroke #%s RAF fire pathLen=%s', this.strokeId, this.path.length);
+				}
 				this.rasterize();
 			});
 		}
@@ -194,7 +242,7 @@ export class BrushEngine {
 		const size = s.size;
 		const aa = s.kind !== 'pencil' && s.antiAlias !== false;
 		const hardness = s.kind === 'pencil' ? 1 : clamp(s.hardness, 0, 1);
-		const margin = size / 2 + 4;
+		const margin = s.kind === 'pencil' ? 0 : size / 2 + 4;
 
 		let pminX = Infinity;
 		let pminY = Infinity;
@@ -206,37 +254,151 @@ export class BrushEngine {
 			if (p.x > pmaxX) pmaxX = p.x;
 			if (p.y > pmaxY) pmaxY = p.y;
 		}
-		const left = Math.max(pminX - margin, -margin);
-		const top = Math.max(pminY - margin, -margin);
-		const right = Math.min(pmaxX + margin, doc.width + margin);
-		const bottom = Math.min(pmaxY + margin, doc.height + margin);
+		const pad = s.kind === 'pencil' ? 0 : margin;
+		const left = Math.max(pminX - pad, -pad);
+		const top = Math.max(pminY - pad, -pad);
+		// right / bottom are exclusive (rect span). Integer pixels are [min, max]
+		// inclusive, so we need max + 1 - min to cover every pixel.
+		const rightInclusive = Math.min(pmaxX + pad, doc.width - 1 + pad);
+		const bottomInclusive = Math.min(pmaxY + pad, doc.height - 1 + pad);
 		const fullRect: Rect = {
 			x: Math.floor(left),
 			y: Math.floor(top),
-			width: Math.ceil(right) - Math.floor(left),
-			height: Math.ceil(bottom) - Math.floor(top)
+			width: Math.floor(rightInclusive + 1) - Math.floor(left),
+			height: Math.floor(bottomInclusive + 1) - Math.floor(top)
 		};
 		if (fullRect.width <= 0 || fullRect.height <= 0) return;
 
 		const dx = Math.max(0, fullRect.x);
 		const dy = Math.max(0, fullRect.y);
-		const dw = Math.min(doc.width, fullRect.x + fullRect.width) - dx;
-		const dh = Math.min(doc.height, fullRect.y + fullRect.height) - dy;
+		const dw = Math.min(doc.width - 1, fullRect.x + fullRect.width - 1) - dx + 1;
+		const dh = Math.min(doc.height - 1, fullRect.y + fullRect.height - 1) - dy + 1;
 		if (dw <= 0 || dh <= 0) return;
 		this.dirtyRect = { x: dx, y: dy, width: dw, height: dh };
 
-		const dabTex = getDabTexture(size, hardness, aa);
-		const wrap = new Container();
+		const isPencilStroke = s.kind === 'pencil';
 
-		const step = Math.max(0.5, Math.min(2, size * Math.max(0.02, s.spacingRatio ?? 0.1)));
+		if (isPencilStroke) {
+			const pixels = new Set<number>();
+			const xMax = dx + dw - 1;
+			const yMax = dy + dh - 1;
+			const bresenham = (x0: number, y0: number, x1: number, y1: number) => {
+				const ax0 = Math.round(x0);
+				const ay0 = Math.round(y0);
+				const ax1 = Math.round(x1);
+				const ay1 = Math.round(y1);
+				const dx2 = Math.abs(ax1 - ax0);
+				const sx = ax0 < ax1 ? 1 : -1;
+				const dy2 = -Math.abs(ay1 - ay0);
+				const sy = ay0 < ay1 ? 1 : -1;
+				let err = dx2 + dy2;
+				let x = ax0;
+				let y = ay0;
+				while (true) {
+					if (x >= dx && y >= dy && x <= xMax && y <= yMax) {
+						pixels.add((y - dy) * dw + (x - dx));
+					}
+					if (x === ax1 && y === ay1) break;
+					const e2 = 2 * err;
+					if (e2 >= dy2) {
+						err += dy2;
+						x += sx;
+					}
+					if (e2 <= dx2) {
+						err += dx2;
+						y += sy;
+					}
+				}
+			};
+			if (this.path.length === 1) {
+				bresenham(this.path[0].x, this.path[0].y, this.path[0].x, this.path[0].y);
+			} else {
+				for (let i = 0; i < this.path.length - 1; i++) {
+					bresenham(this.path[i].x, this.path[i].y, this.path[i + 1].x, this.path[i + 1].y);
+				}
+			}
+			if (PENCIL_TRACE) {
+				tracePencil({
+					phase: 'rasterize',
+					t: performance.now(),
+					pathLen: this.path.length,
+					bresCount: pixels.size,
+					dirtyRect: { ...this.dirtyRect },
+					dim: { dw, dh, dx, dy },
+					path: this.path.slice()
+				});
+				console.log(
+					'[pencil] stroke #%s rasterize: pathLen=%s segments=%s pixelsInRect=%s bounds=[%s..%s x %s..%s] dw=%s dh=%s dx=%s dy=%s',
+					this.strokeId, this.path.length, Math.max(0, this.path.length - 1), pixels.size,
+					pminX, pmaxX, pminY, pmaxY, dw, dh, dx, dy
+				);
+				// Detect suspicious "circle lacks elements": large jump between consecutive path points
+				for (let i = 0; i < this.path.length - 1; i++) {
+					const d = Math.hypot(this.path[i + 1].x - this.path[i].x, this.path[i + 1].y - this.path[i].y);
+					if (d > 10) {
+						console.warn('[pencil] stroke #%s LARGE GAP between [%s] #%s→#%s (%s px): %o → %o',
+							this.strokeId, i, i + 1, d.toFixed(1), this.path[i], this.path[i + 1]);
+					}
+				}
+				// Detect off-by-one boundary pixels at pmaxX/pmaxY
+				const hasXmax = Array.from(pixels).some((idx) => {
+					const x = dx + (idx % dw);
+					return x === pmaxX;
+				});
+				const hasYmax = Array.from(pixels).some((idx) => {
+					const y = dy + Math.floor(idx / dw);
+					return y === pmaxY;
+				});
+				if (!hasXmax && Number.isFinite(pmaxX) && pmaxX < doc.width - 0.5) {
+					console.warn('[pencil] stroke #%s pmaxX=%s pixel NOT PRESSED in %sx%s set (%s entries) — width off-by-one?',
+						this.strokeId, pmaxX, dw, dh, pixels.size);
+				}
+				if (!hasYmax && Number.isFinite(pmaxY) && pmaxY < doc.height - 0.5) {
+					console.warn('[pencil] stroke #%s pmaxY=%s pixel NOT PRESSED in %sx%s set (%s entries) — height off-by-one?',
+						this.strokeId, pmaxY, dw, dh, pixels.size);
+				}
+			}
+			const canvas = document.createElement('canvas');
+			canvas.width = dw;
+			canvas.height = dh;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return;
+			const imgData = ctx.createImageData(dw, dh);
+			const data = imgData.data;
+			for (const idx of pixels) {
+				const off = idx * 4;
+				data[off] = 255;
+				data[off + 1] = 255;
+				data[off + 2] = 255;
+				data[off + 3] = 255;
+			}
+			ctx.putImageData(imgData, 0, 0);
+			const source = new CanvasSource({ resource: canvas });
+			const tex = new Texture({ source });
+			const sprite = new Sprite(tex);
+			sprite.position.set(dx, dy);
+			sprite.anchor.set(0, 0);
+			sprite.blendMode = 'max';
+			const wrap = new Container();
+			wrap.addChild(sprite);
+			this.renderer.app.renderer.render({ container: wrap, target: stroke.target, clear: true });
+			wrap.destroy({ children: true });
+			tex.destroy(true);
+			return;
+		}
+
+		const dabTex = getDabTexture(size, hardness, aa);
+		const wrap2 = new Container();
 
 		const addDab = (x: number, y: number) => {
 			const sprite = new Sprite(dabTex);
 			sprite.anchor.set(0.5, 0.5);
 			sprite.position.set(x, y);
 			sprite.blendMode = 'max';
-			wrap.addChild(sprite);
+			wrap2.addChild(sprite);
 		};
+
+		const step = Math.max(0.5, Math.min(2, size * Math.max(0.02, s.spacingRatio ?? 0.1)));
 
 		if (this.path.length === 1) {
 			addDab(this.path[0].x, this.path[0].y);
@@ -255,8 +417,8 @@ export class BrushEngine {
 			}
 		}
 
-		this.renderer.app.renderer.render({ container: wrap, target: stroke.target, clear: true });
-		wrap.destroy({ children: true });
+		this.renderer.app.renderer.render({ container: wrap2, target: stroke.target, clear: true });
+		wrap2.destroy({ children: true });
 	}
 
 	/** Commits the stroke into the layer, records undo/redo, cleans up. */
@@ -275,6 +437,12 @@ export class BrushEngine {
 		}
 		if (this.rafPending) {
 			this.rafPending = false;
+			this.rasterize();
+		} else {
+			// Guarantee a synchronous final rasterize so any path points added
+			// after the last RAF fired (e.g. a final pointermove + pointerup in
+			// the same frame) are included. rasterize() already uses the full
+			// inclusive path bounds so dirtyRect captures every pixel.
 			this.rasterize();
 		}
 		const rect = this.dirtyRect;
@@ -345,6 +513,17 @@ export class BrushEngine {
 		surfaces.renderInto(stroke.target, new Container(), true);
 
 		const label = s.kind === 'eraser' ? 'Eraser Stroke' : s.kind === 'pencil' ? 'Pencil Stroke' : 'Brush Stroke';
+		if (PENCIL_TRACE && s.kind === 'pencil') {
+			tracePencil({
+				phase: 'finish',
+				t: performance.now(),
+				pathLen: this.path.length,
+				dirtyRect: rect
+			});
+			console.log('[pencil] stroke #%s finish: pathLen=%s segments=%s rect=%s×%s@(%s,%s) eff=%s',
+				this.strokeId, this.path.length, Math.max(0, this.path.length - 1),
+				rect.width, rect.height, rect.x, rect.y, eff.toFixed(2));
+		}
 		doc.history.push({
 			label,
 			memoryBytes: doc.width * doc.height * 4 * 2,

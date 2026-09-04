@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Define the Linear Gradient -->
+  <defs>
+    <linearGradient id="toolGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E40AF" /> <!-- Darker blue start -->
+      <stop offset="100%" stop-color="#FFFFFF" /> <!-- White end -->
+    </linearGradient>
+  </defs>
+
+  <!-- Gradient Fill Rectangle with Border -->
+  <rect 
+    x="3" 
+    y="3" 
+    width="18" 
+    height="18" 
+    rx="2" 
+    ry="2" 
+    fill="url(#toolGradient)" 
+    stroke="#FFFFFF" 
+    stroke-width="1.5" 
+  />
+</svg>
