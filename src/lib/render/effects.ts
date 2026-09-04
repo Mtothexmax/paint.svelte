@@ -71,18 +71,19 @@ export function gaussianBlurActiveLayer(renderer: EditorRenderer, strength: numb
 export interface HslSettings {
 	/** hue rotation in degrees (-180..180) */
 	hue: number;
-	/** saturation factor: 100 = unchanged, 0 = greyscale, 200 = double */
+	/** saturation offset: 0 = unchanged, -100 = greyscale, +100 = double */
 	sat: number;
-	/** lightness/brightness factor: 100 = unchanged */
+	/** lightness offset: 0 = unchanged, -100 = black, +100 = double */
 	light: number;
 }
 
 /**
  * Hue / Saturation / Lightness adjustment via a composed ColorMatrixFilter.
+ * Saturation and lightness are offsets: 0 = unchanged, mapped to factor 1.0.
  */
 export function hueSaturationActiveLayer(renderer: EditorRenderer, s: HslSettings): boolean {
-	const sat = Math.max(0, s.sat) / 100;
-	const light = Math.max(0, s.light) / 100;
+	const sat = Math.max(0, (100 + s.sat) / 100);
+	const light = Math.max(0, (100 + s.light) / 100);
 	return applyFilterSwap(renderer, 'Hue/Saturation', () => {
 		const cm = new ColorMatrixFilter();
 		cm.saturate(sat, true);
@@ -102,19 +103,20 @@ export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
 }
 
 export interface BrightContSettings {
-	/** brightness factor: 100 = unchanged, 0 = black, 200 = double */
+	/** brightness offset: 0 = unchanged, -100 = black, +100 = double */
 	brightness: number;
-	/** contrast factor: 100 = unchanged, 0 = flat grey, 200 = maximum */
+	/** contrast offset: 0 = unchanged, -100 = flat grey, +100 = maximum */
 	contrast: number;
 }
 
 /**
  * Brightness / Contrast adjustment via a composed ColorMatrixFilter.
- * Brightness is applied first, then contrast.
+ * Brightness is applied first, then contrast. Offsets: 0 = unchanged,
+ * mapped to factor 1.0.
  */
 export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: BrightContSettings): boolean {
-	const brightness = Math.max(0, s.brightness) / 100;
-	const contrast = Math.max(0, s.contrast) / 100;
+	const brightness = Math.max(0, (100 + s.brightness) / 100);
+	const contrast = Math.max(0, (100 + s.contrast) / 100);
 	return applyFilterSwap(renderer, 'Brightness / Contrast', () => {
 		const cm = new ColorMatrixFilter();
 		cm.brightness(brightness, true);

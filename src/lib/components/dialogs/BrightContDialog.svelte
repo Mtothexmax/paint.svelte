@@ -15,7 +15,7 @@
 		brightness: number;
 		contrast: number;
 	}
-	const prefs = $state<Prefs>(getSettings<Prefs>('filters.brightCont', { brightness: 100, contrast: 100 }));
+	const prefs = $state<Prefs>(getSettings<Prefs>('filters.brightCont', { brightness: 0, contrast: 0 }));
 
 	let previewOn = $state(true);
 	const renderer = () => getEditorRenderer();
@@ -30,8 +30,8 @@
 
 	function makeFilter() {
 		const cm = new ColorMatrixFilter();
-		cm.brightness(Math.max(0, prefs.brightness) / 100, true);
-		cm.contrast(Math.max(0, prefs.contrast) / 100, true);
+		cm.brightness((100 + prefs.brightness) / 100, true);
+		cm.contrast((100 + prefs.contrast) / 100, true);
 		return cm;
 	}
 	function preview() {
@@ -71,8 +71,8 @@
 </script>
 
 <MovableDialog title="Brightness / Contrast" onClose={cancel} width={400}>
-	<FilterSlider label="Brightness" min={0} max={200} step={1} default={100} bind:value={prefs.brightness} oninput={preview} gradient={brightnessGradient} />
-	<FilterSlider label="Contrast" min={0} max={200} step={1} default={100} bind:value={prefs.contrast} oninput={preview} gradient={contrastGradient} />
+	<FilterSlider label="Brightness" min={-100} max={100} step={1} default={0} bind:value={prefs.brightness} oninput={preview} gradient={brightnessGradient} />
+	<FilterSlider label="Contrast" min={-100} max={100} step={1} default={0} bind:value={prefs.contrast} oninput={preview} gradient={contrastGradient} />
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
 		Preview

@@ -16,7 +16,7 @@
 		sat: number;
 		light: number;
 	}
-	const prefs = $state<HslPrefs>(getSettings<HslPrefs>('filters.hueSat', { hue: 0, sat: 100, light: 100 }));
+	const prefs = $state<HslPrefs>(getSettings<HslPrefs>('filters.hueSat', { hue: 0, sat: 0, light: 0 }));
 
 	let previewOn = $state(true);
 	const renderer = () => getEditorRenderer();
@@ -35,9 +35,9 @@
 
 	function makeFilter() {
 		const cm = new ColorMatrixFilter();
-		cm.saturate(Math.max(0, prefs.sat) / 100, true);
+		cm.saturate((100 + prefs.sat) / 100, true);
 		cm.hue(prefs.hue, true);
-		cm.brightness(Math.max(0, prefs.light) / 100, true);
+		cm.brightness((100 + prefs.light) / 100, true);
 		return cm;
 	}
 	function preview() {
@@ -78,8 +78,8 @@
 
 <MovableDialog title="Hue / Saturation" onClose={cancel} width={400}>
 	<FilterSlider label="Hue" min={-180} max={180} step={1} default={0} bind:value={prefs.hue} oninput={preview} gradient={hueGradient} />
-	<FilterSlider label="Saturation" min={0} max={200} step={1} default={100} bind:value={prefs.sat} oninput={preview} gradient={satGradient} />
-	<FilterSlider label="Lightness" min={0} max={200} step={1} default={100} bind:value={prefs.light} oninput={preview} gradient={lightGradient} />
+	<FilterSlider label="Saturation" min={0} max={200} step={1} default={0} bind:value={prefs.sat} oninput={preview} gradient={satGradient} />
+	<FilterSlider label="Lightness" min={-100} max={100} step={1} default={0} bind:value={prefs.light} oninput={preview} gradient={lightGradient} />
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
 		Preview
