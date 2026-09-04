@@ -199,32 +199,14 @@ export class MoveEngine {
 				y: start.offset.y + Math.round(p.y - this.origin.y)
 			};
 		} else if (this.transformHandle === 'pivot') {
-			const nextWorldPivot = { x: Math.round(p.x), y: Math.round(p.y) };
-			const cos = Math.cos(start.rotation);
-			const sin = Math.sin(start.rotation);
-			const ax = start.scaleX * cos;
-			const ay = start.scaleX * sin;
-			const bx = -start.scaleY * sin;
-			const by = start.scaleY * cos;
-			const rhsX = nextWorldPivot.x - start.offset.x + ax * start.pivot.x + bx * start.pivot.y;
-			const rhsY = nextWorldPivot.y - start.offset.y + ay * start.pivot.x + by * start.pivot.y;
-			const m00 = 1 + ax;
-			const m01 = bx;
-			const m10 = ay;
-			const m11 = 1 + by;
-			const determinant = m00 * m11 - m01 * m10;
-			const nextPivot =
-				Math.abs(determinant) > 1e-6
-					? {
-							x: (rhsX * m11 - m01 * rhsY) / determinant,
-							y: (m00 * rhsY - rhsX * m10) / determinant
-						}
-					: { x: nextWorldPivot.x - start.offset.x, y: nextWorldPivot.y - start.offset.y };
-			this.pivot = nextPivot;
-			this.offset = {
-				x: nextWorldPivot.x - nextPivot.x,
-				y: nextWorldPivot.y - nextPivot.y
+			// The pivot marker is displayed at pivot + offset. Keep the
+			// transform offset fixed so moving this UI control does not move
+			// the selected pixels.
+			this.pivot = {
+				x: Math.round(p.x - start.offset.x),
+				y: Math.round(p.y - start.offset.y)
 			};
+			this.offset = { ...start.offset };
 		} else if (this.transformHandle === 'rotate') {
 			const center = {
 				x: this.pivot.x + this.offset.x,
