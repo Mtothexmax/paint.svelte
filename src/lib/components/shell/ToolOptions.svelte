@@ -36,6 +36,7 @@
 	import AlignLeftIcon from '../../assets/FormatAlignLeft.svg';
 	import AlignCenterIcon from '../../assets/FormatAlignCenter.svg';
 	import AlignRightIcon from '../../assets/FormatAlignRight.svg';
+	import { fillTolerance, fillFloodMode } from '../../state/fill';
 
 	const paintTools = new Set(['brush', 'pencil', 'eraser']);
 	const isPaint = $derived(paintTools.has($activeToolId));
@@ -49,6 +50,8 @@
 	const isLasso = $derived(lassoTools.has($activeToolId));
 
 	const isText = $derived($activeToolId === 'text');
+
+	const isFill = $derived($activeToolId === 'bucket');
 
 	function setAlign(a: TextAlign): void {
 		textAlign.set(a);
@@ -310,6 +313,27 @@
 		</div>
 		<button class="mini-btn" onclick={requestTextCommit} title="Render the text into the layer"> ✓ Finish </button>
 		<button class="mini-btn" onclick={requestTextCancel} title="Discard the text draft"> ✕ </button>
+	{:else if isFill}
+		<PdnSlider label="Tolerance" min={0} max={100} step={1} unit="%" bind:value={$fillTolerance} />
+		<span class="aa-label">Flood Mode:</span>
+		<div class="seg" role="group" aria-label="Flood mode">
+			<button
+				class="seg-btn"
+				class:on={$fillFloodMode === 'contiguous'}
+				title="Fill the connected region around the click"
+				onclick={() => fillFloodMode.set('contiguous')}
+			>
+				⛶ Contiguous
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$fillFloodMode === 'global'}
+				title="Fill every matching pixel on the layer"
+				onclick={() => fillFloodMode.set('global')}
+			>
+				🌐 Global
+			</button>
+		</div>
 	{:else}
 		<span class="tooloptions-placeholder">No tool options for the selected tool yet.</span>
 	{/if}

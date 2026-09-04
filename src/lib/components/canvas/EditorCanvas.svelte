@@ -61,6 +61,7 @@
 		textAction
 	} from '../../state/text';
 	import { commitTextToLayer } from '../../render/text';
+	import { applyFill } from '../../services/fillService';
 	import { ensureSystemFontLoaded, withTimeout } from '../../services/fonts';
 	import { sampleCompositeColorAt } from '../../render/eyedropper';
 	import { rgbaToHex, rgbaToCss } from '../../core/color';
@@ -427,7 +428,7 @@ const EYEDROPPER = 'eyedropper';
 			if (handle === 'pivot') return 'cursor: crosshair;';
 			return pointInTransformSelection(img, moveSelEngine?.transformState ?? transformUi) ? 'cursor: move;' : 'cursor: default;';
 		}
-		if (!(paintArmed || selectionArmed)) return '';
+		if (!(paintArmed || selectionArmed || get(activeToolId) === 'bucket')) return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
 
@@ -1142,6 +1143,16 @@ const EYEDROPPER = 'eyedropper';
 				foregroundColor.set(sampled);
 				showNotice(`Foreground ${rgbaToHex(sampled)}`);
 			}
+			return;
+		}
+		// Paint bucket: left click fills with the foreground colour, right click
+		// with the background colour (Paint.NET behaviour). The tool stays
+		// active; tolerance + contiguous/global come from the options strip.
+		if (get(activeToolId) === 'bucket' && (e.button === 0 || e.button === 2)) {
+			e.preventDefault();
+			const img = imageFromScreen(screenPoint(e));
+			const ok = applyFill(img.x, img.y, e.button === 2 ? get(backgroundColor) : get(foregroundColor));
+			if (!ok) showNotice('Nothing to fill.', 'error');
 			return;
 		}
 		if ((e.button === 0 || e.button === 2) && isPaintTool()) {
