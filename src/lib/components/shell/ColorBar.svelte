@@ -52,7 +52,7 @@
 	}
 </script>
 
-<div class="flex h-full items-center gap-2 pl-0 pr-2">
+	<div class="flex h-full items-center gap-2 pl-0 pr-2 select-none">
 	<div class="color-stack">
 		<button
 			class="cs cs-bg"

@@ -42,7 +42,7 @@
 </script>
 
 <div
-	class="grid w-full content-start"
+		class="grid w-full content-start select-none"
 	style="grid-template-columns:repeat(2, 40px); justify-content:center; gap:4px; padding:4px;"
 >
 	{#each rendered as { tool, sep } (tool.id)}

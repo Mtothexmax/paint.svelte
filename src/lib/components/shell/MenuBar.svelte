@@ -103,7 +103,7 @@
 	});
 </script>
 
-<div bind:this={bar} class="flex h-full items-stretch px-1">
+	<div bind:this={bar} class="flex h-full items-stretch px-1 select-none">
 	{#each MENUS as menu (menu.label)}
 		<div class="relative">
 			<button

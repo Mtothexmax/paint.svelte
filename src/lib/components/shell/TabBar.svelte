@@ -6,7 +6,7 @@
 	import { switchToDocument, closeDocument } from '../../services/fileService';
 </script>
 
-<div class="fltab-tray">
+	<div class="fltab-tray select-none">
 	{#each $documents.docs as doc (doc.id)}
 		<button
 			class="fltab"
