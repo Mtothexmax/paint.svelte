@@ -51,8 +51,9 @@ export class MoveEngine {
 		const doc = documentRegistry.active;
 		const sel = doc?.selection;
 		if (!doc || !sel?.maskId || !this.renderer.surfaces.has(sel.maskId)) return false;
-		const x = Math.floor(p.x);
-		const y = Math.floor(p.y);
+		const pt = this.active ? { x: p.x - this.offset.x, y: p.y - this.offset.y } : p;
+		const x = Math.floor(pt.x);
+		const y = Math.floor(pt.y);
 		if (x < 0 || y < 0 || x >= doc.width || y >= doc.height) return false;
 		const sprite = new Sprite(this.renderer.surfaces.getTexture(sel.maskId));
 		const px = this.renderer.app.renderer.extract.pixels({

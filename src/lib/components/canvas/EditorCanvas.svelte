@@ -9,6 +9,7 @@
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
 	import { MoveEngine } from '../../render/MoveEngine';
+	import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import {
@@ -87,6 +88,12 @@
 	let moving = $state(false);
 	let movePointerId = -1;
 
+	// move-selection-tool state (drag the SELECTION border, not the pixels)
+	let moveSelEngine: MoveSelectionEngine | null = null;
+	let moveSelArmed = $state(false);
+	let movingSelection = $state(false);
+	let moveSelPointerId = -1;
+
 	// selection-tool state (rect / ellipse / lasso drags)
 	let selectionArmed = $state(false);
 	let selecting = $state(false);
@@ -123,7 +130,9 @@
 		if (panning) return '';
 		if (painting) return 'cursor: none;';
 		if (moving) return 'cursor: move;';
+		if (movingSelection) return 'cursor: move;';
 		if (moveArmed) return pointerInside ? 'cursor: move;' : '';
+		if (moveSelArmed) return pointerInside ? 'cursor: move;' : '';
 		if (!(paintArmed || selectionArmed)) return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
@@ -155,10 +164,13 @@
 		const hasDoc = !!documentRegistry.active;
 		paintArmed = PAINT_TOOLS.has(get(activeToolId)) && hasDoc;
 		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
-		moveArmed = get(activeToolId) === 'move' && hasDoc;
+		moveArmed = get(activeToolId) === 'move-pixels' && hasDoc;
+		moveSelArmed = get(activeToolId) === 'move-selection' && hasDoc;
 		refreshRing();
 		// Switching away from the move tool drops (applies) a floating selection.
 		if (moveEngine?.floating && !moveArmed) moveEngine.drop();
+		// Switching away from the move-selection tool cancels an in-progress drag.
+		if (moveSelEngine?.dragging && !moveSelArmed) moveSelEngine.cancel();
 		// Debug: only log when the ACTIVE TOOL actually changed (not on every
 		// pointer event), so we can see why switching tools misbehaves.
 		if (lastLoggedTool !== get(activeToolId)) {
@@ -220,6 +232,13 @@
 				moveEngine.cancel();
 				moving = false;
 				movePointerId = -1;
+			}
+			// A move-selection drag is also interrupted: the selection reverts
+			// to its original position before the selection itself is dropped.
+			if (moveSelEngine?.dragging) {
+				moveSelEngine.cancel();
+				movingSelection = false;
+				moveSelPointerId = -1;
 			}
 			if (documentRegistry.active?.selection.active) deselect();
 			return;
@@ -570,6 +589,33 @@
 			if (moveEngine.pointInSelection(img) && moveEngine.begin() === 'ok') startMoveDrag(e, img);
 			return;
 		}
+		// Move-Selection tool: drags the SELECTION (mask + outline), NOT the
+		// pixels. Click outside a live selection drops the selection (Paint.NET
+		// behaviour). Click inside arms a drag — release commits the move.
+		if (e.button === 0 && moveSelArmed) {
+			e.preventDefault();
+			const doc = documentRegistry.active;
+			if (!doc) return;
+			if (!doc.selection.active) {
+				showNotice('Draw a selection first.');
+				return;
+			}
+			if (!moveSelEngine) moveSelEngine = new MoveSelectionEngine(getEditorRenderer());
+			const img = imageFromScreen(screenPoint(e));
+			if (moveSelEngine.begin(img)) {
+				movingSelection = true;
+				moveSelPointerId = e.pointerId;
+				try {
+					host.setPointerCapture(e.pointerId);
+				} catch {
+					/* ignore */
+				}
+			} else {
+				// No usable selection (e.g. mask surface is missing): drop it.
+				deselect();
+			}
+			return;
+		}
 		// Any other tool/action first drops a floating selection (Paint.NET
 		// behaviour): the content is stamped at its current position.
 		if (moveEngine?.floating) moveEngine.drop();
@@ -623,6 +669,9 @@
 			if (moving && e.pointerId === movePointerId && moveEngine) {
 				moveEngine.moveTo(imageFromScreen(sp));
 			}
+			if (movingSelection && e.pointerId === moveSelPointerId && moveSelEngine) {
+				moveSelEngine.moveTo(imageFromScreen(sp));
+			}
 			if (selecting && e.pointerId === selectPointerId && selStart) {
 				const img = imageFromScreen(sp);
 				if (get(activeToolId) === 'lasso') {
@@ -660,6 +709,18 @@
 			// until it is dropped (click outside / Enter / tool switch)
 			moving = false;
 			movePointerId = -1;
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
+		if (movingSelection && e.pointerId === moveSelPointerId) {
+			// pointer-up commits the move as a single history entry (no-op when
+			// the user clicked without dragging)
+			moveSelEngine?.commit();
+			movingSelection = false;
+			moveSelPointerId = -1;
 			try {
 				host.releasePointerCapture(e.pointerId);
 			} catch {
@@ -727,6 +788,12 @@
 			// interrupted drag: keep the floating selection where it was
 			moving = false;
 			movePointerId = -1;
+		}
+		if (movingSelection && e.pointerId === moveSelPointerId) {
+			// interrupted drag: keep the new selection position (mirrors MoveEngine
+			// behaviour; the user can still drop via click-outside / Enter)
+			movingSelection = false;
+			moveSelPointerId = -1;
 		}
 		if (selecting && e.pointerId === selectPointerId) {
 			cancelSelectDrag();

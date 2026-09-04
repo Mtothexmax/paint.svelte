@@ -148,6 +148,7 @@
 
 	function svPointer(e: PointerEvent) {
 		const el = e.currentTarget as HTMLElement;
+		el.blur();
 		bindRatio(el, e, 'xy', (x, y) => {
 			sat = x;
 			val = 1 - y;
@@ -162,6 +163,7 @@
 	}
 	function stripPointer(axis: 'hue' | 'alpha', e: PointerEvent) {
 		const el = e.currentTarget as HTMLElement;
+		el.blur();
 		bindRatio(el, e, 'y', (_x, y) => {
 			if (axis === 'hue') hue = y * 360;
 			else alpha = Math.round((1 - y) * 255);

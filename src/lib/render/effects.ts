@@ -97,7 +97,13 @@ export function hueSaturationActiveLayer(renderer: EditorRenderer, s: HslSetting
 export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
 	return applyFilterSwap(renderer, 'Invert Colors', () => {
 		const cm = new ColorMatrixFilter();
-		cm.negative(true);
+		// Straight RGBA color inversion (Paint.NET semantics): R' = 1 - R, G' = 1 - G, B' = 1 - B, A' = A
+		cm.matrix = [
+			-1, 0, 0, 0, 1,
+			0, -1, 0, 0, 1,
+			0, 0, -1, 0, 1,
+			0, 0, 0, 1, 0
+		];
 		return cm;
 	});
 }
@@ -235,7 +241,12 @@ function invertSurfaceCopy(renderer: EditorRenderer, srcId: SurfaceId, width: nu
 	const target = RenderTexture.create({ width, height, resolution: 1 });
 	const sprite = new Sprite(src);
 	const cm = new ColorMatrixFilter();
-	cm.negative(true);
+	cm.matrix = [
+		-1, 0, 0, 0, 1,
+		0, -1, 0, 0, 1,
+		0, 0, -1, 0, 1,
+		0, 0, 0, 1, 0
+	];
 	sprite.filters = [cm];
 	renderer.app.renderer.render({ container: sprite, target, clear: true });
 	sprite.destroy();

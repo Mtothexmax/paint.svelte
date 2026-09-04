@@ -10,7 +10,7 @@
 // sampling is distance-based (independent of pointer event frequency and
 // velocity).
 
-import { BlurFilter, Container, Graphics, Rectangle, RenderTexture, Sprite } from 'pixi.js';
+import { CanvasSource, Container, Rectangle, RenderTexture, Sprite, Texture } from 'pixi.js';
 import type { Point, Rect } from '../core/geometry';
 import type { RGBA } from '../core/color';
 import type { ImageDocument } from '../core/document/ImageDocument';
@@ -35,10 +35,85 @@ export interface PaintSettings {
 	antiAlias?: boolean;
 }
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+function clamp(v: number, lo: number, hi: number): number {
+	return Math.max(lo, Math.min(hi, v));
+}
 
 function rgbToInt(c: RGBA): number {
 	return ((Math.round(c.r) & 0xff) << 16) | ((Math.round(c.g) & 0xff) << 8) | (Math.round(c.b) & 0xff);
+}
+
+function getDabAlpha(dist: number, r: number, hardness: number, antiAlias: boolean): number {
+	if (!antiAlias) {
+		return dist <= r ? 1 : 0;
+	}
+
+	const coreR = r * clamp(hardness, 0, 1);
+	const aaR = Math.min(coreR, Math.max(0, r - 0.5));
+
+	if (dist <= aaR) return 1;
+
+	const maxR = r - aaR < 1 ? r + 0.5 : r;
+	if (dist >= maxR) return 0;
+
+	const t = clamp((dist - aaR) / (maxR - aaR), 0, 1);
+	// Smoothstep falloff: 1 - (3t^2 - 2t^3)
+	return 1 - (3 * t * t - 2 * t * t * t);
+}
+
+const dabTextureCache = new Map<string, Texture>();
+
+function getDabTexture(size: number, hardness: number, antiAlias: boolean): Texture {
+	const key = `${size}_${hardness.toFixed(2)}_${antiAlias}`;
+	let cached = dabTextureCache.get(key);
+	if (cached) return cached;
+
+	const r = size / 2;
+	const dim = Math.max(2, Math.ceil(size) + 4);
+	const cx = dim / 2;
+	const cy = dim / 2;
+
+	const canvas = document.createElement('canvas');
+	canvas.width = dim;
+	canvas.height = dim;
+	const ctx = canvas.getContext('2d');
+	if (!ctx) throw new Error('Failed to get 2d context for dab texture');
+
+	const imgData = ctx.createImageData(dim, dim);
+	const data = imgData.data;
+
+	for (let y = 0; y < dim; y++) {
+		for (let x = 0; x < dim; x++) {
+			const dx = x + 0.5 - cx;
+			const dy = y + 0.5 - cy;
+			const dist = Math.hypot(dx, dy);
+
+			const alpha = getDabAlpha(dist, r, hardness, antiAlias);
+
+			const idx = (y * dim + x) * 4;
+			const aByte = Math.round(alpha * 255);
+			data[idx] = 255;
+			data[idx + 1] = 255;
+			data[idx + 2] = 255;
+			data[idx + 3] = aByte;
+		}
+	}
+
+	ctx.putImageData(imgData, 0, 0);
+
+	const source = new CanvasSource({ resource: canvas });
+	cached = new Texture({ source });
+	dabTextureCache.set(key, cached);
+
+	if (dabTextureCache.size > 100) {
+		const firstKey = dabTextureCache.keys().next().value;
+		if (firstKey) {
+			dabTextureCache.get(firstKey)?.destroy(true);
+			dabTextureCache.delete(firstKey);
+		}
+	}
+
+	return cached;
 }
 
 export class BrushEngine {
@@ -109,7 +184,7 @@ export class BrushEngine {
 		}
 	}
 
-	/** Rasterise: crisp stroked path -> GPU blur -> pooled preview buffer. */
+	/** Rasterise: stamp radial-falloff dabs with MAX blending into pooled preview buffer. */
 	private rasterize(): void {
 		const stroke = this.renderer.getActiveStroke();
 		const doc = this.doc;
@@ -117,22 +192,10 @@ export class BrushEngine {
 		if (!stroke || !doc || !s || !this.bufferActive || this.path.length === 0) return;
 
 		const size = s.size;
-		// AA 'pixel': hard, pixel-crisp edges at the full brush size (hardness
-		// ignored — like a pencil). AA 'smooth': hardness sets the soft-brush
-		// falloff, but a small rim anti-aliasing is ALWAYS applied — as in
-		// Paint.NET, where the edge stays anti-aliased even at 100% hardness
-		// (hardness only controls how much extra softness is added on top).
-		const aa = s.antiAlias !== false;
-		const hardness = aa ? clamp(s.hardness, 0.05, 1) : 1;
-		const core = size * hardness; // crisp dab diameter
-		const aaEdge = 0.1; // px of rim AA applied even at hardness 100%
-		const strength = aa ? aaEdge + (1 - hardness) * size * 0.42 : 0; // blur px (softness)
-		// generous transparent border so any filter-edge smear stays far away
-		const margin = size / 2 + strength + 8;
+		const aa = s.kind !== 'pencil' && s.antiAlias !== false;
+		const hardness = s.kind === 'pencil' ? 1 : clamp(s.hardness, 0, 1);
+		const margin = size / 2 + 4;
 
-		// Region around the path, NOT clamped to the canvas: allow up to `margin`
-		// beyond each canvas edge so the blur kernel has full data and the stroke
-		// looks like it was drawn on a larger canvas and then cropped.
 		let pminX = Infinity;
 		let pminY = Infinity;
 		let pmaxX = -Infinity;
@@ -155,67 +218,45 @@ export class BrushEngine {
 		};
 		if (fullRect.width <= 0 || fullRect.height <= 0) return;
 
-		// The actually-affected area on the canvas (for undo snapshots).
 		const dx = Math.max(0, fullRect.x);
 		const dy = Math.max(0, fullRect.y);
 		const dw = Math.min(doc.width, fullRect.x + fullRect.width) - dx;
 		const dh = Math.min(doc.height, fullRect.y + fullRect.height) - dy;
-		if (dw <= 0 || dh <= 0) return; // stroke is entirely off-canvas
+		if (dw <= 0 || dh <= 0) return;
 		this.dirtyRect = { x: dx, y: dy, width: dw, height: dh };
 
-		// Blend an alpha-only WHITE mask (colour applied later via tint) — this
-		// avoids premultiplied colour fringes at the blurred edges.
-		const MASK = 0xffffff;
-
-		// Render the crisp white dab mask DIRECTLY with the blur filter (only in
-		// anti-aliased mode). Small strengths (e.g. 0.25 px rim AA) are valid and
-		// must NOT be skipped — only an exact 0 (pixel mode) skips the pass. The
-		// filter region is explicitly pinned to the whole document + explicit
-		// padding, so Pixi does NOT derive its intermediate filter bounds from
-		// the Graphics geometry (which produced the bottom/right bounding-box
-		// lines).
-		const blur = strength > 0 ? new BlurFilter({ strength, resolution: 1 }) : null;
-		if (blur) blur.padding = Math.ceil(strength * 2 + 4);
+		const dabTex = getDabTexture(size, hardness, aa);
 		const wrap = new Container();
-		// Path is in image coordinates and the pooled target IS the document —
-		// so no extra offset (that shifted the stroke away from the cursor).
-		if (blur) {
-			wrap.filterArea = new Rectangle(0, 0, doc.width, doc.height);
-			wrap.filters = [blur];
-		}
 
-		const g = new Graphics();
-		const dabR = Math.max(0.5, core / 2);
+		const step = Math.max(0.5, Math.min(2, size * Math.max(0.02, s.spacingRatio ?? 0.1)));
+
+		const addDab = (x: number, y: number) => {
+			const sprite = new Sprite(dabTex);
+			sprite.anchor.set(0.5, 0.5);
+			sprite.position.set(x, y);
+			sprite.blendMode = 'max';
+			wrap.addChild(sprite);
+		};
+
 		if (this.path.length === 1) {
-			// a click is a single dab (filled disc)
-			const p = this.path[0];
-			g.circle(p.x, p.y, dabR).fill(MASK);
+			addDab(this.path[0].x, this.path[0].y);
 		} else {
-			// Paint.NET-style spacing. While the stamped dabs would overlap
-			// (spacing <= dab diameter) draw ONE continuous round-cap stroke —
-			// the crisp single-path union is guaranteed to be solid (no
-			// multi-subpath fill artefacts). Only when spacing is wider than a
-			// dab are separate dabs stamped, so the stroke visibly breaks into
-			// dotted/beaded lines.
-			const ratio = Math.max(0.02, s.spacingRatio ?? 0.15);
-			const dabStep = Math.max(0.5, size * ratio);
-			if (dabStep <= core) {
-				g.moveTo(this.path[0].x, this.path[0].y);
-				for (let i = 1; i < this.path.length; i++) {
-					g.lineTo(this.path[i].x, this.path[i].y);
+			addDab(this.path[0].x, this.path[0].y);
+			for (let i = 0; i < this.path.length - 1; i++) {
+				const p1 = this.path[i];
+				const p2 = this.path[i + 1];
+				const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+				if (dist <= 0) continue;
+				const nSteps = Math.ceil(dist / step);
+				for (let j = 1; j <= nSteps; j++) {
+					const t = j / nSteps;
+					addDab(p1.x + (p2.x - p1.x) * t, p1.y + (p2.y - p1.y) * t);
 				}
-				g.stroke({ width: core, color: MASK, alpha: 1, cap: 'round', join: 'round' });
-			} else {
-				// dabs are separate by construction — each is its own fill, so
-				// no overlapping-subpath union is ever rasterised.
-				for (const p of this.path) g.circle(p.x, p.y, dabR).fill(MASK);
 			}
 		}
-		wrap.addChild(g);
 
 		this.renderer.app.renderer.render({ container: wrap, target: stroke.target, clear: true });
 		wrap.destroy({ children: true });
-		blur?.destroy();
 	}
 
 	/** Commits the stroke into the layer, records undo/redo, cleans up. */

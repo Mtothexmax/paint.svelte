@@ -65,14 +65,25 @@
 
 	function onAreaDown(e: PointerEvent) {
 		dragging = true;
-		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+		const el = e.currentTarget as HTMLElement;
+		try {
+			el.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
 		pointerPos(e);
+		el.blur();
 	}
 	function onAreaMove(e: PointerEvent) {
 		if (dragging) pointerPos(e);
 	}
 	function onAreaUp() {
 		dragging = false;
+	}
+	function onAreaKeyDown(e: KeyboardEvent) {
+		if (e.key === ' ' || e.key === 'Backspace' || e.key === 'Delete') {
+			(e.currentTarget as HTMLElement)?.blur();
+		}
 	}
 
 	const lightnessPct = $derived(`${l}%`);
@@ -97,6 +108,7 @@
 		onpointermove={onAreaMove}
 		onpointerup={onAreaUp}
 		onpointercancel={onAreaUp}
+		onkeydown={onAreaKeyDown}
 	>
 		<div class="fg-crosshair" style="left:{s}%; top:{(h / 360) * 100}%;"></div>
 	</div>
@@ -108,6 +120,8 @@
 		max="100"
 		value={l}
 		oninput={onBrightnessInput}
+		onpointerdown={(e) => (e.currentTarget as HTMLElement)?.blur()}
+		onkeydown={onAreaKeyDown}
 		style="background:{sliderGradient}; --thumb-color:{hslCss};"
 	/>
 </div>
@@ -130,6 +144,7 @@
 		overflow: hidden;
 		cursor: crosshair;
 		touch-action: none;
+		outline: none;
 		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
 		background: linear-gradient(
 			to bottom,

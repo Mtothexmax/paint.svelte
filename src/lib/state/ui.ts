@@ -97,6 +97,12 @@ export function cycleBrushSize(delta: number): void {
 // synchronously at startup so the first stroke already uses the saved values.
 
 const BRUSH_KEY = 'paint.svelte.brushSettings.v1';
+const COLORS_KEY = 'paint.svelte.colorSettings.v1';
+
+interface SavedColors {
+	fg: RGBA;
+	bg: RGBA;
+}
 
 interface BrushSettings {
 	size: number;
@@ -109,6 +115,46 @@ interface BrushSettings {
 function clampInt(value: unknown, lo: number, hi: number, fallback: number): number {
 	const n = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : fallback;
 	return clamp(n, lo, hi);
+}
+
+function parseRgba(v: unknown, fallback: RGBA): RGBA {
+	if (!v || typeof v !== 'object') return fallback;
+	const p = v as Partial<RGBA>;
+	return {
+		r: clampInt(p.r, 0, 255, fallback.r),
+		g: clampInt(p.g, 0, 255, fallback.g),
+		b: clampInt(p.b, 0, 255, fallback.b),
+		a: clampInt(p.a, 0, 255, fallback.a)
+	};
+}
+
+function readColorSettings(): SavedColors | null {
+	try {
+		const raw = localStorage.getItem(COLORS_KEY);
+		if (!raw) return null;
+		const p = JSON.parse(raw) as Partial<SavedColors>;
+		if (!p || typeof p !== 'object') return null;
+		return {
+			fg: parseRgba(p.fg, { r: 0, g: 0, b: 0, a: 255 }),
+			bg: parseRgba(p.bg, { r: 255, g: 255, b: 255, a: 255 })
+		};
+	} catch {
+		return null;
+	}
+}
+
+function writeColorSettings(): void {
+	try {
+		localStorage.setItem(
+			COLORS_KEY,
+			JSON.stringify({
+				fg: get(foregroundColor),
+				bg: get(backgroundColor)
+			})
+		);
+	} catch {
+		/* storage unavailable — ignore */
+	}
 }
 
 function brushDefaults(): BrushSettings {
@@ -158,6 +204,14 @@ function writeBrushSettings(): void {
 }
 
 if (typeof window !== 'undefined') {
+	const savedColors = readColorSettings();
+	if (savedColors) {
+		foregroundColor.set(savedColors.fg);
+		backgroundColor.set(savedColors.bg);
+	}
+	foregroundColor.subscribe(() => writeColorSettings());
+	backgroundColor.subscribe(() => writeColorSettings());
+
 	// Restore the saved values once (before any subscription writes back), then
 	// persist every later change.
 	const saved = readBrushSettings();
