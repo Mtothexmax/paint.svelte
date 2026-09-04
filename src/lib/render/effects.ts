@@ -133,81 +133,53 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 	const multiply = contrast < 0 ? contrast + 100 : contrast > 0 ? 100 : 1;
 	const divide = contrast < 0 ? 100 : contrast > 0 ? 100 - contrast : 1;
 
-	// Read the source surface
-	const srcSprite = new Sprite(surfaces.getTexture(beforeId));
+		// Read the source surface
+		const srcSprite = new Sprite(surfaces.getTexture(beforeId));
 		const px = renderer.app.renderer.extract.pixels({ target: srcSprite, resolution: 1 });
 		srcSprite.destroy();
 		const src = px.pixels;
 
-		// Unpremultiply so intensity/shift math works on true colour values
-		for (let i = 0; i < src.length; i += 4) {
-			const a = src[i + 3];
-			if (a > 0 && a < 255) {
-				const inv = 255 / a;
-				src[i] = Math.min(255, Math.round(src[i] * inv));
-				src[i + 1] = Math.min(255, Math.round(src[i + 1] * inv));
-				src[i + 2] = Math.min(255, Math.round(src[i + 2] * inv));
-			}
-		}
-
 		// Build result buffer
 		const afterId = surfaces.create(w, h);
 
-	if (divide === 0) {
-		// Maximum contrast: threshold at 128 → pure black or white
-		for (let i = 0; i < src.length; i += 4) {
-			if (src[i + 3] === 0) continue; // skip transparent pixels
-			const intensity = Math.round(src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114);
-			const val = (intensity + brightness < 128) ? 0 : 255;
-			src[i] = val;
-			src[i + 1] = val;
-			src[i + 2] = val;
+		if (divide === 0) {
+			// Maximum contrast: threshold at 128 → pure black or white
+			for (let i = 0; i < src.length; i += 4) {
+				if (src[i + 3] === 0) continue;
+				const intensity = Math.round(src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114);
+				const val = (intensity + brightness < 128) ? 0 : 255;
+				src[i] = val;
+				src[i + 1] = val;
+				src[i + 2] = val;
+			}
+		} else if (divide === 100) {
+			for (let i = 0; i < src.length; i += 4) {
+				if (src[i + 3] === 0) continue;
+				const r = src[i], g = src[i + 1], b = src[i + 2];
+				const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+				const shift = Math.round((intensity - 127) * multiply / divide + 127 - intensity + brightness);
+				src[i] = clampByte(r + shift);
+				src[i + 1] = clampByte(g + shift);
+				src[i + 2] = clampByte(b + shift);
+			}
+		} else {
+			for (let i = 0; i < src.length; i += 4) {
+				if (src[i + 3] === 0) continue;
+				const r = src[i], g = src[i + 1], b = src[i + 2];
+				const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+				const shift = Math.round((intensity - 127 + brightness) * multiply / divide + 127 - intensity);
+				src[i] = clampByte(r + shift);
+				src[i + 1] = clampByte(g + shift);
+				src[i + 2] = clampByte(b + shift);
+			}
 		}
-	} else if (divide === 100) {
-		// Negative or zero contrast
-		for (let i = 0; i < src.length; i += 4) {
-			if (src[i + 3] === 0) continue;
-			const r = src[i], g = src[i + 1], b = src[i + 2];
-			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
-			const shift = Math.round((intensity - 127) * multiply / divide + 127 - intensity + brightness);
-			src[i] = clampByte(r + shift);
-			src[i + 1] = clampByte(g + shift);
-			src[i + 2] = clampByte(b + shift);
-		}
-	} else {
-		// Positive contrast
-		for (let i = 0; i < src.length; i += 4) {
-			if (src[i + 3] === 0) continue;
-			const r = src[i], g = src[i + 1], b = src[i + 2];
-			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
-			const shift = Math.round((intensity - 127 + brightness) * multiply / divide + 127 - intensity);
-			src[i] = clampByte(r + shift);
-			src[i + 1] = clampByte(g + shift);
-			src[i + 2] = clampByte(b + shift);
-		}
-	}
 
-		// Write the processed pixels into the new surface via an OffscreenCanvas.
-		// extract.pixels() returns premultiplied alpha; putImageData expects
-		// unpremultiplied, so we must convert before writing.
+		// Upload: put processed pixels into an OffscreenCanvas, create a texture
+		// from it, and render onto the target RenderTexture.
 		const canvas = new OffscreenCanvas(w, h);
 		const ctx = canvas.getContext('2d')!;
 		const imgData = ctx.createImageData(w, h);
-		const dst = imgData.data;
-		for (let i = 0; i < src.length; i += 4) {
-			const a = src[i + 3];
-			if (a === 0) {
-				dst[i] = 0; dst[i + 1] = 0; dst[i + 2] = 0; dst[i + 3] = 0;
-			} else if (a >= 255) {
-				dst[i] = src[i]; dst[i + 1] = src[i + 1]; dst[i + 2] = src[i + 2]; dst[i + 3] = 255;
-			} else {
-				const inv = 255 / a;
-				dst[i] = Math.round(src[i] * inv);
-				dst[i + 1] = Math.round(src[i + 1] * inv);
-				dst[i + 2] = Math.round(src[i + 2] * inv);
-				dst[i + 3] = a;
-			}
-		}
+		imgData.data.set(src);
 		ctx.putImageData(imgData, 0, 0);
 		const uploadTex = Texture.from(canvas);
 		const uploadSprite = new Sprite(uploadTex);
