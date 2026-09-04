@@ -644,7 +644,7 @@
 	}
 
 	function transformHandleAt(img: Point): TransformHandle | null {
-		const t = transformUi;
+		const t = moveEngine?.transformState ?? transformUi;
 		const doc = documentRegistry.active;
 		if (!t || !doc) return null;
 		const b = t.bounds;
