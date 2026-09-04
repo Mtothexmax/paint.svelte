@@ -174,9 +174,12 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 			}
 		}
 
-		// Upload: put processed pixels into an OffscreenCanvas, create a texture
-		// from it, and render onto the target RenderTexture.
-		const canvas = new OffscreenCanvas(w, h);
+		// Upload processed pixels: write into a regular <canvas>, create a
+		// texture from it (same pattern as checkerboard.ts), then render onto
+		// the target RenderTexture.
+		const canvas = document.createElement('canvas');
+		canvas.width = w;
+		canvas.height = h;
 		const ctx = canvas.getContext('2d')!;
 		const imgData = ctx.createImageData(w, h);
 		imgData.data.set(src);
@@ -186,6 +189,7 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 		renderer.app.renderer.render({ container: uploadSprite, target: surfaces.getTexture(afterId), clear: true });
 		uploadSprite.destroy();
 		uploadTex.destroy(true);
+		canvas.remove();
 
 	layer.surfaceId = afterId;
 	renderer.rebuildActiveLayers();
