@@ -125,7 +125,6 @@
 			{ handle: 's' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y + b.height + oy },
 			{ handle: 'sw' as TransformHandle, x: b.x + ox, y: b.y + b.height + oy },
 			{ handle: 'w' as TransformHandle, x: b.x + ox, y: b.y + b.height / 2 + oy },
-			{ handle: 'rotate' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y - 24 + oy },
 			{ handle: 'pivot' as TransformHandle, x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y }
 		].map((p) => {
 			const screen = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
@@ -253,7 +252,11 @@
 		if (painting) return 'cursor: none;';
 		if (moving) return 'cursor: move;';
 		if (movingSelection) return 'cursor: move;';
-		if (moveArmed) return pointerInside ? 'cursor: move;' : '';
+		if (moveArmed) {
+			if (!pointerInside) return '';
+			const img = imageFromScreen({ x: pointerX, y: pointerY });
+			return transformHandleAt(img) === 'rotate' ? 'cursor: grab;' : 'cursor: move;';
+		}
 		if (moveSelArmed) return pointerInside ? 'cursor: move;' : '';
 		if (!(paintArmed || selectionArmed)) return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
@@ -666,9 +669,9 @@
 			['w', transformed(b.x, b.y + b.height / 2)]
 		];
 		for (const [handle, p] of points) if (Math.hypot(img.x - p.x, img.y - p.y) <= threshold) return handle;
-		const topCenter = transformed(b.x + b.width / 2, b.y - 24);
 		const outside = Math.hypot(img.x - pivot.x, img.y - pivot.y) > Math.min(b.width, b.height) / 2;
-		if (outside && Math.hypot(img.x - topCenter.x, img.y - topCenter.y) <= 24 / Math.max(doc.view.zoom, 0.01)) return 'rotate';
+		const nearHandle = points.some(([, p]) => Math.hypot(img.x - p.x, img.y - p.y) <= 24 / Math.max(doc.view.zoom, 0.01));
+		if (outside && nearHandle) return 'rotate';
 		return null;
 	}
 
