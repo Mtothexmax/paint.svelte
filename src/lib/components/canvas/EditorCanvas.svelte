@@ -125,10 +125,10 @@
 			{ handle: 'sw' as TransformHandle, x: b.x + ox, y: b.y + b.height + oy },
 			{ handle: 'w' as TransformHandle, x: b.x + ox, y: b.y + b.height / 2 + oy },
 			{ handle: 'rotate' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y - 24 + oy },
-			{ handle: 'pivot' as TransformHandle, x: t.pivot.x, y: t.pivot.y }
+			{ handle: 'pivot' as TransformHandle, x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y }
 		].map((p) => {
 			const screen = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
-			const transformed = point(p.x - (p.handle === 'pivot' ? 0 : ox), p.y - (p.handle === 'pivot' ? 0 : oy));
+			const transformed = point(p.x - ox, p.y - oy);
 			return { ...p, sx: screen.panX + transformed.x * screen.zoom, sy: screen.panY + transformed.y * screen.zoom };
 		});
 	});

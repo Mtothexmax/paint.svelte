@@ -182,10 +182,24 @@ export class MoveEngine {
 
 	setPivot(p: Point): void {
 		if (!this.active || !this.bounds) return;
+		this.offset = this.offsetForPivot(p, this.pivot, this.offset);
 		this.pivot = { ...p };
 		this.applyFloatingTransform();
 		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
 		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+	}
+
+	private offsetForPivot(nextPivot: Point, previousPivot: Point, offset: Point): Point {
+		const cos = Math.cos(this.rotation);
+		const sin = Math.sin(this.rotation);
+		const transformedDelta = {
+			x: (nextPivot.x - previousPivot.x) * this.scaleX * cos - (nextPivot.y - previousPivot.y) * this.scaleY * sin,
+			y: (nextPivot.x - previousPivot.x) * this.scaleX * sin + (nextPivot.y - previousPivot.y) * this.scaleY * cos
+		};
+		return {
+			x: offset.x + previousPivot.x - nextPivot.x + transformedDelta.x,
+			y: offset.y + previousPivot.y - nextPivot.y + transformedDelta.y
+		};
 	}
 
 	setTransformState(state: { pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number }): void {
@@ -226,8 +240,7 @@ export class MoveEngine {
 				x: Math.round(p.x - start.offset.x),
 				y: Math.round(p.y - start.offset.y)
 			};
-			this.offset = { ...start.offset };
-			return;
+			this.offset = this.offsetForPivot(this.pivot, start.pivot, start.offset);
 		} else if (this.transformHandle === 'rotate') {
 			const center = {
 				x: this.pivot.x + this.offset.x,
