@@ -1,7 +1,7 @@
 // Layer: render (pixi). GPU effects applied to the active layer, recorded as a
 // reversible surface swap in the doc history (no readbacks).
 
-import { BlurFilter, ColorMatrixFilter, RenderTexture, Sprite, type Filter } from 'pixi.js';
+import { BlurFilter, ColorMatrixFilter, RenderTexture, Sprite, Texture, type Filter } from 'pixi.js';
 import { documentRegistry } from '../core/document/registry';
 import type { SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
@@ -105,24 +105,117 @@ export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
 export interface BrightContSettings {
 	/** brightness offset: 0 = unchanged, -100 = black, +100 = double */
 	brightness: number;
-	/** contrast offset: 0 = unchanged, -100 = flat grey, +100 = maximum */
+	/** contrast offset: 0 = unchanged, -100 = flat grey, +100 = max */
 	contrast: number;
 }
 
 /**
- * Brightness / Contrast adjustment via a composed ColorMatrixFilter.
- * Brightness is applied first, then contrast. Offsets: 0 = unchanged,
- * mapped to factor 1.0.
+ * Brightness / Contrast adjustment using Paint.NET's intensity-based
+ * algorithm (from Pinta). At contrast = +100 every pixel becomes either
+ * pure black or pure white; at -100 everything collapses to mid-grey.
+ * Brightness is applied first, then contrast shifts each channel
+ * relative to the pixel's intensity.
  */
 export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: BrightContSettings): boolean {
-	const brightness = Math.max(0, (100 + s.brightness) / 100);
-	const contrast = Math.max(0, (100 + s.contrast) / 100);
-	return applyFilterSwap(renderer, 'Brightness / Contrast', () => {
-		const cm = new ColorMatrixFilter();
-		cm.brightness(brightness, true);
-		cm.contrast(contrast, true);
-		return cm;
+	const doc = documentRegistry.active;
+	const layer = doc?.activeLayer;
+	if (!doc || !layer) return false;
+	if (s.brightness === 0 && s.contrast === 0) return false;
+
+	const surfaces = renderer.surfaces;
+	const beforeId = layer.surfaceId;
+	const w = doc.width;
+	const h = doc.height;
+
+	// Compute the per-pixel lookup table (Pinta algorithm)
+	const brightness = s.brightness;
+	const contrast = s.contrast;
+	const multiply = contrast < 0 ? contrast + 100 : contrast > 0 ? 100 : 1;
+	const divide = contrast < 0 ? 100 : contrast > 0 ? 100 - contrast : 1;
+
+	// Read the source surface
+	const srcSprite = new Sprite(surfaces.getTexture(beforeId));
+	const px = renderer.app.renderer.extract.pixels({ target: srcSprite, resolution: 1 });
+	srcSprite.destroy();
+	const src = px.pixels;
+
+	// Build result buffer
+	const afterId = surfaces.create(w, h);
+
+	if (divide === 0) {
+		// Maximum contrast: threshold at 128 → pure black or white
+		for (let i = 0; i < src.length; i += 4) {
+			const intensity = Math.round(src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114);
+			const val = (intensity + brightness < 128) ? 0 : 255;
+			src[i] = val;
+			src[i + 1] = val;
+			src[i + 2] = val;
+			// alpha unchanged
+		}
+	} else if (divide === 100) {
+		// Negative or zero contrast
+		for (let i = 0; i < src.length; i += 4) {
+			const r = src[i], g = src[i + 1], b = src[i + 2];
+			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+			const shift = Math.round((intensity - 127) * multiply / divide + 127 - intensity + brightness);
+			src[i] = clampByte(r + shift);
+			src[i + 1] = clampByte(g + shift);
+			src[i + 2] = clampByte(b + shift);
+		}
+	} else {
+		// Positive contrast
+		for (let i = 0; i < src.length; i += 4) {
+			const r = src[i], g = src[i + 1], b = src[i + 2];
+			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
+			const shift = Math.round((intensity - 127 + brightness) * multiply / divide + 127 - intensity);
+			src[i] = clampByte(r + shift);
+			src[i + 1] = clampByte(g + shift);
+			src[i + 2] = clampByte(b + shift);
+		}
+	}
+
+	// Write the processed pixels into the new surface via an OffscreenCanvas
+	const canvas = new OffscreenCanvas(w, h);
+	const ctx = canvas.getContext('2d')!;
+	const imgData = ctx.createImageData(w, h);
+	imgData.data.set(src);
+		ctx.putImageData(imgData, 0, 0);
+	const uploadTex = Texture.from(canvas);
+	const uploadSprite = new Sprite(uploadTex);
+	renderer.app.renderer.render({ container: uploadSprite, target: surfaces.getTexture(afterId), clear: true });
+	uploadSprite.destroy();
+	uploadTex.destroy(true);
+
+	layer.surfaceId = afterId;
+	renderer.rebuildActiveLayers();
+	doc.setDirty(true);
+	documentRegistry.notifyChange(doc);
+
+	doc.history.push({
+		label: 'Brightness / Contrast',
+		memoryBytes: w * h * 4 * 2,
+		undo: () => {
+			if (layer.surfaceId === afterId) {
+				layer.surfaceId = beforeId;
+				renderer.rebuildActiveLayers();
+			}
+		},
+		redo: () => {
+			if (layer.surfaceId === beforeId) {
+				layer.surfaceId = afterId;
+				renderer.rebuildActiveLayers();
+			}
+		},
+		dispose: () => {
+			if (layer.surfaceId === afterId) surfaces.dispose(beforeId);
+			else surfaces.dispose(afterId);
+		}
 	});
+	return true;
+}
+
+function clampByte(v: number): number {
+	return v < 0 ? 0 : v > 255 ? 255 : v;
 }
 
 /** Renders an inverted (negative) copy of surface `srcId` into a NEW owned

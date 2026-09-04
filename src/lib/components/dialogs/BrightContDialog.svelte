@@ -28,10 +28,16 @@
 	const contrastGradient =
 		'linear-gradient(90deg, #808080 0%, #505050 15%, #b0b0b0 30%, #202020 45%, #e0e0e0 60%, #000000 70%, #000000 76%, #ffffff 76%, #ffffff 82%, #000000 82%, #000000 88%, #ffffff 88%, #ffffff 94%, #000000 94%, #000000 100%)';
 
+	/** Approximate preview using ColorMatrixFilter (the exact Pinta pixel
+	 *  algorithm only runs on Apply — too slow for interactive dragging). */
 	function makeFilter() {
 		const cm = new ColorMatrixFilter();
 		cm.brightness((100 + prefs.brightness) / 100, true);
-		cm.contrast((100 + prefs.contrast) / 100, true);
+		// Approximate Pinta contrast: at contrast=100 the Pinta algorithm
+		// thresholds to black/white; we approximate with a high linear factor.
+		const c = prefs.contrast;
+		const factor = c < 0 ? (100 + c) / 100 : c === 0 ? 1 : 1 + c * c / (100 * (100 - c));
+		cm.contrast(Math.max(0, factor), true);
 		return cm;
 	}
 	function preview() {
