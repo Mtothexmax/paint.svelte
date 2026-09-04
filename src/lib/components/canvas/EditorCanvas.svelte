@@ -262,7 +262,7 @@
 				const cursor = pivot && img.x < pivot.x ? rotateCounterclockwiseCursor : rotateClockwiseCursor;
 				return `cursor: url("${cursor}") 12 12, grab;`;
 			}
-			return 'cursor: move;';
+			return moveEngine?.floating && moveEngine.pointInSelection(img) ? '' : 'cursor: move;';
 		}
 		if (moveSelArmed) return pointerInside ? 'cursor: move;' : '';
 		if (!(paintArmed || selectionArmed)) return '';
