@@ -283,10 +283,10 @@ export class MoveEngine {
 			const movingX = this.transformHandle.includes('w') ? b.x : this.transformHandle.includes('e') ? b.x + b.width : anchorX;
 			const movingY = this.transformHandle.includes('n') ? b.y : this.transformHandle.includes('s') ? b.y + b.height : anchorY;
 			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e')
-				? start.scaleX * ((localPointer.x - start.pivot.x) / (movingX - start.pivot.x))
+				? start.scaleX + ((localPointer.x - movingX) / (movingX - anchorX)) * start.scaleX
 				: start.scaleX;
 			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s')
-				? start.scaleY * ((localPointer.y - start.pivot.y) / (movingY - start.pivot.y))
+				? start.scaleY + ((localPointer.y - movingY) / (movingY - anchorY)) * start.scaleY
 				: start.scaleY;
 			if (shift) {
 				const magnitude = Math.max(Math.abs(sx), Math.abs(sy));
