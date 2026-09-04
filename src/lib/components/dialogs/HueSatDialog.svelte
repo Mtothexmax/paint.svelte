@@ -21,17 +21,18 @@
 	let previewOn = $state(true);
 	const renderer = () => getEditorRenderer();
 
-	/** Hue track: light-blue on the left, then the full hue spectrum. */
+	/** Hue track: full hue spectrum from red (0°) back to red (360°). */
 	const hueGradient =
-		'linear-gradient(90deg, hsl(200,80%,70%) 0%, hsl(0,100%,50%) 8.33%, hsl(60,100%,50%) 25%, hsl(120,100%,50%) 41.67%, hsl(180,100%,50%) 58.33%, hsl(240,100%,50%) 75%, hsl(300,100%,50%) 91.67%, hsl(360,100%,50%) 100%)';
+		'linear-gradient(90deg, hsl(0,100%,50%) 0%, hsl(60,100%,50%) 16.67%, hsl(120,100%,50%) 33.33%, hsl(180,100%,50%) 50%, hsl(240,100%,50%) 66.67%, hsl(300,100%,50%) 83.33%, hsl(360,100%,50%) 100%)';
 
-	/** Saturation track: desaturated on the left (same hue & lightness, zero
-	 *  saturation) → fully saturated on the right. The base hue is taken from
-	 *  the current hue shift so the bar reflects the adjusted colour. */
+	/** Saturation track: desaturated on the left (same hue, 0% saturation) →
+	 *  fully saturated on the right. Uses the hue gradient but fades it to
+	 *  grey on the left. */
 	const satGradient = $derived(() => {
-		const baseHue = 200 + prefs.hue; // approximate starting hue (200 ≈ light blue)
-		const lightPct = Math.round(prefs.light * 50 / 100); // 100 → 50%
-		return `linear-gradient(90deg, hsl(${baseHue},0%,${lightPct}%) 0%, hsl(${baseHue},100%,${lightPct}%) 100%)`;
+		const stops = [0, 60, 120, 180, 240, 300, 360];
+		const left = stops.map((h, i) => `hsl(${h},0%,50%) ${(i / 6 * 100).toFixed(1)}%`).join(', ');
+		const right = stops.map((h, i) => `hsl(${h},100%,50%) ${(i / 6 * 100).toFixed(1)}%`).join(', ');
+		return `linear-gradient(90deg, ${left}, ${right})`;
 	});
 
 	/** Lightness track: black → white. */
