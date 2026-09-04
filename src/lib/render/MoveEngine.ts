@@ -255,8 +255,12 @@ export class MoveEngine {
 					: b.y + b.height / 2;
 			const baseX = this.transformHandle.includes('w') ? -b.width : this.transformHandle.includes('e') ? b.width : 1;
 			const baseY = this.transformHandle.includes('n') ? -b.height : this.transformHandle.includes('s') ? b.height : 1;
-			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e') ? (movingX - anchorX) / baseX : 1;
-			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s') ? (movingY - anchorY) / baseY : 1;
+			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e')
+				? start.scaleX + (movingX - anchorX) / baseX
+				: start.scaleX;
+			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s')
+				? start.scaleY + (movingY - anchorY) / baseY
+				: start.scaleY;
 			if (shift) {
 				const magnitude = Math.max(Math.abs(sx), Math.abs(sy));
 				if (this.transformHandle === 'n' || this.transformHandle === 's') sx = Math.sign(sx || 1) * Math.abs(sy);
@@ -272,8 +276,8 @@ export class MoveEngine {
 				this.offset = { ...start.offset };
 			} else {
 				this.offset = {
-					x: start.offset.x + anchorX - (this.pivot.x + (anchorX - this.pivot.x) * this.scaleX),
-					y: start.offset.y + anchorY - (this.pivot.y + (anchorY - this.pivot.y) * this.scaleY)
+					x: start.offset.x + anchorX - (start.pivot.x + (anchorX - start.pivot.x) * this.scaleX),
+					y: start.offset.y + anchorY - (start.pivot.y + (anchorY - start.pivot.y) * this.scaleY)
 				};
 			}
 		}
