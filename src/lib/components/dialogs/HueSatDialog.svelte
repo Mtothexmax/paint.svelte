@@ -21,19 +21,13 @@
 	let previewOn = $state(true);
 	const renderer = () => getEditorRenderer();
 
-	/** Hue track: full hue spectrum from red (0°) back to red (360°). */
+	/** Hue track: desaturated grey on the left → fully saturated hue spectrum
+	 *  on the right (increasing saturation as hue advances). */
 	const hueGradient =
-		'linear-gradient(90deg, hsl(0,100%,50%) 0%, hsl(60,100%,50%) 16.67%, hsl(120,100%,50%) 33.33%, hsl(180,100%,50%) 50%, hsl(240,100%,50%) 66.67%, hsl(300,100%,50%) 83.33%, hsl(360,100%,50%) 100%)';
+		'linear-gradient(90deg, hsl(0,0%,50%) 0%, hsl(60,17%,50%) 16.6%, hsl(120,33%,50%) 33.3%, hsl(180,50%,50%) 50%, hsl(240,67%,50%) 66.6%, hsl(300,83%,50%) 83.3%, hsl(360,100%,50%) 100%)';
 
-	/** Saturation track: desaturated on the left (same hue, 0% saturation) →
-	 *  fully saturated on the right. Uses the hue gradient but fades it to
-	 *  grey on the left. */
-	const satGradient = $derived(() => {
-		const stops = [0, 60, 120, 180, 240, 300, 360];
-		const left = stops.map((h, i) => `hsl(${h},0%,50%) ${(i / 6 * 100).toFixed(1)}%`).join(', ');
-		const right = stops.map((h, i) => `hsl(${h},100%,50%) ${(i / 6 * 100).toFixed(1)}%`).join(', ');
-		return `linear-gradient(90deg, ${left}, ${right})`;
-	});
+	/** Saturation track: same gradient — grey on the left, vivid on the right. */
+	const satGradient = hueGradient;
 
 	/** Lightness track: black → white. */
 	const lightGradient = 'linear-gradient(90deg, #000 0%, #fff 100%)';
@@ -83,7 +77,7 @@
 
 <MovableDialog title="Hue / Saturation" onClose={cancel} width={400}>
 	<FilterSlider label="Hue" min={-180} max={180} step={1} default={0} bind:value={prefs.hue} oninput={preview} gradient={hueGradient} />
-	<FilterSlider label="Saturation" min={0} max={200} step={1} default={100} bind:value={prefs.sat} oninput={preview} gradient={satGradient()} />
+	<FilterSlider label="Saturation" min={0} max={200} step={1} default={100} bind:value={prefs.sat} oninput={preview} gradient={satGradient} />
 	<FilterSlider label="Lightness" min={0} max={200} step={1} default={100} bind:value={prefs.light} oninput={preview} gradient={lightGradient} />
 	<label class="radio">
 		<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />
