@@ -280,15 +280,15 @@ export class MoveEngine {
 			const anchorX = this.transformHandle.includes('w') ? b.x + b.width : this.transformHandle.includes('e') ? b.x : b.x + b.width / 2;
 			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
 			const localPointer = this.inverseTransformPoint(p, start);
+			const movingX = this.transformHandle.includes('w') ? b.x : this.transformHandle.includes('e') ? b.x + b.width : anchorX;
+			const movingY = this.transformHandle.includes('n') ? b.y : this.transformHandle.includes('s') ? b.y + b.height : anchorY;
 			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e')
 				? start.scaleX +
-					(localPointer.x - (this.transformHandle.includes('w') ? b.x : b.x + b.width)) /
-						(this.transformHandle.includes('w') ? -b.width : b.width)
+					(localPointer.x - movingX) / (movingX - start.pivot.x)
 				: start.scaleX;
 			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s')
 				? start.scaleY +
-					(localPointer.y - (this.transformHandle.includes('n') ? b.y : b.y + b.height)) /
-						(this.transformHandle.includes('n') ? -b.height : b.height)
+					(localPointer.y - movingY) / (movingY - start.pivot.y)
 				: start.scaleY;
 			if (shift) {
 				const magnitude = Math.max(Math.abs(sx), Math.abs(sy));
@@ -304,9 +304,13 @@ export class MoveEngine {
 			if (alt) {
 				this.offset = { ...start.offset };
 			} else {
+				const cos = Math.cos(start.rotation);
+				const sin = Math.sin(start.rotation);
+				const fixedX = (anchorX - start.pivot.x) * (start.scaleX - this.scaleX);
+				const fixedY = (anchorY - start.pivot.y) * (start.scaleY - this.scaleY);
 				this.offset = {
-					x: start.offset.x + anchorX - (start.pivot.x + (anchorX - start.pivot.x) * this.scaleX),
-					y: start.offset.y + anchorY - (start.pivot.y + (anchorY - start.pivot.y) * this.scaleY)
+					x: start.offset.x + fixedX * cos - fixedY * sin,
+					y: start.offset.y + fixedX * sin + fixedY * cos
 				};
 			}
 		}
