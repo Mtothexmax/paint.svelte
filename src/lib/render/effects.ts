@@ -145,16 +145,17 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 	if (divide === 0) {
 		// Maximum contrast: threshold at 128 → pure black or white
 		for (let i = 0; i < src.length; i += 4) {
+			if (src[i + 3] === 0) continue; // skip transparent pixels
 			const intensity = Math.round(src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114);
 			const val = (intensity + brightness < 128) ? 0 : 255;
 			src[i] = val;
 			src[i + 1] = val;
 			src[i + 2] = val;
-			// alpha unchanged
 		}
 	} else if (divide === 100) {
 		// Negative or zero contrast
 		for (let i = 0; i < src.length; i += 4) {
+			if (src[i + 3] === 0) continue;
 			const r = src[i], g = src[i + 1], b = src[i + 2];
 			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
 			const shift = Math.round((intensity - 127) * multiply / divide + 127 - intensity + brightness);
@@ -165,6 +166,7 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 	} else {
 		// Positive contrast
 		for (let i = 0; i < src.length; i += 4) {
+			if (src[i + 3] === 0) continue;
 			const r = src[i], g = src[i + 1], b = src[i + 2];
 			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
 			const shift = Math.round((intensity - 127 + brightness) * multiply / divide + 127 - intensity);
