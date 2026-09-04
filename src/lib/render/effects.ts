@@ -135,12 +135,23 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 
 	// Read the source surface
 	const srcSprite = new Sprite(surfaces.getTexture(beforeId));
-	const px = renderer.app.renderer.extract.pixels({ target: srcSprite, resolution: 1 });
-	srcSprite.destroy();
-	const src = px.pixels;
+		const px = renderer.app.renderer.extract.pixels({ target: srcSprite, resolution: 1 });
+		srcSprite.destroy();
+		const src = px.pixels;
 
-	// Build result buffer
-	const afterId = surfaces.create(w, h);
+		// Unpremultiply so intensity/shift math works on true colour values
+		for (let i = 0; i < src.length; i += 4) {
+			const a = src[i + 3];
+			if (a > 0 && a < 255) {
+				const inv = 255 / a;
+				src[i] = Math.min(255, Math.round(src[i] * inv));
+				src[i + 1] = Math.min(255, Math.round(src[i + 1] * inv));
+				src[i + 2] = Math.min(255, Math.round(src[i + 2] * inv));
+			}
+		}
+
+		// Build result buffer
+		const afterId = surfaces.create(w, h);
 
 	if (divide === 0) {
 		// Maximum contrast: threshold at 128 → pure black or white
@@ -176,17 +187,33 @@ export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: Brigh
 		}
 	}
 
-	// Write the processed pixels into the new surface via an OffscreenCanvas
-	const canvas = new OffscreenCanvas(w, h);
-	const ctx = canvas.getContext('2d')!;
-	const imgData = ctx.createImageData(w, h);
-	imgData.data.set(src);
+		// Write the processed pixels into the new surface via an OffscreenCanvas.
+		// extract.pixels() returns premultiplied alpha; putImageData expects
+		// unpremultiplied, so we must convert before writing.
+		const canvas = new OffscreenCanvas(w, h);
+		const ctx = canvas.getContext('2d')!;
+		const imgData = ctx.createImageData(w, h);
+		const dst = imgData.data;
+		for (let i = 0; i < src.length; i += 4) {
+			const a = src[i + 3];
+			if (a === 0) {
+				dst[i] = 0; dst[i + 1] = 0; dst[i + 2] = 0; dst[i + 3] = 0;
+			} else if (a >= 255) {
+				dst[i] = src[i]; dst[i + 1] = src[i + 1]; dst[i + 2] = src[i + 2]; dst[i + 3] = 255;
+			} else {
+				const inv = 255 / a;
+				dst[i] = Math.round(src[i] * inv);
+				dst[i + 1] = Math.round(src[i + 1] * inv);
+				dst[i + 2] = Math.round(src[i + 2] * inv);
+				dst[i + 3] = a;
+			}
+		}
 		ctx.putImageData(imgData, 0, 0);
-	const uploadTex = Texture.from(canvas);
-	const uploadSprite = new Sprite(uploadTex);
-	renderer.app.renderer.render({ container: uploadSprite, target: surfaces.getTexture(afterId), clear: true });
-	uploadSprite.destroy();
-	uploadTex.destroy(true);
+		const uploadTex = Texture.from(canvas);
+		const uploadSprite = new Sprite(uploadTex);
+		renderer.app.renderer.render({ container: uploadSprite, target: surfaces.getTexture(afterId), clear: true });
+		uploadSprite.destroy();
+		uploadTex.destroy(true);
 
 	layer.surfaceId = afterId;
 	renderer.rebuildActiveLayers();
