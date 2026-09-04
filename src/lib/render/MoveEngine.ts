@@ -232,12 +232,12 @@ export class MoveEngine {
 			const anchorX = this.transformHandle.includes('w') ? b.x + b.width : this.transformHandle.includes('e') ? b.x : b.x + b.width / 2;
 			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
 			const movingX = this.transformHandle.includes('w')
-				? b.x - deltaX
+				? b.x + deltaX
 				: this.transformHandle.includes('e')
 					? b.x + b.width + deltaX
 					: b.x + b.width / 2;
 			const movingY = this.transformHandle.includes('n')
-				? b.y - deltaY
+				? b.y + deltaY
 				: this.transformHandle.includes('s')
 					? b.y + b.height + deltaY
 					: b.y + b.height / 2;
