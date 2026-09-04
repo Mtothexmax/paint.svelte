@@ -1,0 +1,1 @@
+var e=``+new URL(`../assets/favicon.Dbnbsn_w.svg`,import.meta.url).href;export{e as t};
