@@ -5,7 +5,7 @@
 	import { get } from 'svelte/store';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
 	import type { Point } from '../../core/geometry';
-	import { screenToImage, zoomBy } from '../../render/Viewport';
+	import { screenToImage, imageToScreen, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
 	import { MoveEngine } from '../../render/MoveEngine';
@@ -51,8 +51,22 @@
 		showNotice
 	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
+	import {
+		textFontFamily,		textFontSize,
+		textBold,
+		textItalic,
+		textUnderline,
+		textStrike,
+		textAlign,
+		textAction
+	} from '../../state/text';
+	import { commitTextToLayer } from '../../render/text';
+	import { ensureSystemFontLoaded, withTimeout } from '../../services/fonts';
+	import { sampleCompositeColorAt } from '../../render/eyedropper';
+	import { rgbaToHex, rgbaToCss } from '../../core/color';
 
 	const PAINT_TOOLS = new Set(['brush', 'pencil', 'eraser']);
+const EYEDROPPER = 'eyedropper';
 	const KIND: Record<string, 'brush' | 'pencil' | 'eraser'> = {
 		brush: 'brush',
 		pencil: 'pencil',
@@ -257,6 +271,122 @@
 	const isPencil = () => get(activeToolId) === 'pencil' && !!documentRegistry.active;
 	const showRing = $derived(paintArmed && !panning && !isPencil() && (pointerInside || painting));
 
+	// text-tool draft (Paint.NET nub): click places an anchor, the overlay
+	// textarea edits, commit rasterises into the active layer (no live object).
+	let textDraft = $state<{ imgX: number; imgY: number; sx: number; sy: number; zoom: number } | null>(null);
+	let textValue = $state('');
+	let textAreaEl: HTMLTextAreaElement | undefined = $state();
+
+	function openTextDraft(e: PointerEvent): void {
+		const doc = documentRegistry.active;
+		if (!doc) return;
+		if (textDraft) commitTextDraft();
+		const sp = screenPoint(e);
+		const img = imageFromScreen(sp);
+		// Snap the anchor to whole image pixels: the committed raster always
+		// lands pixel-exact (no fractional blur), and the preview shows the
+		// exact screen projection of that pixel.
+		const imgX = Math.round(img.x);
+		const imgY = Math.round(img.y);
+		const snapped = imageToScreen(doc.view, imgX, imgY);
+		textValue = '';
+		textDraft = { imgX, imgY, sx: snapped.x, sy: snapped.y, zoom: doc.view.zoom };
+		// Activate the family in the background so the overlay renders in it.
+		void ensureSystemFontLoaded(get(textFontFamily), { bold: get(textBold), italic: get(textItalic) });
+		// focus after the overlay mounts
+		requestAnimationFrame(() => textAreaEl?.focus());
+	}
+
+	async function commitTextDraft(): Promise<void> {
+		const draft = textDraft;
+		// Capture synchronously — the commit awaits font loading, during which
+		// a new draft may already reset these.
+		const text = textValue;
+		textDraft = null;
+		textValue = '';
+		if (!draft) return;
+		const doc = documentRegistry.active;
+		if (!doc) return;
+		if (!text.trim()) return;
+		const family = get(textFontFamily);
+		const size = get(textFontSize);
+		const bold = get(textBold);
+		const italic = get(textItalic);
+		try {
+			// Wait (bounded) for the real font — otherwise canvas falls back.
+			await withTimeout(ensureSystemFontLoaded(family, { bold, italic }), 5000, false);
+			try {
+				await withTimeout(
+					document.fonts.load(`${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${size}px "${family}"`, text),
+					3000,
+					[]
+				);
+			} catch {
+				/* fall back to whatever is available */
+			}
+			const ok = commitTextToLayer(getEditorRenderer(), doc, {
+				x: draft.imgX,
+				y: draft.imgY,
+				text,
+				family,
+				size,
+				bold,
+				italic,
+				underline: get(textUnderline),
+				strike: get(textStrike),
+				align: get(textAlign),
+				color: get(foregroundColor)
+			});
+			if (!ok) showNotice('Could not commit text.', 'error');
+		} catch (err) {
+			console.error('[text] commit failed', err);
+			showNotice('Could not commit text.', 'error');
+		}
+	}
+
+	function cancelTextDraft(): void {
+		textDraft = null;
+		textValue = '';
+	}
+
+	/** Drags the uncommitted text draft by its nub (Paint.NET behaviour). */
+	function onTextNubDown(e: PointerEvent): void {
+		if (!textDraft) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const nub = e.currentTarget as HTMLElement;
+		try {
+			nub.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
+		const move = (ev: PointerEvent) => {
+			if (!textDraft) return;
+			const rect = host.getBoundingClientRect();
+			const doc = documentRegistry.active;
+			// Same 1px snap as on placement: free dragging, pixel-exact land.
+			const imgX = doc ? Math.round((ev.clientX - rect.left - doc.view.panX) / doc.view.zoom) : textDraft.imgX;
+			const imgY = doc ? Math.round((ev.clientY - rect.top - doc.view.panY) / doc.view.zoom) : textDraft.imgY;
+			textDraft.imgX = imgX;
+			textDraft.imgY = imgY;
+			if (doc) {
+				const snapped = imageToScreen(doc.view, imgX, imgY);
+				textDraft.sx = snapped.x;
+				textDraft.sy = snapped.y;
+			}
+		};
+		const up = () => {
+			nub.removeEventListener('pointermove', move as EventListener);
+			nub.removeEventListener('pointerup', up);
+			nub.removeEventListener('pointercancel', up);
+			// refocus so typing can continue right away
+			requestAnimationFrame(() => textAreaEl?.focus());
+		};
+		nub.addEventListener('pointermove', move as EventListener);
+		nub.addEventListener('pointerup', up);
+		nub.addEventListener('pointercancel', up);
+	}
+
 	// OS pointer over the canvas: crosshair (the system "plus" cursor) while a
 	// paint tool OR a selection tool is armed and NOT painting; fully hidden
 	// while painting (only the preview ring + painted stroke are visible, like
@@ -269,6 +399,7 @@
 			return zoomRightHeld ? 'cursor: zoom-out;' : 'cursor: zoom-in;';
 		}
 		if (painting && !isPencil()) return 'cursor: none;';
+		if (get(activeToolId) === 'text') return pointerInside ? 'cursor: text;' : '';
 		if (moving) return 'cursor: move;';
 		if (moveArmed) {
 			if (!pointerInside) return '';
@@ -336,6 +467,8 @@
 		syncTransformUi();
 		if (ready) getEditorRenderer().setTransformHandlesVisible(moveArmed);
 		refreshRing();
+		// Switching away from the text tool commits the open draft (Paint.NET).
+		if (get(activeToolId) !== 'text' && textDraft) commitTextDraft();
 		// Switching away from the move tool drops (applies) a floating selection.
 		if (moveEngine?.floating && !moveArmed) moveEngine.drop();
 		// Switching away from the move-selection tool cancels an in-progress drag.
@@ -526,6 +659,8 @@
 
 	function onWheel(e: WheelEvent) {
 		e.preventDefault();
+		// Zooming would orphan the text-draft overlay — commit it first.
+		if (textDraft) commitTextDraft();
 		const doc = documentRegistry.active;
 		if (!doc || !ready) return;
 		const renderer = getEditorRenderer();
@@ -822,9 +957,13 @@
 
 	function onPointerDown(e: PointerEvent) {
 		if (!ready) return;
+		// Clicks inside the text-draft editor belong to the textarea.
+		if (isTextTarget(e.target)) return;
 		movePointer(screenPoint(e));
 		const wantsPan = e.button === 1 || (e.button === 0 && (spaceHeld || panArmed));
 		if (wantsPan) {
+			// Panning would orphan the text-draft overlay — commit it first.
+			if (textDraft) commitTextDraft();
 			e.preventDefault();
 			const doc = documentRegistry.active;
 			if (!doc) return;
@@ -853,6 +992,15 @@
 			syncTransformUi();
 			updateStatus(doc);
 			refreshRing();
+			return;
+		}
+		// Text tool: a click places the editing nub (committing any open draft
+		// first, Paint.NET behaviour). Space-pan and the zoom tool above still
+		// take precedence. The draft's own drag nub is handled separately.
+		if (get(activeToolId) === 'text' && (e.button === 0 || e.button === 2)) {
+			if (e.target instanceof HTMLElement && e.target.closest('.text-nub')) return;
+			e.preventDefault();
+			openTextDraft(e);
 			return;
 		}
 		// Polygon lasso: clicks place vertices (left = chosen mode with
@@ -971,6 +1119,31 @@
 		// button in the background colour (Paint.NET behaviour). Right-button
 		// painting also suppresses the context menu (preventDefault + the
 		// App-level oncontextmenu guard), so it never interrupts a stroke.
+		if (get(activeToolId) === EYEDROPPER) {
+			// Eyedropper stays active (Paint.NET behaviour): left click samples
+			// into the foreground slot, right click into the background slot.
+			if (e.button !== 0 && e.button !== 2) return;
+			e.preventDefault();
+			const img = imageFromScreen(screenPoint(e));
+			const doc = documentRegistry.active;
+			if (!doc || img.x < 0 || img.y < 0 || img.x >= doc.width || img.y >= doc.height) {
+				showNotice('Outside canvas.');
+				return;
+			}
+			const sampled = sampleCompositeColorAt(getEditorRenderer(), doc, img.x, img.y);
+			if (!sampled) {
+				showNotice('Could not sample colour.', 'error');
+				return;
+			}
+			if (e.button === 2) {
+				backgroundColor.set(sampled);
+				showNotice(`Background ${rgbaToHex(sampled)}`);
+			} else {
+				foregroundColor.set(sampled);
+				showNotice(`Foreground ${rgbaToHex(sampled)}`);
+			}
+			return;
+		}
 		if ((e.button === 0 || e.button === 2) && isPaintTool()) {
 			e.preventDefault();
 			painting = true;
@@ -1258,7 +1431,14 @@
 				else cancelPolygon();
 				polygonAction.set(null);
 			});
-			disposers.push(unTool, unSize, unPoly);
+		// Text-tool options strip → commit/cancel requests.
+			const unText = textAction.subscribe((a) => {
+				if (!a) return;
+				if (a === 'commit') commitTextDraft();
+				else cancelTextDraft();
+				textAction.set(null);
+			});
+			disposers.push(unTool, unSize, unPoly, unText);
 
 			const onEnter = () => {
 				pointerInside = true;
@@ -1317,6 +1497,44 @@
 	style="touch-action: none; {cursorCss}"
 >
 	<canvas bind:this={canvasEl} class="absolute inset-0 block h-full w-full" style="touch-action:none;"></canvas>
+	{#if textDraft}
+		{@const td = textDraft}
+		<div
+			class="text-nub absolute z-40"
+			style="left:{td.sx - 5}px; top:{td.sy - 5}px;"
+			title="Drag to move the text"
+			onpointerdown={onTextNubDown}
+		></div>
+		<textarea
+			bind:this={textAreaEl}
+			bind:value={textValue}
+			class="text-draft select-text absolute z-30"
+			style="left:{td.sx}px; top:{td.sy}px; color:{rgbaToCss($foregroundColor)}; font-family:'{$textFontFamily}', sans-serif; font-size:{$textFontSize * td.zoom}px; font-weight:{$textBold ? 'bold' : 'normal'}; font-style:{$textItalic ? 'italic' : 'normal'}; text-align:{$textAlign}; text-decoration:{$textUnderline && $textStrike ? 'underline line-through' : $textUnderline ? 'underline' : $textStrike ? 'line-through' : 'none'}; line-height:1;"
+			rows={1}
+			spellcheck={false}
+			placeholder="Type here…"
+			oninput={(e) => {
+				// Free typing: grow with the content instead of jailing it in a
+				// fixed box (width follows the longest line, height the lines).
+				const el = e.currentTarget as HTMLTextAreaElement;
+				el.style.height = 'auto';
+				el.style.height = `${el.scrollHeight}px`;
+			}}
+			onkeydown={(e) => {
+				if (e.key === 'Escape') {
+					e.preventDefault();
+					e.stopPropagation();
+					cancelTextDraft();
+				} else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+					e.preventDefault();
+					e.stopPropagation();
+					commitTextDraft();
+				} else {
+					e.stopPropagation();
+				}
+			}}
+		></textarea>
+	{/if}
 	{#if showRing}
 		<div
 			class="brush-preview-ring pointer-events-none absolute z-10"

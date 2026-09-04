@@ -574,6 +574,44 @@ body {
 	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 
+/* ---- text-tool draft editor (Paint.NET nub) ---- */
+.text-draft {
+	background: transparent;
+	/* outline instead of border: zero layout inset, so the preview glyphs sit
+	 * exactly where the committed raster lands */
+	border: none;
+	outline: 1px dashed rgba(255, 255, 255, 0.7);
+	outline-offset: 0;
+	/* Bleed for italic overhang (right) and descenders (bottom) so cursive
+	 * text is never clipped. Left/top stay 0 to keep the anchor exact. */
+	padding: 0 0.4em 0.35em 0;
+	border-radius: 0;
+	resize: none;
+	overflow: hidden;
+	white-space: pre;
+	min-width: 60px;
+	/* free typing: the box grows with the content, never jails it */
+	width: max-content;
+	max-width: none;
+	field-sizing: content;
+	line-height: 1;
+}
+.text-draft:focus {
+	outline-style: solid;
+	outline-color: var(--accent, #3b82f6);
+}
+/* drag handle (nub) for the uncommitted text draft */
+.text-nub {
+	width: 10px;
+	height: 10px;
+	background: var(--accent, #3b82f6);
+	border: 1px solid #fff;
+	box-shadow: 0 0 0 1px #1e3a8a;
+	border-radius: 2px;
+	cursor: move;
+	touch-action: none;
+}
+
 /* ---- colour picker popover ---- */
 .color-backdrop {
 	position: fixed;
@@ -1136,6 +1174,117 @@ body {
 .fsl-num:focus {
 	outline: none;
 	border-color: var(--accent);
+}
+.fsl-select {
+	min-width: 140px;
+	padding: 4px 6px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-size: 12px;
+}
+.fsl-select:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+/* ---- font dropdown (text tool): name in UI font + pangram preview ---- */
+.fontdrop {
+	position: relative;
+}
+.fontdrop-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+}
+.fontdrop-current {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fontdrop-arrow {
+	margin-left: auto;
+	opacity: 0.7;
+}
+.fontdrop-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	background: transparent;
+}
+.fontdrop-pop {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 901;
+	min-width: 420px;
+	max-width: min(560px, 80vw);
+	max-height: 320px;
+	overflow-y: auto;
+	background: var(--bg-elev);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+	padding: 4px;
+}
+.fontdrop-search {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	width: 100%;
+	box-sizing: border-box;
+	margin-bottom: 4px;
+	padding: 6px 8px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-size: 12px;
+}
+.fontdrop-search:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+.fontdrop-row {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+	width: 100%;
+	padding: 6px 8px;
+	background: transparent;
+	border: none;
+	border-radius: 5px;
+	color: var(--text);
+	font-size: 13px;
+	cursor: pointer;
+	text-align: left;
+}
+.fontdrop-row:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+.fontdrop-row.on {
+	background: rgba(59, 130, 246, 0.25);
+}
+.fontdrop-name {
+	flex: 0 0 auto;
+	min-width: 130px;
+	font-family: inherit;
+}
+.fontdrop-tab {
+	flex: 0 0 12px;
+}
+.fontdrop-pangram {
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	opacity: 0.9;
+}
+.fontdrop-foot {
+	padding: 6px 8px 2px;
+	font-size: 11px;
+	color: var(--text-dim);
 }
 .fsl-reset {
 	flex: 0 0 auto;

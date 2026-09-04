@@ -15,10 +15,27 @@
 		selectionFixedRatio,
 		selectionFixedSize
 	} from '../../state/ui';
+	import {
+		textFontFamily,
+		textFontSize,
+		textBold,
+		textItalic,
+		textUnderline,
+		textStrike,
+		textAlign,
+		setTextFontSize,
+		requestTextCommit,
+		requestTextCancel,
+		type TextAlign
+	} from '../../state/text';
 	import { get } from 'svelte/store';
 	import { requestPolygonFinish } from '../../state/polygon';
 	import PdnSlider from '../common/PdnSlider.svelte';
 	import IconSplitButton from '../common/IconSplitButton.svelte';
+	import FontDropdown from '../common/FontDropdown.svelte';
+	import AlignLeftIcon from '../../assets/FormatAlignLeft.svg';
+	import AlignCenterIcon from '../../assets/FormatAlignCenter.svg';
+	import AlignRightIcon from '../../assets/FormatAlignRight.svg';
 
 	const paintTools = new Set(['brush', 'pencil', 'eraser']);
 	const isPaint = $derived(paintTools.has($activeToolId));
@@ -30,6 +47,12 @@
 	// Lasso family: Freehand lasso ('lasso') or Polygon lasso ('select-poly').
 	const lassoTools = new Set(['lasso', 'select-poly']);
 	const isLasso = $derived(lassoTools.has($activeToolId));
+
+	const isText = $derived($activeToolId === 'text');
+
+	function setAlign(a: TextAlign): void {
+		textAlign.set(a);
+	}
 
 	const AA_OPTIONS = [
 		{
@@ -204,6 +227,89 @@
 				</button>
 			{/if}
 		{/if}
+	{:else if isText}
+		<span class="aa-label">Font:</span>
+		<FontDropdown bind:value={$textFontFamily} />
+		<span class="aa-label">Size:</span>
+		<input
+			class="fsl-num"
+			type="number"
+			min="8"
+			max="200"
+			step="1"
+			value={$textFontSize}
+			onchange={(e) => setTextFontSize(parseFloat((e.currentTarget as HTMLInputElement).value))}
+			title="Font size in pixels"
+		/>
+		<div class="seg" role="group" aria-label="Weight and decorations">
+			<button
+				class="seg-btn"
+				class:on={$textBold}
+				style="font-weight:bold;"
+				title="Bold"
+				onclick={() => textBold.update((v) => !v)}
+			>
+				B
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$textItalic}
+				style="font-style:italic;"
+				title="Italic"
+				onclick={() => textItalic.update((v) => !v)}
+			>
+				I
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$textUnderline}
+				style="text-decoration:underline;"
+				title="Underline"
+				onclick={() => textUnderline.update((v) => !v)}
+			>
+				U
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$textStrike}
+				style="text-decoration:line-through;"
+				title="Strikethrough"
+				onclick={() => textStrike.update((v) => !v)}
+			>
+				S
+			</button>
+		</div>
+		<div class="seg" role="group" aria-label="Text alignment">
+			<button
+				class="seg-btn"
+				class:on={$textAlign === 'left'}
+				title="Align left"
+				aria-label="Align left"
+				onclick={() => setAlign('left')}
+			>
+				<img src={AlignLeftIcon} alt="" class="h-4 w-4" draggable="false" />
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$textAlign === 'center'}
+				title="Align center"
+				aria-label="Align center"
+				onclick={() => setAlign('center')}
+			>
+				<img src={AlignCenterIcon} alt="" class="h-4 w-4" draggable="false" />
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$textAlign === 'right'}
+				title="Align right"
+				aria-label="Align right"
+				onclick={() => setAlign('right')}
+			>
+				<img src={AlignRightIcon} alt="" class="h-4 w-4" draggable="false" />
+			</button>
+		</div>
+		<button class="mini-btn" onclick={requestTextCommit} title="Render the text into the layer"> ✓ Finish </button>
+		<button class="mini-btn" onclick={requestTextCancel} title="Discard the text draft"> ✕ </button>
 	{:else}
 		<span class="tooloptions-placeholder">No tool options for the selected tool yet.</span>
 	{/if}

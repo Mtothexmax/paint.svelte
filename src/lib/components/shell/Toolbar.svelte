@@ -19,6 +19,7 @@
 	import EraserIcon from '../../assets/Eraser.svg';
 	import TextIcon from '../../assets/Text.svg';
 	import zoomSvg from '@fluentui-emoji/svg/icons/flat/magnifying-glass-tilted-left.svg';
+	import pencilSvg from '@fluentui-emoji/svg/icons/flat/pencil.svg';
 	import panSvg from '@fluentui-emoji/svg/icons/flat/hand-with-fingers-splayed-default.svg';
 	import curlySvg from '../../assets/Line.svg';
 
@@ -56,7 +57,7 @@
 		{ id: 'brush', label: 'Paintbrush', src: paintbrushSvg },
 		{ id: 'eraser', label: 'Eraser', src: EraserIcon },
 		// Row 7
-		{ id: 'pencil', label: 'Pencil', glyph: '✏️' },
+		{ id: 'pencil', label: 'Pencil', src: pencilSvg },
 		{ id: 'eyedropper', label: 'Color Picker', src: ColorPickerIcon },
 		// Row 8
 		{ id: 'clone-stamp', label: 'Clone Stamp', src: CloneBrushIcon, placeholder: true },
