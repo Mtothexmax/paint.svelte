@@ -11,6 +11,7 @@
 	import { MoveEngine } from '../../render/MoveEngine';
 	import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
 	import type { TransformHandle } from '../../render/MoveEngine';
+	import { logTransformDebug } from '../../render/transformDebug';
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import {
@@ -753,6 +754,12 @@
 			// authoritative while a floating selection is being transformed.
 			syncTransformUi();
 			const handle = transformHandleAt(img);
+			logTransformDebug('canvas.pointerdown', {
+				pointer: img,
+				handle,
+				floating: moveEngine.floating,
+				transform: moveEngine.transformState
+			});
 			const now = performance.now();
 			if (handle === 'pivot' && lastTransformClick.handle === 'pivot' && now - lastTransformClick.time < 400) {
 				resetPivotToCenter();
@@ -909,6 +916,7 @@
 				/* ignore */
 			}
 			syncTransformUi();
+			logTransformDebug('canvas.pointerup', { transform: moveEngine?.transformState });
 		}
 		if (movingSelection && e.pointerId === moveSelPointerId) {
 			// pointer-up commits the move as a single history entry (no-op when

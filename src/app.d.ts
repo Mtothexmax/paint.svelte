@@ -15,4 +15,13 @@ declare module '*.svg' {
 	export default src;
 }
 
+declare global {
+	interface Window {
+		paintTransformDebug?: {
+			read: () => Array<Record<string, unknown>>;
+			clear: () => void;
+		};
+	}
+}
+
 export {};

@@ -15,6 +15,7 @@ import { documentRegistry } from '../core/document/registry';
 import type { Layer, SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
 import { blitMaskedInto, boundsOfLoops, complementMaskSurface } from './selection';
+import { logTransformDebug } from './transformDebug';
 
 export type MoveBeginResult = 'ok' | 'none';
 export type TransformHandle = 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'pivot' | 'rotate';
@@ -127,6 +128,7 @@ export class MoveEngine {
 		this.baseOffset = { x: 0, y: 0 };
 		this.origin = null;
 		this.active = true;
+		logTransformDebug('engine.begin', { bounds, selectionBounds: sel.bounds ?? null });
 
 		layer.surfaceId = erasedId;
 		this.renderer.rebuildActiveLayers();
@@ -178,6 +180,12 @@ export class MoveEngine {
 			scaleY: this.scaleY,
 			rotation: this.rotation
 		};
+		logTransformDebug('engine.beginTransform', {
+			handle,
+			pointer: p,
+			transformStart: this.transformStart,
+			bounds: this.bounds
+		});
 	}
 
 	setPivot(p: Point): void {
@@ -309,6 +317,13 @@ export class MoveEngine {
 			this.scaleY,
 			this.rotation
 		);
+		logTransformDebug('engine.transformTo', {
+			handle: this.transformHandle,
+			pointer: p,
+			shift,
+			alt,
+			transform: this.transformState
+		});
 	}
 
 	private applyFloatingTransform(): void {
