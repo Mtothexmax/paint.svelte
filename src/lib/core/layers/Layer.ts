@@ -15,7 +15,7 @@ export interface Layer {
 	name: string;
 	visible: boolean;
 	opacity: number; // 0..1
-	blendMode: string; // 'normal' for now
+	blendMode: string; // one of LAYER_BLEND_MODES ('normal' default)
 	surfaceId: SurfaceId;
 }
 
@@ -30,4 +30,28 @@ export function createRasterLayer(surfaceId: SurfaceId, name: string): Layer {
 		blendMode: 'normal',
 		surfaceId
 	};
+}
+
+/** Blend modes a layer can use (Pixi v8 blend names). */
+export const LAYER_BLEND_MODES = [
+	'normal',
+	'multiply',
+	'screen',
+	'overlay',
+	'darken',
+	'lighten',
+	'color-dodge',
+	'color-burn',
+	'hard-light',
+	'soft-light',
+	'difference',
+	'exclusion',
+	'add'
+] as const;
+
+export type LayerBlendMode = (typeof LAYER_BLEND_MODES)[number];
+
+/** True for a known layer blend mode id. */
+export function isLayerBlendMode(mode: string): mode is LayerBlendMode {
+	return (LAYER_BLEND_MODES as readonly string[]).includes(mode);
 }

@@ -36,7 +36,44 @@
 	import AlignLeftIcon from '../../assets/FormatAlignLeft.svg';
 	import AlignCenterIcon from '../../assets/FormatAlignCenter.svg';
 	import AlignRightIcon from '../../assets/FormatAlignRight.svg';
+	import ShapeRectangleIcon from '@material-symbols/svg-400/rounded/rectangle.svg';
+	import ShapeRoundedRectIcon from '@material-symbols/svg-400/rounded/crop_square.svg';
+	import ShapeEllipseIcon from '@material-symbols/svg-400/rounded/circle.svg';
+	import ShapeTriangleIcon from '@material-symbols/svg-400/rounded/change_history.svg';
+	import ShapeDiamondIcon from '@material-symbols/svg-400/rounded/stat_0.svg';
+	import ShapePentagonIcon from '@material-symbols/svg-400/rounded/pentagon.svg';
+	import ShapeHexagonIcon from '@material-symbols/svg-400/rounded/hexagon.svg';
+	import ShapeStarIcon from '@material-symbols/svg-400/rounded/star.svg';
 	import { fillTolerance, fillFloodMode } from '../../state/fill';
+	import {
+		SHAPE_KINDS,
+		shapeKind,
+		shapeWidth,
+		shapeLineStyle,
+		shapeDrawStyle,
+		type ShapeKind
+	} from '../../state/shapes';
+	import {
+		lineWidth,
+		lineStyle as curveLineStyle,
+		lineArrowStart,
+		lineArrowEnd,
+		requestLineCommit,
+		requestLineCancel
+	} from '../../state/lines';
+
+	/** Material Symbols (rounded) per shape kind — black glyphs are lightened
+	 * via CSS (.shape-kind-ic) for the dark strip. */
+	const SHAPE_ICONS: Record<ShapeKind, string> = {
+		rectangle: ShapeRectangleIcon,
+		'rounded-rect': ShapeRoundedRectIcon,
+		ellipse: ShapeEllipseIcon,
+		triangle: ShapeTriangleIcon,
+		diamond: ShapeDiamondIcon,
+		pentagon: ShapePentagonIcon,
+		hexagon: ShapeHexagonIcon,
+		star: ShapeStarIcon
+	};
 
 	const paintTools = new Set(['brush', 'pencil', 'eraser']);
 	const isPaint = $derived(paintTools.has($activeToolId));
@@ -52,6 +89,95 @@
 	const isText = $derived($activeToolId === 'text');
 
 	const isFill = $derived($activeToolId === 'bucket');
+
+	const isWand = $derived($activeToolId === 'wand');
+
+	const isShape = $derived($activeToolId === 'shape');
+
+	const isLine = $derived($activeToolId === 'line');
+
+	const LINE_STYLE_OPTIONS = [
+		{
+			id: 'solid',
+			icon: '―',
+			label: 'Solid',
+			description: 'Continuous line'
+		},
+		{
+			id: 'dashed',
+			icon: '┄',
+			label: 'Dashed',
+			description: 'Dashed line'
+		},
+		{
+			id: 'dotted',
+			icon: '┈',
+			label: 'Dotted',
+			description: 'Dotted line'
+		}
+	];
+
+	const ARROW_START_OPTIONS = [
+		{
+			id: 'off',
+			icon: '—',
+			label: 'No Start Arrow',
+			description: 'Plain start point'
+		},
+		{
+			id: 'on',
+			icon: '◀',
+			label: 'Start Arrow',
+			description: 'Arrow head at the start point'
+		}
+	];
+
+	const ARROW_END_OPTIONS = [
+		{
+			id: 'off',
+			icon: '—',
+			label: 'No End Arrow',
+			description: 'Plain end point'
+		},
+		{
+			id: 'on',
+			icon: '▶',
+			label: 'End Arrow',
+			description: 'Arrow head at the end point'
+		}
+	];
+
+	let lineStyle = $state<string>('solid');
+	$effect(() => {
+		lineStyle = get(shapeLineStyle);
+	});
+	$effect(() => {
+		shapeLineStyle.set(lineStyle as 'solid' | 'dashed' | 'dotted');
+	});
+
+	let curveStyle = $state<string>('solid');
+	$effect(() => {
+		curveStyle = get(curveLineStyle);
+	});
+	$effect(() => {
+		curveLineStyle.set(curveStyle as 'solid' | 'dashed' | 'dotted');
+	});
+
+	let startArrowState = $state<string>('off');
+	$effect(() => {
+		startArrowState = get(lineArrowStart) ? 'on' : 'off';
+	});
+	$effect(() => {
+		lineArrowStart.set(startArrowState === 'on');
+	});
+
+	let endArrowState = $state<string>('off');
+	$effect(() => {
+		endArrowState = get(lineArrowEnd) ? 'on' : 'off';
+	});
+	$effect(() => {
+		lineArrowEnd.set(endArrowState === 'on');
+	});
 
 	function setAlign(a: TextAlign): void {
 		textAlign.set(a);
@@ -334,6 +460,91 @@
 				🌐 Global
 			</button>
 		</div>
+		<span class="tooloptions-placeholder" title="Changing tolerance or flood mode re-applies the last fill">
+			Tolerance edits re-apply the last fill.
+		</span>
+	{:else if isWand}
+		<PdnSlider
+			label="Tolerance"
+			min={0}
+			max={100}
+			step={1}
+			unit="%"
+			bind:value={$fillTolerance}
+		/>
+		<span class="aa-label">Flood Mode:</span>
+		<div class="seg" role="group" aria-label="Flood mode">
+			<button
+				class="seg-btn"
+				class:on={$fillFloodMode === 'contiguous'}
+				title="Select the connected region around the click"
+				onclick={() => fillFloodMode.set('contiguous')}
+			>
+				⛶ Contiguous
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$fillFloodMode === 'global'}
+				title="Select every matching pixel on the layer"
+				onclick={() => fillFloodMode.set('global')}
+			>
+				🌐 Global
+			</button>
+		</div>
+		<span class="tooloptions-placeholder" title="Tolerance and flood mode are shared with the paint bucket">
+			Shared with the paint bucket.
+		</span>
+	{:else if isShape}
+		<span class="aa-label">Shape:</span>
+		<div class="seg" role="group" aria-label="Shape type">
+			{#each SHAPE_KINDS as k (k.id)}
+				<button
+					class="seg-btn"
+					class:on={$shapeKind === k.id}
+					title={k.label}
+					aria-label={k.label}
+					onclick={() => shapeKind.set(k.id)}
+				>
+					<img src={SHAPE_ICONS[k.id]} alt="" class="shape-kind-ic" draggable="false" />
+				</button>
+			{/each}
+		</div>
+		<PdnSlider label="Brush Width" min={1} max={50} step={1} bind:value={$shapeWidth} />
+		<span class="aa-label">Line Style:</span>
+		<IconSplitButton options={LINE_STYLE_OPTIONS} bind:value={lineStyle} title="Line style" />
+		<div class="seg" role="group" aria-label="Draw style">
+			<button
+				class="seg-btn"
+				class:on={$shapeDrawStyle === 'outline'}
+				title="Draw shape outline (foreground)"
+				onclick={() => shapeDrawStyle.set('outline')}
+			>
+				☐ Outline
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$shapeDrawStyle === 'fill'}
+				title="Draw filled shape (background)"
+				onclick={() => shapeDrawStyle.set('fill')}
+			>
+				■ Filled
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$shapeDrawStyle === 'fill-outline'}
+				title="Draw filled shape with outline"
+				onclick={() => shapeDrawStyle.set('fill-outline')}
+			>
+				❚ Both
+			</button>
+		</div>
+	{:else if isLine}
+		<PdnSlider label="Brush Width" min={1} max={50} step={1} bind:value={$lineWidth} />
+		<IconSplitButton options={ARROW_START_OPTIONS} bind:value={startArrowState} title="Start arrow" />
+		<IconSplitButton options={LINE_STYLE_OPTIONS} bind:value={curveStyle} title="Line style" />
+		<IconSplitButton options={ARROW_END_OPTIONS} bind:value={endArrowState} title="End arrow" />
+		<button class="mini-btn" onclick={requestLineCommit} title="Render the line into the layer"> ✓ Finish </button>
+		<button class="mini-btn" onclick={requestLineCancel} title="Discard the line draft"> ✕ </button>
 	{:else}
 		<span class="tooloptions-placeholder">No tool options for the selected tool yet.</span>
 	{/if}

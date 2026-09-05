@@ -33,7 +33,9 @@ export const MENUS: MenuDef[] = [
 			{ type: 'command', commandId: 'view.zoomOut' },
 			{ type: 'separator' },
 			{ type: 'command', commandId: 'view.actualSize' },
-			{ type: 'command', commandId: 'view.fitWindow' }
+			{ type: 'command', commandId: 'view.fitWindow' },
+			{ type: 'separator' },
+			{ type: 'command', commandId: 'view.checkerDark' }
 		]
 	},
 	{

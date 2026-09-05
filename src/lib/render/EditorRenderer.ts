@@ -16,6 +16,8 @@ type DocId = string;
 export class EditorRenderer {
 	app!: Application;
 	readonly surfaces = new SurfaceStore();
+	/** Current transparency-checkerboard theme (services keep it in sync). */
+	checkerDark = false;
 	private scenes = new Map<DocId, DocScene>();
 	private activeScene: DocScene | null = null;
 	private transformHandlesVisible = false;
@@ -73,7 +75,14 @@ export class EditorRenderer {
 
 	private addDoc(doc: ImageDocument): void {
 		if (this.scenes.has(doc.id)) return;
-		this.scenes.set(doc.id, new DocScene(doc, this.surfaces));
+		this.scenes.set(doc.id, new DocScene(doc, this.surfaces, this.checkerDark));
+	}
+
+	/** Applies the transparency-checkerboard theme to all open documents
+	 * (and to documents opened later, via the flag). */
+	setCheckerTheme(dark: boolean): void {
+		this.checkerDark = dark;
+		for (const scene of this.scenes.values()) scene.setCheckerTheme(dark);
 	}
 
 	private removeDoc(id: DocId): void {

@@ -25,7 +25,7 @@
 	} from '../../services/clipboardService';
 	import { dialog } from '../../services/dialogService';
 	import { commands } from '../../services/commandRegistry';
-	import {
+	import { applyCheckerTheme } from '../../services/commands';	import {
 		deleteSelection,
 		deselect,
 		fillSelection,
@@ -61,7 +61,17 @@
 		textAction
 	} from '../../state/text';
 	import { commitTextToLayer } from '../../render/text';
+	import { commitShapeToLayer, shapePolygonPoints } from '../../render/shapes';
+	import { commitLineToLayer, arrowHeadLength, arrowHeadPoints } from '../../render/lines';
+	import {
+		shapeKind,
+		shapeWidth,
+		shapeLineStyle,
+		shapeDrawStyle
+	} from '../../state/shapes';
+	import { lineWidth, lineStyle, lineArrowStart, lineArrowEnd, lineAction } from '../../state/lines';
 	import { applyFill } from '../../services/fillService';
+	import { applyWandSelection } from '../../services/wandService';
 	import { ensureSystemFontLoaded, withTimeout } from '../../services/fonts';
 	import { sampleCompositeColorAt } from '../../render/eyedropper';
 	import { rgbaToHex, rgbaToCss } from '../../core/color';
@@ -350,6 +360,142 @@ const EYEDROPPER = 'eyedropper';
 		textValue = '';
 	}
 
+	// shapes-tool draft (Paint.NET nub): drag defines the bounding box, the
+	// overlay previews, release rasterises into the active layer (no live
+	// object). Right-button drag swaps the outline/fill colours.
+	let shapeDraft = $state<{
+		startX: number;
+		startY: number;
+		curX: number;
+		curY: number;
+		swap: boolean;
+	} | null>(null);
+	let shapePointerId = -1;
+
+	function normShapeRect(d: { startX: number; startY: number; curX: number; curY: number }): {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	} {
+		return {
+			x: Math.min(d.startX, d.curX),
+			y: Math.min(d.startY, d.curY),
+			width: Math.abs(d.curX - d.startX),
+			height: Math.abs(d.curY - d.startY)
+		};
+	}
+
+	function cancelShapeDraft(): void {
+		shapeDraft = null;
+		shapePointerId = -1;
+	}
+
+	// line/curve-tool draft: the first drag draws straight (controls follow
+	// at 1/3 and 2/3); after release 4 draggable nubs bend the cubic Bézier.
+	// A click elsewhere commits the open line first. Right button swaps colour
+	// (single fg colour for lines — swap is a no-op kept for symmetry).
+	let lineDraft = $state<{
+		p0: Point;
+		p1: Point;
+		p2: Point;
+		p3: Point;
+		swap: boolean;
+		drawing: boolean;
+	} | null>(null);
+	let linePointerId = -1;
+
+	function straightLineControls(a: Point, b: Point): [Point, Point] {
+		return [
+			{ x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 },
+			{ x: a.x + ((b.x - a.x) * 2) / 3, y: a.y + ((b.y - a.y) * 2) / 3 }
+		];
+	}
+
+	function cancelLineDraft(): void {
+		lineDraft = null;
+		linePointerId = -1;
+	}
+
+	function finishLineDraft(): void {
+		const draft = lineDraft;
+		lineDraft = null;
+		linePointerId = -1;
+		if (!draft) return;
+		const doc = documentRegistry.active;
+		if (!doc) return;
+		const fg = get(foregroundColor);
+		const bg = get(backgroundColor);
+		const startArrow = get(lineArrowStart);
+		const endArrow = get(lineArrowEnd);
+		const ok = commitLineToLayer(getEditorRenderer(), doc, {
+			p0: draft.p0,
+			p1: draft.p1,
+			p2: draft.p2,
+			p3: draft.p3,
+			lineWidth: get(lineWidth),
+			lineStyle: get(lineStyle),
+			arrow: startArrow ? (endArrow ? 'both' : 'start') : endArrow ? 'end' : 'none',
+			color: draft.swap ? bg : fg
+		});
+		if (!ok) showNotice('Could not draw line.', 'error');
+	}
+
+	/** Drags one of the 4 spline nubs (same capture pattern as the text nub). */
+	function onLineNubDown(e: PointerEvent, i: 0 | 1 | 2 | 3): void {
+		if (!lineDraft) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const nub = e.currentTarget as HTMLElement;
+		try {
+			nub.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
+		const keys = ['p0', 'p1', 'p2', 'p3'] as const;
+		const key = keys[i];
+		const move = (ev: PointerEvent) => {
+			if (!lineDraft) return;
+			const rect = host.getBoundingClientRect();
+			const img = imageFromScreen({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+			lineDraft[key] = { x: img.x, y: img.y };
+		};
+		const up = () => {
+			nub.removeEventListener('pointermove', move as EventListener);
+			nub.removeEventListener('pointerup', up);
+			nub.removeEventListener('pointercancel', up);
+		};
+		nub.addEventListener('pointermove', move as EventListener);
+		nub.addEventListener('pointerup', up);
+		nub.addEventListener('pointercancel', up);
+	}
+
+	function finishShapeDraft(): void {
+		const draft = shapeDraft;
+		shapeDraft = null;
+		shapePointerId = -1;
+		if (!draft) return;
+		const doc = documentRegistry.active;
+		if (!doc) return;
+		const r = normShapeRect(draft);
+		if (r.width < 2 || r.height < 2) return; // click without drag paints nothing
+		const fg = get(foregroundColor);
+		const bg = get(backgroundColor);
+		const ok = commitShapeToLayer(getEditorRenderer(), doc, {
+			x: r.x,
+			y: r.y,
+			width: r.width,
+			height: r.height,
+			kind: get(shapeKind),
+			lineWidth: get(shapeWidth),
+			lineStyle: get(shapeLineStyle),
+			drawStyle: get(shapeDrawStyle),
+			outline: draft.swap ? bg : fg,
+			fill: draft.swap ? fg : bg
+		});
+		if (!ok) showNotice('Could not draw shape.', 'error');
+	}
+
 	/** Drags the uncommitted text draft by its nub (Paint.NET behaviour). */
 	function onTextNubDown(e: PointerEvent): void {
 		if (!textDraft) return;
@@ -428,7 +574,8 @@ const EYEDROPPER = 'eyedropper';
 			if (handle === 'pivot') return 'cursor: crosshair;';
 			return pointInTransformSelection(img, moveSelEngine?.transformState ?? transformUi) ? 'cursor: move;' : 'cursor: default;';
 		}
-		if (!(paintArmed || selectionArmed || get(activeToolId) === 'bucket')) return '';
+		if (!(paintArmed || selectionArmed || get(activeToolId) === 'bucket' || get(activeToolId) === 'wand' || get(activeToolId) === 'shape' || get(activeToolId) === 'line'))
+			return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
 
@@ -470,6 +617,11 @@ const EYEDROPPER = 'eyedropper';
 		refreshRing();
 		// Switching away from the text tool commits the open draft (Paint.NET).
 		if (get(activeToolId) !== 'text' && textDraft) commitTextDraft();
+		// Switching away from the shapes tool cancels the open draft (Paint.NET
+		// paints nothing until release).
+		if (get(activeToolId) !== 'shape' && shapeDraft) cancelShapeDraft();
+		// Same for the line tool's editable draft.
+		if (get(activeToolId) !== 'line' && lineDraft) cancelLineDraft();
 		// Switching away from the move tool drops (applies) a floating selection.
 		if (moveEngine?.floating && !moveArmed) moveEngine.drop();
 		// Switching away from the move-selection tool cancels an in-progress drag.
@@ -523,6 +675,14 @@ const EYEDROPPER = 'eyedropper';
 		// selection (Paint.NET behaviour). Guarded against typing inputs and
 		// open modal dialogs so it never steals Escape from them.
 		if (e.key === 'Escape' && !typing && !get(dialog).kind) {
+			if (lineDraft) {
+				cancelLineDraft();
+				return;
+			}
+			if (shapeDraft) {
+				cancelShapeDraft();
+				return;
+			}
 			if (polyBuilding) {
 				cancelPolygon();
 				return;
@@ -560,6 +720,12 @@ const EYEDROPPER = 'eyedropper';
 		if (polyBuilding && e.key === 'Enter' && !typing && !get(dialog).kind) {
 			e.preventDefault();
 			finishPolygon();
+			return;
+		}
+		// Enter commits an editable line draft (not while still drawing it).
+		if (lineDraft && !lineDraft.drawing && e.key === 'Enter' && !typing && !get(dialog).kind) {
+			e.preventDefault();
+			finishLineDraft();
 			return;
 		}
 		// Undo / Redo and the selection commands — handled here directly
@@ -662,6 +828,9 @@ const EYEDROPPER = 'eyedropper';
 		e.preventDefault();
 		// Zooming would orphan the text-draft overlay — commit it first.
 		if (textDraft) commitTextDraft();
+		// A shape draft is view-dependent too — cancel it (nothing painted yet).
+		if (shapeDraft) cancelShapeDraft();
+		if (lineDraft) cancelLineDraft();
 		const doc = documentRegistry.active;
 		if (!doc || !ready) return;
 		const renderer = getEditorRenderer();
@@ -965,6 +1134,8 @@ const EYEDROPPER = 'eyedropper';
 		if (wantsPan) {
 			// Panning would orphan the text-draft overlay — commit it first.
 			if (textDraft) commitTextDraft();
+			if (shapeDraft) cancelShapeDraft();
+			if (lineDraft) cancelLineDraft();
 			e.preventDefault();
 			const doc = documentRegistry.active;
 			if (!doc) return;
@@ -1151,8 +1322,57 @@ const EYEDROPPER = 'eyedropper';
 		if (get(activeToolId) === 'bucket' && (e.button === 0 || e.button === 2)) {
 			e.preventDefault();
 			const img = imageFromScreen(screenPoint(e));
-			const ok = applyFill(img.x, img.y, e.button === 2 ? get(backgroundColor) : get(foregroundColor));
-			if (!ok) showNotice('Nothing to fill.', 'error');
+			const result = applyFill(img.x, img.y, e.button === 2 ? get(backgroundColor) : get(foregroundColor));
+			if (result === 'out-of-bounds') showNotice('Outside canvas.');
+			else if (result === 'outside-selection') showNotice('Outside the selection.', 'error');
+			else if (result === 'transparent') showNotice('Fill colour is fully transparent.', 'error');
+			else if (result === 'failed') showNotice('Nothing to fill.', 'error');
+			return;
+		}
+		// Magic wand: same flood region as the bucket (tolerance +
+		// contiguous/global from the options strip), committed as a selection.
+		// Modifier behaviour mirrors the other selection tools (Ctrl/Shift =
+		// add, Alt = subtract, right button always subtracts).
+		if (get(activeToolId) === 'wand' && (e.button === 0 || e.button === 2)) {
+			e.preventDefault();
+			const img = imageFromScreen(screenPoint(e));
+			const selMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey || e.shiftKey ? 'add' : get(selectionMode);
+			const result = applyWandSelection(img.x, img.y, selMode);
+			if (result === 'out-of-bounds') showNotice('Outside canvas.');
+			else if (result === 'empty') showNotice('No matching pixels.', 'error');
+			else if (result === 'no-selection') showNotice('Nothing to subtract from.', 'error');
+			else if (result === 'failed') showNotice('Could not select.', 'error');
+			return;
+		}
+		// Shapes tool: drag defines the bounding box (any direction); release
+		// rasterises. Right-button drag swaps outline/fill colours.
+		if (get(activeToolId) === 'shape' && (e.button === 0 || e.button === 2)) {
+			e.preventDefault();
+			const img = imageFromScreen(screenPoint(e));
+			shapeDraft = { startX: img.x, startY: img.y, curX: img.x, curY: img.y, swap: e.button === 2 };
+			shapePointerId = e.pointerId;
+			try {
+				host.setPointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
+		// Line tool: a drag draws straight (controls follow); release keeps 4
+		// editable nubs. A click elsewhere commits the open line first.
+		if (get(activeToolId) === 'line' && (e.button === 0 || e.button === 2)) {
+			if (e.target instanceof HTMLElement && e.target.closest('.line-nub')) return;
+			e.preventDefault();
+			if (lineDraft) finishLineDraft();
+			const img = imageFromScreen(screenPoint(e));
+			const pt = { x: img.x, y: img.y };
+			lineDraft = { p0: pt, p1: { ...pt }, p2: { ...pt }, p3: { ...pt }, swap: e.button === 2, drawing: true };
+			linePointerId = e.pointerId;
+			try {
+				host.setPointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
 			return;
 		}
 		if ((e.button === 0 || e.button === 2) && isPaintTool()) {
@@ -1211,6 +1431,18 @@ const EYEDROPPER = 'eyedropper';
 				syncTransformUi();
 				return;
 			}
+			if (shapeDraft && e.pointerId === shapePointerId) {
+				const img = imageFromScreen(sp);
+				shapeDraft.curX = img.x;
+				shapeDraft.curY = img.y;
+			}
+			if (lineDraft?.drawing && e.pointerId === linePointerId) {
+				const img = imageFromScreen(sp);
+				lineDraft.p3 = { x: img.x, y: img.y };
+				const [c1, c2] = straightLineControls(lineDraft.p0, lineDraft.p3);
+				lineDraft.p1 = c1;
+				lineDraft.p2 = c2;
+			}
 			if (painting && e.pointerId === paintPointerId && engine) {
 				engine.lineTo(imageFromScreen(sp));
 			}
@@ -1247,6 +1479,24 @@ const EYEDROPPER = 'eyedropper';
 
 	function endPointer(e: PointerEvent) {
 		zoomRightHeld = false;
+		// Release of the initial line drag arms the 4 nubs (no commit yet).
+		// Nub releases bubble here too but drawing is already false then.
+		if (lineDraft?.drawing && e.pointerId === linePointerId) {
+			lineDraft.drawing = false;
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
+		if (shapeDraft && e.pointerId === shapePointerId) {
+			finishShapeDraft();
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
 		if (painting && e.pointerId === paintPointerId) {
 			engine?.finish();
 			painting = false;
@@ -1337,6 +1587,12 @@ const EYEDROPPER = 'eyedropper';
 
 	function cancelPointer(e: PointerEvent) {
 		zoomRightHeld = false;
+		if (lineDraft?.drawing && e.pointerId === linePointerId) {
+			cancelLineDraft();
+		}
+		if (shapeDraft && e.pointerId === shapePointerId) {
+			cancelShapeDraft();
+		}
 		if (painting && e.pointerId === paintPointerId) {
 			engine?.cancel();
 			painting = false;
@@ -1442,14 +1698,21 @@ const EYEDROPPER = 'eyedropper';
 				else cancelPolygon();
 				polygonAction.set(null);
 			});
-		// Text-tool options strip → commit/cancel requests.
+			// Text-tool options strip → commit/cancel requests.
 			const unText = textAction.subscribe((a) => {
 				if (!a) return;
-				if (a === 'commit') commitTextDraft();
+				if (a === 'commit') void commitTextDraft();
 				else cancelTextDraft();
 				textAction.set(null);
 			});
-			disposers.push(unTool, unSize, unPoly, unText);
+			// Line-tool options strip → commit/cancel requests.
+			const unLine = lineAction.subscribe((a) => {
+				if (!a) return;
+				if (a === 'commit') finishLineDraft();
+				else cancelLineDraft();
+				lineAction.set(null);
+			});
+			disposers.push(unTool, unSize, unPoly, unText, unLine);
 
 			const onEnter = () => {
 				pointerInside = true;
@@ -1489,6 +1752,7 @@ const EYEDROPPER = 'eyedropper';
 
 			updateStatus(documentRegistry.active);
 			updateArmed();
+			applyCheckerTheme();
 		};
 
 		void initEditorRenderer(canvasEl).then(() => {
@@ -1508,6 +1772,79 @@ const EYEDROPPER = 'eyedropper';
 	style="touch-action: none; {cursorCss}"
 >
 	<canvas bind:this={canvasEl} class="absolute inset-0 block h-full w-full" style="touch-action:none;"></canvas>
+	{#if shapeDraft && documentRegistry.active}
+		{@const sd = shapeDraft}
+		{@const sr = normShapeRect(sd)}
+		{@const sdoc = documentRegistry.active}
+		{@const sp0 = imageToScreen(sdoc.view, sr.x, sr.y)}
+		{@const szw = Math.max(sdoc.view.zoom, 1e-4)}
+		{@const ssw = Math.max(sr.width * szw, 0.01)}
+		{@const ssh = Math.max(sr.height * szw, 0.01)}
+		{@const slw = Math.max($shapeWidth * szw, 0.5)}
+		{@const sfill = $shapeDrawStyle === 'outline' ? 'none' : rgbaToCss(sd.swap ? $foregroundColor : $backgroundColor)}
+		{@const sstroke = $shapeDrawStyle === 'fill' ? 'none' : rgbaToCss(sd.swap ? $backgroundColor : $foregroundColor)}
+		{@const sdash = $shapeLineStyle === 'dashed' ? `${3 * slw} ${2 * slw}` : $shapeLineStyle === 'dotted' ? `0.1 ${1.6 * slw}` : 'none'}
+		<svg
+			class="pointer-events-none absolute z-30"
+			style="left:{sp0.x}px; top:{sp0.y}px; overflow:visible;"
+			width={ssw}
+			height={ssh}
+		>
+			{#if $shapeKind === 'rectangle'}
+				<rect
+					x="0"
+					y="0"
+					width={ssw}
+					height={ssh}
+					fill={sfill}
+					stroke={sstroke}
+					stroke-width={slw}
+					stroke-dasharray={sdash}
+					stroke-linejoin="round"
+					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
+				/>
+			{:else if $shapeKind === 'rounded-rect'}
+				<rect
+					x="0"
+					y="0"
+					width={ssw}
+					height={ssh}
+					rx={Math.min(ssw, ssh) * 0.25}
+					fill={sfill}
+					stroke={sstroke}
+					stroke-width={slw}
+					stroke-dasharray={sdash}
+					stroke-linejoin="round"
+					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
+				/>
+			{:else if $shapeKind === 'ellipse'}
+				<ellipse
+					cx={ssw / 2}
+					cy={ssh / 2}
+					rx={ssw / 2}
+					ry={ssh / 2}
+					fill={sfill}
+					stroke={sstroke}
+					stroke-width={slw}
+					stroke-dasharray={sdash}
+					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
+				/>
+			{:else}
+				{@const spts = shapePolygonPoints($shapeKind, 0, 0, ssw, ssh)
+					.map((p) => `${p.x},${p.y}`)
+					.join(' ')}
+				<polygon
+					points={spts}
+					fill={sfill}
+					stroke={sstroke}
+					stroke-width={slw}
+					stroke-dasharray={sdash}
+					stroke-linejoin="round"
+					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
+				/>
+			{/if}
+		</svg>
+	{/if}
 	{#if textDraft}
 		{@const td = textDraft}
 		<div
@@ -1545,6 +1882,66 @@ const EYEDROPPER = 'eyedropper';
 				}
 			}}
 		></textarea>
+	{/if}
+	{#if lineDraft && documentRegistry.active}
+		{@const ld = lineDraft}
+		{@const ldoc = documentRegistry.active}
+		{@const lzw = Math.max(ldoc.view.zoom, 1e-4)}
+		{@const lq0 = imageToScreen(ldoc.view, ld.p0.x, ld.p0.y)}
+		{@const lq1 = imageToScreen(ldoc.view, ld.p1.x, ld.p1.y)}
+		{@const lq2 = imageToScreen(ldoc.view, ld.p2.x, ld.p2.y)}
+		{@const lq3 = imageToScreen(ldoc.view, ld.p3.x, ld.p3.y)}
+		{@const llw = Math.max($lineWidth * lzw, 0.5)}
+		{@const lcol = rgbaToCss(ld.swap ? $backgroundColor : $foregroundColor)}
+		{@const ldash = $lineStyle === 'dashed' ? `${3 * llw} ${2 * llw}` : $lineStyle === 'dotted' ? `0.1 ${1.6 * llw}` : 'none'}
+		{@const lahLen = arrowHeadLength($lineWidth)}
+		{@const lah0 = $lineArrowStart
+			? arrowHeadPoints(ld.p0, ld.p1, ld.p2, ld.p3, true, lahLen)
+			: null}
+		{@const lah3 = $lineArrowEnd
+			? arrowHeadPoints(ld.p0, ld.p1, ld.p2, ld.p3, false, lahLen)
+			: null}
+		<svg class="pointer-events-none absolute inset-0 z-30 h-full w-full" style="overflow:visible;">
+			<path
+				d="M {lq0.x} {lq0.y} C {lq1.x} {lq1.y}, {lq2.x} {lq2.y}, {lq3.x} {lq3.y}"
+				fill="none"
+				stroke={lcol}
+				stroke-width={llw}
+				stroke-dasharray={ldash}
+				stroke-linecap="round"
+			/>
+			{#if lah0}
+				<polygon
+					points={lah0
+						.map((p) => {
+							const s = imageToScreen(ldoc.view, p.x, p.y);
+							return `${s.x},${s.y}`;
+						})
+						.join(' ')}
+					fill={lcol}
+				/>
+			{/if}
+			{#if lah3}
+				<polygon
+					points={lah3
+						.map((p) => {
+							const s = imageToScreen(ldoc.view, p.x, p.y);
+							return `${s.x},${s.y}`;
+						})
+						.join(' ')}
+					fill={lcol}
+				/>
+			{/if}
+		</svg>
+		{#each [lq0, lq1, lq2, lq3] as q, i (i)}
+			<div
+				class="line-nub absolute z-40"
+				class:line-ctrl={i === 1 || i === 2}
+				style="left:{q.x - 5}px; top:{q.y - 5}px;"
+				title={i === 0 ? 'Start point' : i === 3 ? 'End point' : 'Control point'}
+				onpointerdown={(e) => onLineNubDown(e, i as 0 | 1 | 2 | 3)}
+			></div>
+		{/each}
 	{/if}
 	{#if showRing}
 		<div

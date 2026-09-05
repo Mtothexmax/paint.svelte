@@ -280,6 +280,12 @@ body {
 	background: var(--accent-soft);
 	box-shadow: inset 0 0 0 2px var(--accent);
 }
+/* Wide tools (Shapes) span both toolbar columns (needs width:auto — the
+   base rule fixes every button to one column width). */
+.tool-btn.wide {
+	grid-column: span 2;
+	width: auto;
+}
 .tool-glyph {
 	font-size: 22px;
 	line-height: 1;
@@ -610,6 +616,21 @@ body {
 	border-radius: 2px;
 	cursor: move;
 	touch-action: none;
+}
+/* nubs of the uncommitted spline: square for start/end, round for controls */
+.line-nub {
+	width: 10px;
+	height: 10px;
+	background: var(--accent, #3b82f6);
+	border: 1px solid #fff;
+	box-shadow: 0 0 0 1px #1e3a8a;
+	border-radius: 2px;
+	cursor: move;
+	touch-action: none;
+}
+.line-nub.line-ctrl {
+	background: #fff;
+	border-radius: 9999px;
 }
 
 /* ---- colour picker popover ---- */
@@ -1001,6 +1022,9 @@ body {
 	flex-direction: column;
 	gap: 2px;
 }
+.layer-list.drop-below {
+	box-shadow: inset 0 -2px 0 var(--accent);
+}
 .layer-row {
 	display: flex;
 	align-items: center;
@@ -1019,6 +1043,15 @@ body {
 }
 .layer-row.dim {
 	opacity: 0.45;
+}
+.layer-row.dragging {
+	opacity: 0.5;
+}
+.layer-row.drop-before {
+	box-shadow: 0 -2px 0 var(--accent);
+}
+.layer-row.drop-after {
+	box-shadow: 0 2px 0 var(--accent);
 }
 .layer-eye {
 	background: none;
@@ -1039,6 +1072,18 @@ body {
 .layer-op {
 	font-size: 11px;
 	color: var(--text-dim);
+}
+.layer-blend {
+	max-width: 92px;
+	padding: 1px 2px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text-dim);
+	font-size: 11px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .layer-actions {
 	display: none;
@@ -1080,12 +1125,32 @@ body {
 	font-size: 14px;
 	line-height: 1;
 }
+.menu-check {
+	width: 16px;
+	flex: 0 0 auto;
+	text-align: center;
+	font-size: 13px;
+	line-height: 1;
+	color: var(--accent, #3b82f6);
+	font-weight: bold;
+}
 .menu-text {
 	flex: 1 1 auto;
 	text-align: left;
 }
 .menu-item:not(.disabled) .menu-ic {
 	filter: saturate(1);
+}
+/* Inline Material Symbol glyphs in the menu (exact light color, no filter). */
+.menu-svg {
+	display: inline-flex;
+	width: 16px;
+	height: 16px;
+}
+.menu-svg svg {
+	width: 16px;
+	height: 16px;
+	fill: #e3e3e3;
 }
 
 /* ---- filter slider row (editable value + icon reset) ---- */
@@ -1285,6 +1350,12 @@ body {
 	padding: 6px 8px 2px;
 	font-size: 11px;
 	color: var(--text-dim);
+}
+/* Material Symbols are black glyphs — lighten them for the dark strips. */
+.shape-kind-ic {
+	width: 18px;
+	height: 18px;
+	filter: invert(0.88);
 }
 .fsl-reset {
 	flex: 0 0 auto;

@@ -8,6 +8,8 @@ export interface CommandDef {
 	shortcut?: string;
 	run: () => void | Promise<void>;
 	isEnabled?: () => boolean;
+	/** When present the menu renders a checkmark column for this command. */
+	checked?: () => boolean;
 }
 
 class CommandRegistry {
@@ -33,6 +35,15 @@ class CommandRegistry {
 		const def = this.map.get(id);
 		if (!def) return false;
 		return def.isEnabled ? def.isEnabled() : true;
+	}
+
+	isChecked(id: string): boolean {
+		return this.map.get(id)?.checked?.() ?? false;
+	}
+
+	/** True when the command renders a checkbox column (has `checked`). */
+	hasCheck(id: string): boolean {
+		return typeof this.map.get(id)?.checked === 'function';
 	}
 
 	label(id: string): string {

@@ -9,6 +9,23 @@ import type { SurfaceId } from '../core/layers/Layer';
 
 export type BlendName = 'normal' | 'erase' | 'none';
 
+/** Layer blend-mode id → Pixi sprite blend mode (unknown falls back below). */
+export const SPRITE_BLENDS: Record<string, Sprite['blendMode']> = {
+	normal: 'normal',
+	multiply: 'multiply',
+	screen: 'screen',
+	overlay: 'overlay',
+	darken: 'darken',
+	lighten: 'lighten',
+	'color-dodge': 'color-dodge',
+	'color-burn': 'color-burn',
+	'hard-light': 'hard-light',
+	'soft-light': 'soft-light',
+	difference: 'difference',
+	exclusion: 'exclusion',
+	add: 'add'
+};
+
 export class SurfaceStore {
 	private app: Application | null = null;
 	private surfaces = new Map<SurfaceId, RenderTexture>();
@@ -117,6 +134,21 @@ export class SurfaceStore {
 		const holder = new Container();
 		holder.addChild(sprite);
 		this.render(holder, dest, false);
+		holder.destroy({ children: true });
+	}
+
+	/**
+	 * Composites one layer surface over another (merge-down): `srcId` is drawn
+	 * onto `destId` with the layer's opacity and blend-mode id (unknown ids
+	 * fall back to normal). Both surfaces stay owned by the caller.
+	 */
+	compositeLayer(srcId: SurfaceId, destId: SurfaceId, alpha: number, blendMode: string): void {
+		const sprite = new Sprite(this.getTexture(srcId));
+		sprite.alpha = Math.max(0, Math.min(1, alpha));
+		sprite.blendMode = SPRITE_BLENDS[blendMode] ?? 'normal';
+		const holder = new Container();
+		holder.addChild(sprite);
+		this.render(holder, this.getTexture(destId), false);
 		holder.destroy({ children: true });
 	}
 

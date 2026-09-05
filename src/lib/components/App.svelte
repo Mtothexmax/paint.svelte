@@ -5,6 +5,7 @@
 	import { registerBuiltinCommands } from '../services/commands';
 	import { startShortcutService } from '../services/shortcutService';
 	import { startThumbnails } from '../state/thumbnails';
+	import { startLayerThumbnails } from '../state/layerThumbnails';
 
 	import MenuBar from './shell/MenuBar.svelte';
 	import TabBar from './shell/TabBar.svelte';
@@ -27,9 +28,11 @@
 		registerBuiltinCommands();
 		const stopShortcuts = startShortcutService();
 		const stopThumbs = startThumbnails();
+		const stopLayerThumbs = startLayerThumbnails();
 		return () => {
 			stopShortcuts();
 			stopThumbs();
+			stopLayerThumbs();
 		};
 	});
 </script>

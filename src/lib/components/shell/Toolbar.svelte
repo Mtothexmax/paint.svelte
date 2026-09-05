@@ -33,6 +33,8 @@
 		glyph?: string;
 		/** When true the tool is not implemented yet — clicking it just shows a notice. */
 		placeholder?: boolean;
+		/** When true the button spans both toolbar columns. */
+		wide?: boolean;
 	}
 
 	// Order matches the Paint.NET toolbar (left column then right column, row by row).
@@ -65,8 +67,8 @@
 		// Row 9
 		{ id: 'text', label: 'Text', src: TextIcon },
 		{ id: 'line', label: 'Line / Curve', src: curlySvg, placeholder: true },
-		// Row 10 (Shapes sits alone in the left column, like Paint.NET).
-		{ id: 'shape', label: 'Shapes', src: ShapesIcon }
+		// Row 10 (Shapes spans both columns, like Paint.NET).
+		{ id: 'shape', label: 'Shapes', src: ShapesIcon, wide: true }
 	];
 
 	function pickTool(id: string, label: string, placeholder?: boolean): void {
@@ -89,6 +91,7 @@
 				class="tool-btn"
 				class:active={$activeToolId === tool.id}
 				class:placeholder={tool.placeholder}
+				class:wide={tool.wide}
 				title={tool.placeholder ? `${tool.label} (placeholder)` : tool.label}
 				aria-label={tool.label}
 				onmousedown={(event) => event.preventDefault()}
@@ -100,7 +103,7 @@
 				}}
 			>
 				{#if tool.src}
-					<img src={tool.src} alt={tool.label} class="h-6 w-6" draggable="false" />
+					<img src={tool.src} alt={tool.label} class={tool.wide ? 'h-6 w-12' : 'h-6 w-6'} draggable="false" />
 				{:else}
 					<span class="tool-glyph">{tool.glyph}</span>
 				{/if}

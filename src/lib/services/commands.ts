@@ -2,7 +2,7 @@
 
 import { documentRegistry } from '../core/document/registry';
 import { statusBar } from '../state/ui';
-import { getEditorRenderer } from '../render/EditorRenderer';
+import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import { fitView, zoomTo } from '../render/Viewport';
 import { commands } from './commandRegistry';
 import { closeDialog, openDialog } from './dialogService';
@@ -13,6 +13,8 @@ import {
 	openFromPicker
 } from './fileService';
 import type { ViewState } from '../core/document/ImageDocument';
+import { get } from 'svelte/store';
+import { checkerTheme } from '../state/view';
 import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
 import { copySelection, cutSelection, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
@@ -31,6 +33,13 @@ function applyViewCommand(fn: (view: ViewState, vw: number, vh: number) => ViewS
 	renderer.refreshActiveView();
 	setStatusZoom(doc.view);
 	return true;
+}
+
+/** Applies the stored transparency-checkerboard theme to the renderer
+ * (no-op before the renderer exists — EditorCanvas syncs on attach). */
+export function applyCheckerTheme(): void {
+	if (!hasEditorRenderer()) return;
+	getEditorRenderer().setCheckerTheme(get(checkerTheme) === 'dark');
 }
 
 let registered = false;
@@ -99,6 +108,15 @@ export function registerBuiltinCommands(): void {
 					return fitView(doc.width, doc.height, vw, vh);
 				}),
 			isEnabled: hasDoc
+		},
+		{
+			id: 'view.checkerDark',
+			label: 'Dark Checkerboard',
+			checked: () => get(checkerTheme) === 'dark',
+			run: () => {
+				checkerTheme.set(get(checkerTheme) === 'dark' ? 'bright' : 'dark');
+				applyCheckerTheme();
+			}
 		}
 	]);
 

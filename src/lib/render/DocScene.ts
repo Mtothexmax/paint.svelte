@@ -5,7 +5,7 @@ import type { ImageDocument } from '../core/document/ImageDocument';
 import type { Point } from '../core/geometry';
 import type { Layer } from '../core/layers/Layer';
 import { checkerTexture } from './checkerboard';
-import type { SurfaceStore } from './SurfaceStore';
+import { SPRITE_BLENDS, type SurfaceStore } from './SurfaceStore';
 
 const SQUARE = 8; // checker square in screen px
 const BASE = SQUARE * 2; // texture side in image px (2 squares)
@@ -95,10 +95,10 @@ export class DocScene {
 	private strokeClipTexture: Texture | null = null;
 	private strokeClipSprite: Sprite | null = null;
 
-	constructor(doc: ImageDocument, surfaces: SurfaceStore) {
+	constructor(doc: ImageDocument, surfaces: SurfaceStore, darkChecker = false) {
 		this.doc = doc;
 		this.checker = new TilingSprite({
-			texture: checkerTexture(SQUARE),
+			texture: checkerTexture(SQUARE, darkChecker ? 'dark' : 'bright'),
 			width: doc.width,
 			height: doc.height
 		});
@@ -131,6 +131,7 @@ export class DocScene {
 			const sprite = new Sprite(texture);
 			sprite.alpha = layer.opacity;
 			sprite.visible = layer.visible;
+			sprite.blendMode = SPRITE_BLENDS[layer.blendMode] ?? 'normal';
 			this.root.addChild(sprite);
 			return sprite;
 		});
@@ -152,8 +153,12 @@ export class DocScene {
 		else if (fallback) sprite.texture = fallback;
 	}
 
-	/** Lazily allocates the pooled stroke buffer + overlay (doc-sized). */
-	ensureStroke(): { target: RenderTexture; overlay: Sprite } {
+	/** Swaps the transparency checkerboard theme (tileScale is preserved). */
+	setCheckerTheme(dark: boolean): void {
+		this.checker.texture = checkerTexture(SQUARE, dark ? 'dark' : 'bright');
+	}
+
+	/** Lazily allocates the pooled stroke buffer + overlay (doc-sized). */	ensureStroke(): { target: RenderTexture; overlay: Sprite } {
 		if (!this.strokeBuffer || !this.strokeOverlay) {
 			this.strokeBuffer = RenderTexture.create({ width: this.doc.width, height: this.doc.height, resolution: 1 });
 			this.strokeOverlay = new Sprite(this.strokeBuffer);

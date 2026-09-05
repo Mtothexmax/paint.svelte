@@ -3,7 +3,7 @@
 // their own raster commands (region snapshots).
 
 import { documentRegistry } from '../core/document/registry';
-import { createRasterLayer, type Layer } from '../core/layers/Layer';
+import { createRasterLayer, isLayerBlendMode, LAYER_BLEND_MODES, type Layer } from '../core/layers/Layer';
 import { getEditorRenderer } from '../render/EditorRenderer';
 
 function touch(doc: import('../core/document/ImageDocument').ImageDocument) {
@@ -104,7 +104,16 @@ export function moveLayer(id: string, delta: number): void {
 	if (!doc) return;
 	const from = doc.indexOfLayer(id);
 	if (from < 0) return;
-	const to = Math.max(0, Math.min(doc.layers.length - 1, from + delta));
+	reorderLayer(id, from + delta);
+}
+
+/** Moves the given layer to the absolute stack index `to` (0 = bottom). */
+export function reorderLayer(id: string, to: number): void {
+	const doc = activeDoc();
+	if (!doc) return;
+	const from = doc.indexOfLayer(id);
+	if (from < 0) return;
+	to = Math.max(0, Math.min(doc.layers.length - 1, to));
 	if (to === from) return;
 
 	doc.moveLayer(id, to);
@@ -208,6 +217,57 @@ export function selectLayer(id: string): void {
 	documentRegistry.notifyChange(doc);
 }
 
+/** Merges the active layer down into the layer below it (opacity + blend
+ * mode applied, undoable). No-op when the active layer is the bottom one. */
+export function mergeDown(): void {
+	const doc = activeDoc();
+	if (!doc) return;
+	const index = doc.indexOfLayer(doc.activeLayerId ?? '');
+	if (index <= 0) return;
+	const renderer = getEditorRenderer();
+	const surfaces = renderer.surfaces;
+	const active = doc.layers[index];
+	const below = doc.layers[index - 1];
+	const belowBefore = below.surfaceId;
+
+	const merged = surfaces.copyRegion(belowBefore, { x: 0, y: 0, width: doc.width, height: doc.height });
+	surfaces.compositeLayer(active.surfaceId, merged, active.opacity, active.blendMode);
+
+	const activeId = active.id;
+	const belowId = below.id;
+	doc.removeLayer(activeId);
+	below.surfaceId = merged;
+	doc.setActiveLayer(belowId);
+	rebuild();
+	touch(doc);
+
+	doc.history.push({
+		label: 'Merge Down',
+		undo: () => {
+			below.surfaceId = belowBefore;
+			doc.insertLayer(active, index);
+			doc.setActiveLayer(activeId);
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		redo: () => {
+			below.surfaceId = merged;
+			doc.removeLayer(activeId);
+			ensureActive(doc, activeId);
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		dispose: () => {
+			if (!doc.layers.includes(active)) {
+				surfaces.dispose(belowBefore);
+				surfaces.dispose(active.surfaceId);
+			} else {
+				surfaces.dispose(merged);
+			}
+		}
+	});
+}
+
 /** Duplicates the given layer (pixels copied via GPU region copy). */
 export function duplicateLayer(id: string): void {
 	const doc = activeDoc();
@@ -253,12 +313,59 @@ export function duplicateLayer(id: string): void {
 	});
 }
 
+/** Sets a layer's blend mode (undoable). Unknown ids are ignored. */
+export function setLayerBlendMode(id: string, mode: string): void {
+	if (!isLayerBlendMode(mode)) return;
+	const doc = activeDoc();
+	if (!doc) return;
+	const layer = doc.layers.find((l) => l.id === id);
+	if (!layer || layer.blendMode === mode) return;
+	const old = layer.blendMode;
+
+	layer.blendMode = mode;
+	rebuild();
+	touch(doc);
+
+	doc.history.push({
+		label: 'Layer Blend Mode',
+		undo: () => {
+			layer.blendMode = old;
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		redo: () => {
+			layer.blendMode = mode;
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		dispose: () => {}
+	});
+}
+
+/** Blend-mode dropdown options (id + display label). */
+export const BLEND_MODE_OPTIONS: Array<{ id: (typeof LAYER_BLEND_MODES)[number]; label: string }> = [
+	{ id: 'normal', label: 'Normal' },
+	{ id: 'multiply', label: 'Multiply' },
+	{ id: 'screen', label: 'Screen' },
+	{ id: 'overlay', label: 'Overlay' },
+	{ id: 'darken', label: 'Darken' },
+	{ id: 'lighten', label: 'Lighten' },
+	{ id: 'color-dodge', label: 'Color Dodge' },
+	{ id: 'color-burn', label: 'Color Burn' },
+	{ id: 'hard-light', label: 'Hard Light' },
+	{ id: 'soft-light', label: 'Soft Light' },
+	{ id: 'difference', label: 'Difference' },
+	{ id: 'exclusion', label: 'Exclusion' },
+	{ id: 'add', label: 'Additive' }
+];
+
 /** Current layer snapshot for a document (used by the Layers panel). */
 export interface LayerRow {
 	id: string;
 	name: string;
 	visible: boolean;
 	opacity: number;
+	blendMode: string;
 	active: boolean;
 	index: number;
 }
@@ -272,6 +379,7 @@ export function layerRows(doc: import('../core/document/ImageDocument').ImageDoc
 			name: l.name,
 			visible: l.visible,
 			opacity: l.opacity,
+			blendMode: isLayerBlendMode(l.blendMode) ? l.blendMode : 'normal',
 			active: l.id === doc.activeLayerId,
 			index: arr.length - 1 - i
 		}));

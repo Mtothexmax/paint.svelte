@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"@fluentui-emoji/svg": "^2.2.0",
+		"@material-symbols/svg-400": "^0.47.1",
 		"pixi.js": "^8.20.1"
 	}
 }

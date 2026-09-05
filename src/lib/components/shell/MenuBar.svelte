@@ -7,6 +7,7 @@
 	import { commands } from '../../services/commandRegistry';
 	import { lastApplied } from '../../state/repeat';
 	import type { MenuEntry } from '../../services/menuService';
+	import BrightnessContrastSvg from '@material-symbols/svg-400/rounded/contrast.svg?raw';
 
 	const CATEGORY: Record<string, 'effects' | 'adjustments'> = {
 		Effects: 'effects',
@@ -22,6 +23,7 @@
 		'view.zoomOut': '🔎',
 		'view.actualSize': '⛶',
 		'view.fitWindow': '⤢',
+		'view.checkerDark': '◑',
 		'edit.undo': '↩️',
 		'edit.redo': '↪️',
 		'edit.selectAll': '⌗',
@@ -34,6 +36,10 @@
 		'adjustments.hueSat': '🌈',
 		'adjustments.invertColors': '🔁',
 		'effects.blur': '💧'
+	};
+	/** Raw inline SVG markup per command (rendered via {@html}, exact color). */
+	const COMMAND_SVG_ICONS: Record<string, string> = {
+		'adjustments.brightCont': BrightnessContrastSvg
 	};
 	const LABEL_ICONS: Record<string, string> = {
 		'Cut': '✂️',
@@ -65,24 +71,45 @@
 	}
 
 	function iconOf(entry: MenuEntry): string {
-		if (entry.type === 'command') return COMMAND_ICONS[entry.commandId] ?? '';
+		if (entry.type === 'command')
+			return COMMAND_SVG_ICONS[entry.commandId] ?? COMMAND_ICONS[entry.commandId] ?? '';
 		if (entry.type === 'disabled') return LABEL_ICONS[entry.label] ?? '';
 		return '';
 	}
 
-	function labelOf(entry: MenuEntry): { text: string; shortcut?: string; disabled: boolean; icon: string } {
+	function isSvgIcon(entry: MenuEntry): boolean {
+		return entry.type === 'command' && entry.commandId in COMMAND_SVG_ICONS;
+	}
+
+	function labelOf(entry: MenuEntry): {
+		text: string;
+		shortcut?: string;
+		disabled: boolean;
+		icon: string;
+		checked: boolean;
+		checkable: boolean;
+	} {
 		if (entry.type === 'command') {
 			return {
 				text: commands.label(entry.commandId),
 				shortcut: commands.shortcut(entry.commandId),
 				disabled: !commands.isEnabled(entry.commandId),
-				icon: iconOf(entry)
+				icon: iconOf(entry),
+				checked: commands.isChecked(entry.commandId),
+				checkable: commands.hasCheck(entry.commandId)
 			};
 		}
 		if (entry.type === 'disabled') {
-			return { text: entry.label, shortcut: entry.shortcut, disabled: true, icon: iconOf(entry) };
+			return {
+				text: entry.label,
+				shortcut: entry.shortcut,
+				disabled: true,
+				icon: iconOf(entry),
+				checked: false,
+				checkable: false
+			};
 		}
-		return { text: '', disabled: true, icon: '' };
+		return { text: '', disabled: true, icon: '', checked: false, checkable: false };
 	}
 
 	function onGlobalMouseDown(e: MouseEvent) {
@@ -140,7 +167,14 @@
 								disabled={info.disabled}
 								onclick={() => activate(entry)}
 							>
-								<span class="menu-ic">{info.icon || ''}</span>
+								{#if info.checkable}<span class="menu-check">{info.checked ? '✓' : ''}</span>{/if}
+								<span class="menu-ic">
+									{#if isSvgIcon(entry)}
+										<span class="menu-svg">{@html iconOf(entry)}</span>
+									{:else}
+										{info.icon || ''}
+									{/if}
+								</span>
 								<span class="menu-text">{info.text}</span>
 								{#if info.shortcut}<span class="menu-shortcut">{info.shortcut}</span>{/if}
 							</button>

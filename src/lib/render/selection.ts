@@ -234,6 +234,39 @@ export function blitMaskedInto(
 	surfaces.dispose(scratchId);
 }
 
+/** Returns a NEW surface = mask A ∪ mask B (both doc-sized, white-set). */
+export function unionMasks(
+	surfaces: SurfaceStore,
+	aId: SurfaceId,
+	bId: SurfaceId,
+	width: number,
+	height: number
+): SurfaceId {
+	const out = surfaces.create(width, height);
+	const holder = new Container();
+	// Opaque white over anything stays white — normal blending unions the sets.
+	holder.addChild(new Sprite(surfaces.getTexture(aId)));
+	holder.addChild(new Sprite(surfaces.getTexture(bId)));
+	surfaces.renderInto(surfaces.getTexture(out), holder, true);
+	holder.destroy({ children: true });
+	return out;
+}
+
+/** Returns a NEW surface = mask A − mask B (both doc-sized, white-set). */
+export function subtractMasks(
+	surfaces: SurfaceStore,
+	aId: SurfaceId,
+	bId: SurfaceId,
+	width: number,
+	height: number
+): SurfaceId {
+	const compB = complementMaskSurface(surfaces, bId, width, height);
+	const out = surfaces.create(width, height);
+	blitMaskedInto(surfaces, compB, aId, out, 'normal', width, height);
+	surfaces.dispose(compB);
+	return out;
+}
+
 /** Closed outline (image px, no duplicated first point) of the current shape,
  * used to draw the ants. Rect → 4 corners, ellipse → sampled points, lasso →
  * the raw polygon points. */

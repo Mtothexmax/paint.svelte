@@ -44,3 +44,36 @@ export function renderThumbnail(
 	holder.destroy({ children: true });
 	return canvas;
 }
+
+/**
+ * Renders a single layer surface scaled to fit within `size` and returns a
+ * small detached canvas. No backing fill — transparency stays transparent
+ * (the caller shows a checkerboard behind it).
+ */
+export function renderLayerThumbnail(
+	renderer: EditorRenderer,
+	doc: ImageDocument,
+	surfaceId: string,
+	size = 44
+): HTMLCanvasElement | null {
+	if (!renderer.surfaces.has(surfaceId)) return null;
+	const tex = renderer.surfaces.getTexture(surfaceId);
+	const scale = Math.min(size / doc.width, size / doc.height, 1) || 1;
+	const cw = Math.max(1, Math.round(doc.width * scale));
+	const ch = Math.max(1, Math.round(doc.height * scale));
+
+	const rt = RenderTexture.create({ width: cw, height: ch, resolution: 1 });
+	const holder = new Container();
+	const sprite = new Sprite(tex);
+	sprite.scale.set(scale, scale);
+	holder.addChild(sprite);
+	renderer.app.renderer.render({ container: holder, target: rt, clear: true });
+
+	const probe = new Sprite(rt);
+	const canvas = renderer.app.renderer.extract.canvas(probe) as HTMLCanvasElement;
+
+	probe.destroy();
+	rt.destroy(true);
+	holder.destroy({ children: true });
+	return canvas;
+}
