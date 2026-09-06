@@ -8,6 +8,9 @@
 	import { screenToImage, imageToScreen, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
+	import { CloneEngine } from '../../render/CloneEngine';
+	import { RecolorEngine } from '../../render/RecolorEngine';
+	import { affinePoint } from '../../render/affine';
 	import { MoveEngine } from '../../render/MoveEngine';
 	import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
 	import type { TransformHandle } from '../../render/MoveEngine';
@@ -44,6 +47,7 @@
 		foregroundColor,
 		backgroundColor,
 		antiAliasMode,
+		moveDistort,
 		selectionMode,
 		selectionRatio,
 		selectionFixedRatio,
@@ -51,6 +55,8 @@
 		showNotice
 	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
+	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
+	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
 	import {
 		textFontFamily,		textFontSize,
 		textBold,
@@ -116,6 +122,16 @@ const EYEDROPPER = 'eyedropper';
 	let painting = $state(false);
 	let paintPointerId = -1;
 
+	// clone-stamp state (Alt+click sets the source, strokes stamp it)
+	let cloneEngine: CloneEngine | null = null;
+	let cloning = $state(false);
+	let clonePointerId = -1;
+
+	// recolor state (paints foreground, preserves destination alpha)
+	let recolorEngine: RecolorEngine | null = null;
+	let recoloring = $state(false);
+	let recolorPointerId = -1;
+
 	// move-tool state (drag the selection content; commits on pointer-up)
 	let moveEngine: MoveEngine | null = null;
 	let moveArmed = $state(false);
@@ -131,6 +147,8 @@ const EYEDROPPER = 'eyedropper';
 		scaleX: number;
 		scaleY: number;
 		rotation: number;
+		skewX: number;
+		skewY: number;
 	} | null>(null);
 	let transformRevision = $state(0);
 	let handleBounds = $state<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -142,13 +160,16 @@ const EYEDROPPER = 'eyedropper';
 		const b = t.bounds;
 		const ox = t.offset.x;
 		const oy = t.offset.y;
-		const cos = Math.cos(t.rotation);
-		const sin = Math.sin(t.rotation);
-		const point = (x: number, y: number) => {
-			const sx = (x - t.pivot.x) * t.scaleX;
-			const sy = (y - t.pivot.y) * t.scaleY;
-			return { x: t.pivot.x + t.offset.x + sx * cos - sy * sin, y: t.pivot.y + t.offset.y + sx * sin + sy * cos };
+		const state = {
+			pivot: t.pivot,
+			offset: t.offset,
+			scaleX: t.scaleX,
+			scaleY: t.scaleY,
+			rotation: t.rotation,
+			skewX: t.skewX,
+			skewY: t.skewY
 		};
+		const point = (x: number, y: number) => affinePoint(state, { x, y });
 		return [
 			{ handle: 'nw' as TransformHandle, x: b.x + ox, y: b.y + oy },
 			{ handle: 'n' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y + oy },
@@ -161,7 +182,7 @@ const EYEDROPPER = 'eyedropper';
 			{ handle: 'pivot' as TransformHandle, x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y }
 		].map((p) => {
 			const screen = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
-			const transformed = point(p.x - ox, p.y - oy);
+			const transformed = point(p.x, p.y);
 			return { ...p, sx: screen.panX + transformed.x * screen.zoom, sy: screen.panY + transformed.y * screen.zoom };
 		});
 	});
@@ -209,7 +230,16 @@ const EYEDROPPER = 'eyedropper';
 			? moveSelEngine?.transformState
 			: moveEngine?.transformState;
 		if (state) {
-			transformUi = { bounds: state.bounds, pivot: state.pivot, offset: state.offset, scaleX: state.scaleX, scaleY: state.scaleY, rotation: state.rotation };
+			transformUi = {
+				bounds: state.bounds,
+				pivot: state.pivot,
+				offset: state.offset,
+				scaleX: state.scaleX,
+				scaleY: state.scaleY,
+				rotation: state.rotation,
+				skewX: (state as { skewX?: number }).skewX ?? 0,
+				skewY: (state as { skewY?: number }).skewY ?? 0
+			};
 		} else {
 			const bounds = { ...selectionBounds };
 			transformUi = {
@@ -218,7 +248,9 @@ const EYEDROPPER = 'eyedropper';
 				offset: { x: 0, y: 0 },
 				scaleX: 1,
 				scaleY: 1,
-				rotation: 0
+				rotation: 0,
+				skewX: 0,
+				skewY: 0
 			};
 		}
 		if (get(activeToolId) === 'move-selection' && moveSelEngine?.dragging) {
@@ -277,10 +309,14 @@ const EYEDROPPER = 'eyedropper';
 	let pointerY = $state(-1000);
 	let pointerInside = $state(false);
 	let paintArmed = $state(false);
+	let cloneArmed = $state(false);
+	let recolorArmed = $state(false);
 	let ringR = $state(0);
 
 	const isPencil = () => get(activeToolId) === 'pencil' && !!documentRegistry.active;
-	const showRing = $derived(paintArmed && !panning && !isPencil() && (pointerInside || painting));
+	const showRing = $derived(
+		(paintArmed || cloneArmed || recolorArmed) && !panning && !isPencil() && (pointerInside || painting || cloning || recoloring)
+	);
 
 	// text-tool draft (Paint.NET nub): click places an anchor, the overlay
 	// textarea edits, commit rasterises into the active layer (no live object).
@@ -546,6 +582,7 @@ const EYEDROPPER = 'eyedropper';
 			return zoomRightHeld ? 'cursor: zoom-out;' : 'cursor: zoom-in;';
 		}
 		if (painting && !isPencil()) return 'cursor: none;';
+		if ((cloning || recoloring) && pointerInside) return 'cursor: none;';
 		if (get(activeToolId) === 'text') return pointerInside ? 'cursor: text;' : '';
 		if (moving) return 'cursor: move;';
 		if (moveArmed) {
@@ -574,7 +611,7 @@ const EYEDROPPER = 'eyedropper';
 			if (handle === 'pivot') return 'cursor: crosshair;';
 			return pointInTransformSelection(img, moveSelEngine?.transformState ?? transformUi) ? 'cursor: move;' : 'cursor: default;';
 		}
-		if (!(paintArmed || selectionArmed || get(activeToolId) === 'bucket' || get(activeToolId) === 'wand' || get(activeToolId) === 'shape' || get(activeToolId) === 'line'))
+		if (!(paintArmed || cloneArmed || recolorArmed || selectionArmed || get(activeToolId) === 'bucket' || get(activeToolId) === 'wand' || get(activeToolId) === 'shape' || get(activeToolId) === 'line'))
 			return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
@@ -609,6 +646,8 @@ const EYEDROPPER = 'eyedropper';
 		zoomArmed = get(activeToolId) === 'zoom' && hasDoc;
 		if (!zoomArmed && wasZoomArmed) zoomRightHeld = false;
 		paintArmed = PAINT_TOOLS.has(get(activeToolId)) && hasDoc;
+		cloneArmed = get(activeToolId) === 'clone-stamp' && hasDoc;
+		recolorArmed = get(activeToolId) === 'recolor' && hasDoc;
 		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
 		moveArmed = get(activeToolId) === 'move-pixels' && hasDoc;
 		moveSelArmed = get(activeToolId) === 'move-selection' && hasDoc;
@@ -622,6 +661,17 @@ const EYEDROPPER = 'eyedropper';
 		if (get(activeToolId) !== 'shape' && shapeDraft) cancelShapeDraft();
 		// Same for the line tool's editable draft.
 		if (get(activeToolId) !== 'line' && lineDraft) cancelLineDraft();
+		// An interrupted clone/recolor stroke is discarded on tool switch.
+		if (cloning && get(activeToolId) !== 'clone-stamp') {
+			cloneEngine?.cancel();
+			cloning = false;
+			clonePointerId = -1;
+		}
+		if (recoloring && get(activeToolId) !== 'recolor') {
+			recolorEngine?.cancel();
+			recoloring = false;
+			recolorPointerId = -1;
+		}
 		// Switching away from the move tool drops (applies) a floating selection.
 		if (moveEngine?.floating && !moveArmed) moveEngine.drop();
 		// Switching away from the move-selection tool cancels an in-progress drag.
@@ -645,11 +695,13 @@ const EYEDROPPER = 'eyedropper';
 		if (polyBuilding && get(activeToolId) !== 'select-poly') cancelPolygon();
 	}
 
-	/** Recomputes the ring radius from the brush size and the current zoom
+	/** Recomputes the ring radius from the active dab size and the current zoom
 	 * (zooming changes the on-screen size of the brush preview). */
 	function refreshRing(): void {
 		const doc = documentRegistry.active;
-		ringR = paintArmed && doc ? (get(brushSize) / 2) * doc.view.zoom : 0;
+		const tool = get(activeToolId);
+		const size = tool === 'clone-stamp' ? get(cloneSize) : tool === 'recolor' ? get(recolorSize) : get(brushSize);
+		ringR = (paintArmed || cloneArmed || recolorArmed) && doc ? (size / 2) * doc.view.zoom : 0;
 	}
 
 	/** Moves the brush preview to the pointer position. */
@@ -1016,13 +1068,16 @@ const EYEDROPPER = 'eyedropper';
 		if (!t || !doc) return null;
 		const b = t.bounds;
 		const threshold = 10 / Math.max(doc.view.zoom, 0.01);
-		const cos = Math.cos(t.rotation);
-		const sin = Math.sin(t.rotation);
-		const transformed = (x: number, y: number): Point => {
-			const sx = (x - t.pivot.x) * t.scaleX;
-			const sy = (y - t.pivot.y) * t.scaleY;
-			return { x: t.pivot.x + t.offset.x + sx * cos - sy * sin, y: t.pivot.y + t.offset.y + sx * sin + sy * cos };
+		const state = {
+			pivot: t.pivot,
+			offset: t.offset,
+			scaleX: t.scaleX,
+			scaleY: t.scaleY,
+			rotation: t.rotation,
+			skewX: (t as { skewX?: number }).skewX ?? 0,
+			skewY: (t as { skewY?: number }).skewY ?? 0
 		};
+		const transformed = (x: number, y: number): Point => affinePoint(state, { x, y });
 		const pivot = { x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y };
 		if (Math.hypot(img.x - pivot.x, img.y - pivot.y) <= threshold) return 'pivot';
 		const points: Array<[TransformHandle, Point]> = [
@@ -1038,16 +1093,28 @@ const EYEDROPPER = 'eyedropper';
 		return null;
 	}
 
-	function pointInTransformSelection(img: Point, t: { bounds: { x: number; y: number; width: number; height: number }; pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number } | null): boolean {
+	function pointInTransformSelection(img: Point, t: { bounds: { x: number; y: number; width: number; height: number }; pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number; skewX?: number; skewY?: number } | null): boolean {
 		if (!t) return false;
-		const cos = Math.cos(t.rotation);
-		const sin = Math.sin(t.rotation);
-		const dx = img.x - t.pivot.x - t.offset.x;
-		const dy = img.y - t.pivot.y - t.offset.y;
-		const localX = t.pivot.x + (dx * cos + dy * sin) / (t.scaleX || 1);
-		const localY = t.pivot.y + (-dx * sin + dy * cos) / (t.scaleY || 1);
 		const b = t.bounds;
-		return localX >= b.x && localX <= b.x + b.width && localY >= b.y && localY <= b.y + b.height;
+		const corners = [
+			affinePoint(
+				{ pivot: t.pivot, offset: t.offset, scaleX: t.scaleX, scaleY: t.scaleY, rotation: t.rotation, skewX: t.skewX ?? 0, skewY: t.skewY ?? 0 },
+				{ x: b.x, y: b.y }
+			),
+			affinePoint(
+				{ pivot: t.pivot, offset: t.offset, scaleX: t.scaleX, scaleY: t.scaleY, rotation: t.rotation, skewX: t.skewX ?? 0, skewY: t.skewY ?? 0 },
+				{ x: b.x + b.width, y: b.y }
+			),
+			affinePoint(
+				{ pivot: t.pivot, offset: t.offset, scaleX: t.scaleX, scaleY: t.scaleY, rotation: t.rotation, skewX: t.skewX ?? 0, skewY: t.skewY ?? 0 },
+				{ x: b.x + b.width, y: b.y + b.height }
+			),
+			affinePoint(
+				{ pivot: t.pivot, offset: t.offset, scaleX: t.scaleX, scaleY: t.scaleY, rotation: t.rotation, skewX: t.skewX ?? 0, skewY: t.skewY ?? 0 },
+				{ x: b.x, y: b.y + b.height }
+			)
+		];
+		return pointInPolygon(img, corners);
 	}
 
 	function logTransformCursor(img: Point): void {
@@ -1055,16 +1122,16 @@ const EYEDROPPER = 'eyedropper';
 		const doc = documentRegistry.active;
 		if (!t || !doc || (get(activeToolId) !== 'move-pixels' && get(activeToolId) !== 'move-selection')) return;
 		const b = t.bounds;
-		const cos = Math.cos(t.rotation);
-		const sin = Math.sin(t.rotation);
-		const point = (x: number, y: number): Point => {
-			const sx = (x - t.pivot.x) * t.scaleX;
-			const sy = (y - t.pivot.y) * t.scaleY;
-			return {
-				x: t.pivot.x + t.offset.x + sx * cos - sy * sin,
-				y: t.pivot.y + t.offset.y + sx * sin + sy * cos
-			};
+		const state = {
+			pivot: t.pivot,
+			offset: t.offset,
+			scaleX: t.scaleX,
+			scaleY: t.scaleY,
+			rotation: t.rotation,
+			skewX: (t as { skewX?: number }).skewX ?? 0,
+			skewY: (t as { skewY?: number }).skewY ?? 0
 		};
+		const point = (x: number, y: number): Point => affinePoint(state, { x, y });
 		const pivot = { x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y };
 		const corners = [point(b.x, b.y), point(b.x + b.width, b.y), point(b.x + b.width, b.y + b.height), point(b.x, b.y + b.height)];
 		const outside = !pointInPolygon(img, corners);
@@ -1210,7 +1277,10 @@ const EYEDROPPER = 'eyedropper';
 		if (e.button === 0 && moveArmed) {
 			e.preventDefault();
 			const img = imageFromScreen(screenPoint(e));
-			if (!moveEngine) moveEngine = new MoveEngine(getEditorRenderer());
+			if (!moveEngine) {
+				moveEngine = new MoveEngine(getEditorRenderer());
+				moveEngine.setDistortMode(get(moveDistort));
+			}
 			// Refresh the handle geometry before hit-testing. The engine is
 			// authoritative while a floating selection is being transformed.
 			syncTransformUi();
@@ -1375,6 +1445,65 @@ const EYEDROPPER = 'eyedropper';
 			}
 			return;
 		}
+		// Clone stamp: Alt+click sets the source anchor, otherwise a stroke
+		// stamps the source with an aligned offset.
+		if (get(activeToolId) === 'clone-stamp' && (e.button === 0 || e.button === 2)) {
+			e.preventDefault();
+			if (!cloneEngine) cloneEngine = new CloneEngine(getEditorRenderer());
+			const img = imageFromScreen(screenPoint(e));
+			if (e.altKey) {
+				cloneEngine.setSource(img);
+				showNotice('Clone source set.');
+				return;
+			}
+			const started = cloneEngine.begin(
+				{
+					size: get(cloneSize),
+					opacity: get(cloneOpacity) / 100,
+					hardness: get(cloneHardness) / 100,
+					spacingRatio: get(brushSpacing) / 100
+				},
+				img
+			);
+			if (started === 'no-source') {
+				showNotice('Alt+click to set the clone source.', 'error');
+				return;
+			}
+			if (started === 'none') return;
+			cloning = true;
+			clonePointerId = e.pointerId;
+			try {
+				host.setPointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
+		// Recolor brush: paints the foreground colour, destination alpha kept.
+		if (get(activeToolId) === 'recolor' && (e.button === 0 || e.button === 2)) {
+			e.preventDefault();
+			if (!recolorEngine) recolorEngine = new RecolorEngine(getEditorRenderer());
+			const img = imageFromScreen(screenPoint(e));
+			const started = recolorEngine.begin(
+				{
+					size: get(recolorSize),
+					opacity: get(recolorOpacity) / 100,
+					hardness: get(recolorHardness) / 100,
+					spacingRatio: get(brushSpacing) / 100,
+					color: get(foregroundColor)
+				},
+				img
+			);
+			if (!started) return;
+			recoloring = true;
+			recolorPointerId = e.pointerId;
+			try {
+				host.setPointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
 		if ((e.button === 0 || e.button === 2) && isPaintTool()) {
 			e.preventDefault();
 			painting = true;
@@ -1443,6 +1572,12 @@ const EYEDROPPER = 'eyedropper';
 				lineDraft.p1 = c1;
 				lineDraft.p2 = c2;
 			}
+			if (cloning && e.pointerId === clonePointerId && cloneEngine) {
+				cloneEngine.lineTo(imageFromScreen(sp));
+			}
+			if (recoloring && e.pointerId === recolorPointerId && recolorEngine) {
+				recolorEngine.lineTo(imageFromScreen(sp));
+			}
 			if (painting && e.pointerId === paintPointerId && engine) {
 				engine.lineTo(imageFromScreen(sp));
 			}
@@ -1479,6 +1614,26 @@ const EYEDROPPER = 'eyedropper';
 
 	function endPointer(e: PointerEvent) {
 		zoomRightHeld = false;
+		if (cloning && e.pointerId === clonePointerId) {
+			cloneEngine?.finish();
+			cloning = false;
+			clonePointerId = -1;
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
+		if (recoloring && e.pointerId === recolorPointerId) {
+			recolorEngine?.finish();
+			recoloring = false;
+			recolorPointerId = -1;
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
 		// Release of the initial line drag arms the 4 nubs (no commit yet).
 		// Nub releases bubble here too but drawing is already false then.
 		if (lineDraft?.drawing && e.pointerId === linePointerId) {
@@ -1587,6 +1742,16 @@ const EYEDROPPER = 'eyedropper';
 
 	function cancelPointer(e: PointerEvent) {
 		zoomRightHeld = false;
+		if (cloning && e.pointerId === clonePointerId) {
+			cloneEngine?.cancel();
+			cloning = false;
+			clonePointerId = -1;
+		}
+		if (recoloring && e.pointerId === recolorPointerId) {
+			recolorEngine?.cancel();
+			recoloring = false;
+			recolorPointerId = -1;
+		}
 		if (lineDraft?.drawing && e.pointerId === linePointerId) {
 			cancelLineDraft();
 		}
@@ -1712,7 +1877,9 @@ const EYEDROPPER = 'eyedropper';
 				else cancelLineDraft();
 				lineAction.set(null);
 			});
-			disposers.push(unTool, unSize, unPoly, unText, unLine);
+			// Distort toggle → move engine (also applied when created below).
+			const unDistort = moveDistort.subscribe((v) => moveEngine?.setDistortMode(v));
+			disposers.push(unTool, unSize, unPoly, unText, unLine, unDistort);
 
 			const onEnter = () => {
 				pointerInside = true;

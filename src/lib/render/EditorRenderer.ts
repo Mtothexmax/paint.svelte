@@ -9,6 +9,7 @@ import type { Point } from '../core/geometry';
 import type { SurfaceId } from '../core/layers/Layer';
 import { DocScene } from './DocScene';
 import { SurfaceStore } from './SurfaceStore';
+import { affinePoint } from './affine';
 import { selectionOutlinePoints, traceSelectionOutline } from './selection';
 
 type DocId = string;
@@ -47,9 +48,8 @@ export class EditorRenderer {
 			resolution: Math.max(window.devicePixelRatio || 1, 1)
 		});
 		this.app = app;
-			this.surfaces.attach(app);
-			(window as unknown as Record<string, unknown>).__renderer = this;
-			this.wireRegistry();
+		this.surfaces.attach(app);
+		this.wireRegistry();
 		// Render any documents that were already registered before init finished.
 		for (const doc of documentRegistry.all) this.addDoc(doc);
 		this.attachActive();
@@ -235,7 +235,9 @@ export class EditorRenderer {
 		offsetY: number,
 		scaleX: number,
 		scaleY: number,
-		rotation: number
+		rotation: number,
+		skewX = 0,
+		skewY = 0
 	): void {
 		const doc = documentRegistry.active;
 		const bounds = doc?.selection.bounds;
@@ -249,7 +251,9 @@ export class EditorRenderer {
 			offsetY,
 			scaleX,
 			scaleY,
-			rotation
+			rotation,
+			skewX,
+			skewY
 		);
 	}
 
@@ -271,9 +275,11 @@ export class EditorRenderer {
 		offsetY: number,
 		scaleX: number,
 		scaleY: number,
-		rotation: number
+		rotation: number,
+		skewX = 0,
+		skewY = 0
 	): void {
-		this.activeScene?.setSelectionTintTransform(pivotX, pivotY, offsetX, offsetY, scaleX, scaleY, rotation);
+		this.activeScene?.setSelectionTintTransform(pivotX, pivotY, offsetX, offsetY, scaleX, scaleY, rotation, skewX, skewY);
 	}
 
 	setSelectionPreviewMask(maskId: SurfaceId): void {
@@ -299,20 +305,16 @@ export class EditorRenderer {
 		offset: Point,
 		scaleX: number,
 		scaleY: number,
-		rotation: number
+		rotation: number,
+		skewX = 0,
+		skewY = 0
 	): void {
 		const doc = documentRegistry.active;
 		if (!doc || !this.activeScene) return;
 		const loops = this.selectionOutlineLoops(doc);
 		if (!loops) return;
-		const cos = Math.cos(rotation);
-		const sin = Math.sin(rotation);
-		const transform = (p: Point): Point => {
-			const x = (p.x - pivot.x) * scaleX;
-			const y = (p.y - pivot.y) * scaleY;
-			return { x: pivot.x + offset.x + x * cos - y * sin, y: pivot.y + offset.y + x * sin + y * cos };
-		};
-		const transformed = loops.map((loop) => loop.map(transform));
+		const state = { pivot, offset, scaleX, scaleY, rotation, skewX, skewY };
+		const transformed = loops.map((loop) => loop.map((p) => affinePoint(state, p)));
 		this.activeScene.showSelectionOutline(transformed, true);
 		if (this.usesGeometryTint(doc.selection)) this.activeScene.setSelectionTintFromLoops(transformed);
 	}

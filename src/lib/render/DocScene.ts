@@ -381,13 +381,16 @@ export class DocScene {
 		offsetY: number,
 		scaleX: number,
 		scaleY: number,
-		rotation: number
+		rotation: number,
+		skewX = 0,
+		skewY = 0
 	): void {
 		if (!this.tintSprite) return;
 		this.tintSprite.anchor.set(pivotX / this.doc.width, pivotY / this.doc.height);
 		this.tintSprite.position.set(pivotX + offsetX, pivotY + offsetY);
 		this.tintSprite.scale.set(scaleX, scaleY);
 		this.tintSprite.rotation = rotation;
+		this.tintSprite.skew.set(skewX, skewY);
 	}
 
 	/**
@@ -423,13 +426,16 @@ export class DocScene {
 		offsetY: number,
 		scaleX: number,
 		scaleY: number,
-		rotation: number
+		rotation: number,
+		skewX = 0,
+		skewY = 0
 	): void {
 		if (!this.floating) return;
 		this.floating.anchor.set(pivotLocalX / this.floating.texture.width, pivotLocalY / this.floating.texture.height);
 		this.floating.position.set(pivotX + offsetX, pivotY + offsetY);
 		this.floating.scale.set(scaleX, scaleY);
 		this.floating.rotation = rotation;
+		this.floating.skew.set(skewX, skewY);
 	}
 
 	/**

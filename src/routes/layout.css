@@ -986,8 +986,6 @@ body {
 
 /* ---- layers / history panels ---- */
 .history-list {
-	overflow-y: auto;
-	max-height: 170px;
 	display: flex;
 	flex-direction: column;
 	gap: 1px;

@@ -57,12 +57,12 @@ export const MENUS: MenuDef[] = [
 	},
 	{
 		label: 'Image',
-		enabled: false,
+		enabled: true,
 		entries: [
 			{ type: 'disabled', label: 'Resize…' },
 			{ type: 'disabled', label: 'Canvas Size…' },
 			{ type: 'disabled', label: 'Rotate 90°' },
-			{ type: 'disabled', label: 'Crop to Selection' }
+			{ type: 'command', commandId: 'image.cropToSelection' }
 		]
 	},
 	{

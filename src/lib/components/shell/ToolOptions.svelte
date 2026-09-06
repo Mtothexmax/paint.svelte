@@ -10,6 +10,7 @@
 		brushHardness,
 		brushSpacing,
 		antiAliasMode,
+		moveDistort,
 		selectionMode,
 		selectionRatio,
 		selectionFixedRatio,
@@ -61,6 +62,9 @@
 		requestLineCommit,
 		requestLineCancel
 	} from '../../state/lines';
+	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
+	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
+	import { commands } from '../../services/commandRegistry';
 
 	/** Material Symbols (rounded) per shape kind — black glyphs are lightened
 	 * via CSS (.shape-kind-ic) for the dark strip. */
@@ -95,6 +99,13 @@
 	const isShape = $derived($activeToolId === 'shape');
 
 	const isLine = $derived($activeToolId === 'line');
+
+	const isClone = $derived($activeToolId === 'clone-stamp');
+
+	const isRecolor = $derived($activeToolId === 'recolor');
+
+	const isMovePixels = $derived($activeToolId === 'move-pixels');
+	const isMoveSelection = $derived($activeToolId === 'move-selection');
 
 	const LINE_STYLE_OPTIONS = [
 		{
@@ -356,6 +367,13 @@
 				</button>
 			{/if}
 		{/if}
+		<button
+			class="mini-btn"
+			title="Crop the image to the selection bounding box"
+			onclick={() => commands.run('image.cropToSelection')}
+		>
+			✂ Crop to Selection
+		</button>
 	{:else if isText}
 		<span class="aa-label">Font:</span>
 		<FontDropdown bind:value={$textFontFamily} />
@@ -494,6 +512,13 @@
 		<span class="tooloptions-placeholder" title="Tolerance and flood mode are shared with the paint bucket">
 			Shared with the paint bucket.
 		</span>
+		<button
+			class="mini-btn"
+			title="Crop the image to the selection bounding box"
+			onclick={() => commands.run('image.cropToSelection')}
+		>
+			✂ Crop to Selection
+		</button>
 	{:else if isShape}
 		<span class="aa-label">Shape:</span>
 		<div class="seg" role="group" aria-label="Shape type">
@@ -545,6 +570,56 @@
 		<IconSplitButton options={ARROW_END_OPTIONS} bind:value={endArrowState} title="End arrow" />
 		<button class="mini-btn" onclick={requestLineCommit} title="Render the line into the layer"> ✓ Finish </button>
 		<button class="mini-btn" onclick={requestLineCancel} title="Discard the line draft"> ✕ </button>
+	{:else if isClone}
+		<PdnSlider label="Size" min={1} max={400} step={1} bind:value={$cloneSize} />
+		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$cloneOpacity} />
+		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$cloneHardness} />
+		<span class="tooloptions-placeholder" title="Hold Alt and click to set the clone source">
+			Alt+click sets the source.
+		</span>
+	{:else if isRecolor}
+		<PdnSlider label="Size" min={1} max={400} step={1} bind:value={$recolorSize} />
+		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$recolorOpacity} />
+		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$recolorHardness} />
+		<span class="tooloptions-placeholder" title="Paints the foreground colour, destination alpha is preserved">
+			Alpha is preserved.
+		</span>
+	{:else if isMovePixels}
+		<span class="aa-label">Transform:</span>
+		<div class="seg" role="group" aria-label="Transform mode">
+			<button
+				class="seg-btn"
+				class:on={!$moveDistort}
+				title="Move, scale and rotate"
+				onclick={() => moveDistort.set(false)}
+			>
+				⤢ Move
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$moveDistort}
+				title="Distort (shear) via the corner handles"
+				onclick={() => moveDistort.set(true)}
+			>
+				◩ Distort
+			</button>
+		</div>
+		<button
+			class="mini-btn"
+			title="Crop the image to the selection bounding box"
+			onclick={() => commands.run('image.cropToSelection')}
+		>
+			✂ Crop to Selection
+		</button>
+	{:else if isMoveSelection}
+		<span class="tooloptions-placeholder">Drag inside the selection to move its outline.</span>
+		<button
+			class="mini-btn"
+			title="Crop the image to the selection bounding box"
+			onclick={() => commands.run('image.cropToSelection')}
+		>
+			✂ Crop to Selection
+		</button>
 	{:else}
 		<span class="tooloptions-placeholder">No tool options for the selected tool yet.</span>
 	{/if}

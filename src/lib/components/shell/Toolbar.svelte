@@ -62,8 +62,8 @@
 		{ id: 'pencil', label: 'Pencil', src: pencilSvg },
 		{ id: 'eyedropper', label: 'Color Picker', src: ColorPickerIcon },
 		// Row 8
-		{ id: 'clone-stamp', label: 'Clone Stamp', src: CloneBrushIcon, placeholder: true },
-		{ id: 'recolor', label: 'Recolor', src: RecolorIcon, placeholder: true },
+		{ id: 'clone-stamp', label: 'Clone Stamp', src: CloneBrushIcon },
+		{ id: 'recolor', label: 'Recolor', src: RecolorIcon },
 		// Row 9
 		{ id: 'text', label: 'Text', src: TextIcon },
 		{ id: 'line', label: 'Line / Curve', src: curlySvg, placeholder: true },

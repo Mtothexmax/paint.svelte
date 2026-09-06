@@ -1,7 +1,7 @@
 // Layer: services. Registers the built-in Slice 1 commands (File/View).
 
 import { documentRegistry } from '../core/document/registry';
-import { statusBar } from '../state/ui';
+import { statusBar, showNotice } from '../state/ui';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import { fitView, zoomTo } from '../render/Viewport';
 import { commands } from './commandRegistry';
@@ -19,6 +19,7 @@ import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
 import { copySelection, cutSelection, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
 import { invertColorsScoped } from '../render/effects';
+import { cropToSelection } from '../render/crop';
 
 function setStatusZoom(view: ViewState): void {
 	statusBar.update((s) => ({ ...s, zoomPct: Math.round(view.zoom * 100) }));
@@ -183,6 +184,17 @@ export function registerBuiltinCommands(): void {
 			shortcut: 'Del',
 			run: () => {
 				deleteSelection();
+			},
+			isEnabled: () => !!documentRegistry.active?.selection.active
+		},
+		{
+			id: 'image.cropToSelection',
+			label: 'Crop to Selection',
+			run: () => {
+				const renderer = getEditorRenderer();
+				if (cropToSelection(renderer)) {
+					showNotice('Cropped to selection.');
+				}
 			},
 			isEnabled: () => !!documentRegistry.active?.selection.active
 		}

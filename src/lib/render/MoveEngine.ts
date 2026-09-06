@@ -36,6 +36,11 @@ export class MoveEngine {
 	private scaleX = 1;
 	private scaleY = 1;
 	private rotation = 0;
+	/** Shear in radians (distort mode, Photoshop skew style). */
+	private skewX = 0;
+	private skewY = 0;
+	/** When true, corner/edge handles shear instead of scaling. */
+	private distortMode = false;
 
 	// drag-in-flight state
 	private origin: Point | null = null; // press point of the current drag
@@ -51,7 +56,7 @@ export class MoveEngine {
 		return this.active;
 	}
 
-	get transformState(): { bounds: Rect; pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number } | null {
+	get transformState(): { bounds: Rect; pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number; skewX: number; skewY: number } | null {
 		if (!this.bounds) return null;
 		return {
 			bounds: { ...this.bounds },
@@ -59,8 +64,15 @@ export class MoveEngine {
 			offset: { ...this.offset },
 			scaleX: this.scaleX,
 			scaleY: this.scaleY,
-			rotation: this.rotation
+			rotation: this.rotation,
+			skewX: this.skewX,
+			skewY: this.skewY
 		};
+	}
+
+	/** Switches corner/edge handles between scale and shear (distort). */
+	setDistortMode(v: boolean): void {
+		this.distortMode = v;
 	}
 
 	/** True when the current selection mask covers the given image point. A 1×1
@@ -126,6 +138,8 @@ export class MoveEngine {
 		this.scaleX = 1;
 		this.scaleY = 1;
 		this.rotation = 0;
+		this.skewX = 0;
+		this.skewY = 0;
 		this.baseOffset = { x: 0, y: 0 };
 		this.origin = null;
 		this.active = true;
@@ -175,7 +189,7 @@ export class MoveEngine {
 		const maskId = this.doc?.selection.maskId;
 		if (maskId && surfaces.has(maskId)) {
 			const movedMaskId = surfaces.create(this.doc!.width, this.doc!.height);
-			surfaces.blitTransformed(maskId, movedMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+			surfaces.blitTransformed(maskId, movedMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation, 'normal', this.skewX, this.skewY);
 			eraseSelectionRegion(surfaces, movedMaskId, previewId, this.doc!.width, this.doc!.height);
 			surfaces.dispose(movedMaskId);
 		}
@@ -185,7 +199,7 @@ export class MoveEngine {
 	}
 
 	private applyPreviewTransform(): void {
-		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
 		this.renderer.setActiveTintTransform(
 			this.pivot.x,
 			this.pivot.y,
@@ -193,7 +207,9 @@ export class MoveEngine {
 			this.offset.y,
 			this.scaleX,
 			this.scaleY,
-			this.rotation
+			this.rotation,
+			this.skewX,
+			this.skewY
 		);
 	}
 
@@ -208,7 +224,9 @@ export class MoveEngine {
 			pivot: { ...this.pivot },
 			scaleX: this.scaleX,
 			scaleY: this.scaleY,
-			rotation: this.rotation
+			rotation: this.rotation,
+			skewX: this.skewX,
+			skewY: this.skewY
 		};
 		logTransformDebug('engine.beginTransform', {
 			handle,
@@ -223,8 +241,8 @@ export class MoveEngine {
 		this.offset = this.offsetForPivot(p, this.pivot, this.offset);
 		this.pivot = { ...p };
 		this.applyFloatingTransform();
-		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
-		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
+		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
 		this.updateLivePreview();
 	}
 
@@ -252,16 +270,18 @@ export class MoveEngine {
 		};
 	}
 
-	setTransformState(state: { pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number }): void {
+	setTransformState(state: { pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number; skewX?: number; skewY?: number }): void {
 		if (!this.active) return;
 		this.pivot = { ...state.pivot };
 		this.offset = { ...state.offset };
 		this.scaleX = state.scaleX;
 		this.scaleY = state.scaleY;
 		this.rotation = state.rotation;
+		this.skewX = state.skewX ?? 0;
+		this.skewY = state.skewY ?? 0;
 		this.applyFloatingTransform();
-		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
-		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
+		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
 		this.updateLivePreview();
 	}
 
@@ -271,7 +291,9 @@ export class MoveEngine {
 		pivot: { x: 0, y: 0 },
 		scaleX: 1,
 		scaleY: 1,
-		rotation: 0
+		rotation: 0,
+		skewX: 0,
+		skewY: 0
 	};
 
 	transformTo(p: Point, shift = false, alt = false): void {
@@ -298,8 +320,7 @@ export class MoveEngine {
 				y: start.pivot.y + scaledY / (start.scaleY || 1)
 			};
 			this.offset = this.offsetForPivot(this.pivot, start.pivot, start.offset);
-		} else if (this.transformHandle === 'rotate') {
-			const center = {
+		} else if (this.transformHandle === 'rotate') {			const center = {
 				x: this.pivot.x + this.offset.x,
 				y: this.pivot.y + this.offset.y
 			};
@@ -308,6 +329,23 @@ export class MoveEngine {
 			let next = start.rotation + angle - startAngle;
 			if (shift) next = Math.round((next * 180) / Math.PI / 10) * (Math.PI / 18);
 			this.rotation = next;
+		} else if (this.distortMode) {
+			// Distort mode: handles shear about the pivot instead of scaling.
+			// North/south handles shear X with the pointer's horizontal travel
+			// (sign flips so dragging right always slants right); east/west
+			// handles shear Y with the vertical travel. Corners do both.
+			const h = this.transformHandle;
+			const dx = p.x - this.origin.x;
+			const dy = p.y - this.origin.y;
+			const clampSkew = (v: number) => Math.max(-1, Math.min(1, v));
+			if (h.includes('n') || h.includes('s')) {
+				const s = h.includes('n') ? -1 : 1;
+				this.skewX = clampSkew(start.skewX + (dx / (b.height || 1)) * s);
+			}
+			if (h.includes('e') || h.includes('w')) {
+				const s = h.includes('e') ? 1 : -1;
+				this.skewY = clampSkew(start.skewY + (dy / (b.width || 1)) * s);
+			}
 		} else {
 			const anchorX = this.transformHandle.includes('w') ? b.x + b.width : this.transformHandle.includes('e') ? b.x : b.x + b.width / 2;
 			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
@@ -345,7 +383,7 @@ export class MoveEngine {
 			}
 		}
 		this.applyFloatingTransform();
-		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation);
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
 		this.renderer.setActiveTintTransform(
 			this.pivot.x,
 			this.pivot.y,
@@ -353,7 +391,9 @@ export class MoveEngine {
 			this.offset.y,
 			this.scaleX,
 			this.scaleY,
-			this.rotation
+			this.rotation,
+			this.skewX,
+			this.skewY
 		);
 		this.updateLivePreview();
 		logTransformDebug('engine.transformTo', {
@@ -374,7 +414,9 @@ export class MoveEngine {
 			this.offset.y,
 			this.scaleX,
 			this.scaleY,
-			this.rotation
+			this.rotation,
+			this.skewX,
+			this.skewY
 		);
 	}
 
@@ -409,7 +451,7 @@ export class MoveEngine {
 		}
 		const dx = this.offset.x;
 		const dy = this.offset.y;
-		if (dx === 0 && dy === 0 && this.scaleX === 1 && this.scaleY === 1 && this.rotation === 0) {
+		if (dx === 0 && dy === 0 && this.scaleX === 1 && this.scaleY === 1 && this.rotation === 0 && this.skewX === 0 && this.skewY === 0) {
 			this.cancel();
 			return false;
 		}
@@ -429,12 +471,12 @@ export class MoveEngine {
 		const sel = doc.selection;
 		const oldMaskId = sel.maskId;
 		if (oldMaskId && surfaces.has(oldMaskId))
-			surfaces.blitTransformed(oldMaskId, afterId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation, 'erase');
+			surfaces.blitTransformed(oldMaskId, afterId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation, 'erase', this.skewX, this.skewY);
 
 		// move the selection (mask surface + geometry) by the same offset
 		const newMaskId = surfaces.create(w, h);
 		if (oldMaskId && surfaces.has(oldMaskId))
-			surfaces.blitTransformed(oldMaskId, newMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation);
+			surfaces.blitTransformed(oldMaskId, newMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation, 'normal', this.skewX, this.skewY);
 		// A floating selection is a cut/paste operation, not just a normal
 		// alpha blend: transparent selected pixels must clear the destination.
 		eraseSelectionRegion(surfaces, newMaskId, afterId, w, h);
@@ -449,7 +491,10 @@ export class MoveEngine {
 			dy,
 			this.scaleX,
 			this.scaleY,
-			this.rotation
+			this.rotation,
+			'normal',
+			this.skewX,
+			this.skewY
 		);
 
 		const origRect = sel.rect ? { ...sel.rect } : null;
@@ -466,7 +511,7 @@ export class MoveEngine {
 		sel.rect = movedRect;
 		sel.points = movedPoints;
 		sel.bounds = movedBounds;
-		if (this.scaleX !== 1 || this.scaleY !== 1 || this.rotation !== 0) {
+		if (this.scaleX !== 1 || this.scaleY !== 1 || this.rotation !== 0 || this.skewX !== 0 || this.skewY !== 0) {
 			sel.composite = true;
 			sel.inverted = false;
 			sel.outlineLoops = this.renderer.computeMaskOutline(newMaskId, w, h);
@@ -597,6 +642,8 @@ export class MoveEngine {
 		this.scaleX = 1;
 		this.scaleY = 1;
 		this.rotation = 0;
+		this.skewX = 0;
+		this.skewY = 0;
 		this.active = false;
 	}
 }

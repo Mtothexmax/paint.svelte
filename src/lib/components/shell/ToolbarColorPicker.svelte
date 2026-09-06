@@ -86,7 +86,7 @@
 		}
 	}
 
-	const lightnessPct = $derived(`${l}%`);
+	const lightnessPct = '50%'; // area is always vivid: lightness comes only from the slider below
 	const hslCss = $derived(`hsl(${h}, ${s}%, ${l}%)`);
 	const sliderGradient = $derived(
 		`linear-gradient(to right, hsl(${h}, ${s}%, 0%) 0%, hsl(${h}, ${s}%, 50%) 50%, hsl(${h}, ${s}%, 100%) 100%)`

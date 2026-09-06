@@ -43,21 +43,21 @@
 		};
 	});
 </script>
+<div class="panel-card flex h-[20vh] shrink-0 flex-col">
+    <div class="panel-title">History</div>
 
-<div class="panel-card flex h-full flex-col">
-	<div class="panel-title">History</div>
-	{#if labels.length > 0}
-		<div class="history-list">
-			<button class="history-row history-baseline" class:on={cursor === -1} onclick={() => travel(-1)}>
-				Initial
-			</button>
-			{#each labels as label, i (i)}
-				<button class="history-row" class:on={i === cursor} onclick={() => travel(i)}>
-					{label}
-				</button>
-			{/each}
-		</div>
-	{:else}
-		<p class="panel-empty">Nothing to undo yet.</p>
-	{/if}
+    <div class="history-list flex-1 min-h-0 overflow-y-auto">
+        {#if labels.length > 0}
+            <button class="history-row history-baseline" class:on={cursor === -1} onclick={() => travel(-1)}>
+                Initial
+            </button>
+            {#each labels as label, i (i)}
+                <button class="history-row" class:on={i === cursor} onclick={() => travel(i)}>
+                    {label}
+                </button>
+            {/each}
+        {:else}
+            <p class="panel-empty p-4 text-center text-sm text-neutral-400 italic">Nothing to undo yet.</p>
+        {/if}
+    </div>
 </div>

@@ -165,13 +165,16 @@ export class SurfaceStore {
 		scaleX: number,
 		scaleY: number,
 		rotation: number,
-		blend: BlendName = 'normal'
+		blend: BlendName = 'normal',
+		skewX = 0,
+		skewY = 0
 	): void {
 		const sprite = new Sprite(this.getTexture(srcId));
 		sprite.anchor.set(sourcePivotX / sprite.texture.width, sourcePivotY / sprite.texture.height);
 		sprite.position.set(worldPivotX + offsetX, worldPivotY + offsetY);
 		sprite.scale.set(scaleX, scaleY);
 		sprite.rotation = rotation;
+		sprite.skew.set(skewX, skewY);
 		sprite.blendMode = blend;
 		const holder = new Container();
 		holder.addChild(sprite);

@@ -79,6 +79,10 @@ export const antiAliasMode = writable<'pixel' | 'smooth'>('smooth');
 export type SelectionMode = 'replace' | 'add' | 'subtract';
 export const selectionMode = writable<SelectionMode>('replace');
 
+/** Move-pixels distort mode (shear via the corner handles, Photoshop skew
+ * style). Session-only; the engine reads it through a subscription. */
+export const moveDistort = writable<boolean>(false);
+
 /** Rectangle-select sizing: normal (free), fixed aspect ratio, or fixed size. */
 export type SelectionRatio = 'normal' | 'fixedRatio' | 'fixedSize';
 export const selectionRatio = writable<SelectionRatio>('normal');
