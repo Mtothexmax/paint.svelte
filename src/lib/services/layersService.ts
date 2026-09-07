@@ -285,7 +285,8 @@ export function duplicateLayer(id: string): void {
 		...src,
 		id: `layer-${crypto.randomUUID()}`,
 		surfaceId: copyId,
-		name: `${src.name} copy`
+		name: `${src.name} copy`,
+		...(src.text ? { text: { ...src.text, color: { ...src.text.color } } } : null)
 	};
 	const index = doc.indexOfLayer(id) + 1;
 	doc.insertLayer(layer, index);
@@ -368,6 +369,7 @@ export interface LayerRow {
 	blendMode: string;
 	active: boolean;
 	index: number;
+	isText: boolean;
 }
 
 export function layerRows(doc: import('../core/document/ImageDocument').ImageDocument): LayerRow[] {
@@ -381,6 +383,7 @@ export function layerRows(doc: import('../core/document/ImageDocument').ImageDoc
 			opacity: l.opacity,
 			blendMode: isLayerBlendMode(l.blendMode) ? l.blendMode : 'normal',
 			active: l.id === doc.activeLayerId,
-			index: arr.length - 1 - i
+			index: arr.length - 1 - i,
+			isText: l.kind === 'text'
 		}));
 }

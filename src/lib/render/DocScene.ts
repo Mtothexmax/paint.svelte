@@ -142,7 +142,34 @@ export class DocScene {
 	/** Rebuilds layer sprites after a surface swap (e.g. after an effect). */
 	resync(surfaces: SurfaceStore): void {
 		this.rebuildLayers(surfaces);
+		this.resyncSize();
 		this.setCrisp(this.crisp);
+	}
+
+	/**
+	 * Re-syncs doc-sized scene furniture after the document dimensions change
+	 * (crop to selection, including its undo/redo): the checkerboard area and
+	 * the pooled stroke buffer/overlay. The stroke clip is dropped with the
+	 * overlay (a selection never survives a resize — crop clears it).
+	 */
+	resyncSize(): void {
+		this.checker.width = this.doc.width;
+		this.checker.height = this.doc.height;
+		if (this.strokeBuffer) {
+			this.strokeBuffer.destroy(true);
+			this.strokeBuffer = null;
+		}
+		if (this.strokeOverlay) {
+			if (this.strokeOverlay.parent) this.strokeOverlay.parent.removeChild(this.strokeOverlay);
+			this.strokeOverlay.destroy();
+			this.strokeOverlay = null;
+		}
+		if (this.strokeClipSprite) {
+			this.strokeClipSprite.destroy();
+			this.strokeClipSprite = null;
+		}
+		this.strokeClipTexture = null;
+		this.raiseTop();
 	}
 
 	setActiveLayerPreview(texture: Texture | null, fallback: Texture | null = null): void {

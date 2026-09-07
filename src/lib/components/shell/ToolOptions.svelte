@@ -45,6 +45,10 @@
 	import ShapePentagonIcon from '@material-symbols/svg-400/rounded/pentagon.svg';
 	import ShapeHexagonIcon from '@material-symbols/svg-400/rounded/hexagon.svg';
 	import ShapeStarIcon from '@material-symbols/svg-400/rounded/star.svg';
+	import GradientLinearIcon from '../../assets/GradientLinear.svg';
+	import GradientRadialIcon from '../../assets/GradientRadial.svg';
+	import GradientDiamondIcon from '../../assets/GradientDiamond.svg';
+	import GradientConicalIcon from '../../assets/GradientConical.svg';
 	import { fillTolerance, fillFloodMode } from '../../state/fill';
 	import {
 		SHAPE_KINDS,
@@ -62,9 +66,16 @@
 		requestLineCommit,
 		requestLineCancel
 	} from '../../state/lines';
+	import {
+		gradientMode,
+		gradientRepeat,
+		requestGradientCommit,
+		requestGradientCancel
+	} from '../../state/gradients';
 	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
 	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
 	import { commands } from '../../services/commandRegistry';
+	import { selectionActive } from '../../state/documents';
 
 	/** Material Symbols (rounded) per shape kind — black glyphs are lightened
 	 * via CSS (.shape-kind-ic) for the dark strip. */
@@ -99,6 +110,8 @@
 	const isShape = $derived($activeToolId === 'shape');
 
 	const isLine = $derived($activeToolId === 'line');
+
+	const isGradient = $derived($activeToolId === 'gradient');
 
 	const isClone = $derived($activeToolId === 'clone-stamp');
 
@@ -367,13 +380,15 @@
 				</button>
 			{/if}
 		{/if}
-		<button
-			class="mini-btn"
-			title="Crop the image to the selection bounding box"
-			onclick={() => commands.run('image.cropToSelection')}
-		>
-			✂ Crop to Selection
-		</button>
+		{#if $selectionActive}
+			<button
+				class="mini-btn"
+				title="Crop the image to the selection bounding box"
+				onclick={() => commands.run('image.cropToSelection')}
+			>
+				✂ Crop to Selection
+			</button>
+		{/if}
 	{:else if isText}
 		<span class="aa-label">Font:</span>
 		<FontDropdown bind:value={$textFontFamily} />
@@ -512,13 +527,15 @@
 		<span class="tooloptions-placeholder" title="Tolerance and flood mode are shared with the paint bucket">
 			Shared with the paint bucket.
 		</span>
-		<button
-			class="mini-btn"
-			title="Crop the image to the selection bounding box"
-			onclick={() => commands.run('image.cropToSelection')}
-		>
-			✂ Crop to Selection
-		</button>
+		{#if $selectionActive}
+			<button
+				class="mini-btn"
+				title="Crop the image to the selection bounding box"
+				onclick={() => commands.run('image.cropToSelection')}
+			>
+				✂ Crop to Selection
+			</button>
+		{/if}
 	{:else if isShape}
 		<span class="aa-label">Shape:</span>
 		<div class="seg" role="group" aria-label="Shape type">
@@ -570,6 +587,71 @@
 		<IconSplitButton options={ARROW_END_OPTIONS} bind:value={endArrowState} title="End arrow" />
 		<button class="mini-btn" onclick={requestLineCommit} title="Render the line into the layer"> ✓ Finish </button>
 		<button class="mini-btn" onclick={requestLineCancel} title="Discard the line draft"> ✕ </button>
+	{:else if isGradient}
+		<span class="aa-label">Mode:</span>
+		<div class="seg" role="group" aria-label="Gradient mode">
+			<button
+				class="seg-btn"
+				class:on={$gradientMode === 'linear'}
+				title="Linear gradient"
+				onclick={() => gradientMode.set('linear')}
+			>
+				<img class="seg-icon" src={GradientLinearIcon} alt="Linear" />
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$gradientMode === 'radial'}
+				title="Radial gradient"
+				onclick={() => gradientMode.set('radial')}
+			>
+				<img class="seg-icon" src={GradientRadialIcon} alt="Radial" />
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$gradientMode === 'diamond'}
+				title="Diamond gradient"
+				onclick={() => gradientMode.set('diamond')}
+			>
+				<img class="seg-icon" src={GradientDiamondIcon} alt="Diamond" />
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$gradientMode === 'conical'}
+				title="Conical gradient"
+				onclick={() => gradientMode.set('conical')}
+			>
+				<img class="seg-icon" src={GradientConicalIcon} alt="Conical" />
+			</button>
+		</div>
+		<span class="aa-label">Repeat:</span>
+		<div class="seg" role="group" aria-label="Gradient repeat">
+			<button
+				class="seg-btn"
+				class:on={$gradientRepeat === 'none'}
+				title="No repeat (clamped)"
+				onclick={() => gradientRepeat.set('none')}
+			>
+				None
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$gradientRepeat === 'wrapped'}
+				title="Repeat wrapped (tiled)"
+				onclick={() => gradientRepeat.set('wrapped')}
+			>
+				Wrapped
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$gradientRepeat === 'mirrored'}
+				title="Repeat mirrored"
+				onclick={() => gradientRepeat.set('mirrored')}
+			>
+				Mirrored
+			</button>
+		</div>
+		<button class="mini-btn" onclick={requestGradientCommit} title="Render the gradient into the layer"> ✓ Finish </button>
+		<button class="mini-btn" onclick={requestGradientCancel} title="Discard the gradient draft"> ✕ </button>
 	{:else if isClone}
 		<PdnSlider label="Size" min={1} max={400} step={1} bind:value={$cloneSize} />
 		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$cloneOpacity} />
@@ -604,22 +686,26 @@
 				◩ Distort
 			</button>
 		</div>
-		<button
-			class="mini-btn"
-			title="Crop the image to the selection bounding box"
-			onclick={() => commands.run('image.cropToSelection')}
-		>
-			✂ Crop to Selection
-		</button>
+		{#if $selectionActive}
+			<button
+				class="mini-btn"
+				title="Crop the image to the selection bounding box"
+				onclick={() => commands.run('image.cropToSelection')}
+			>
+				✂ Crop to Selection
+			</button>
+		{/if}
 	{:else if isMoveSelection}
 		<span class="tooloptions-placeholder">Drag inside the selection to move its outline.</span>
-		<button
-			class="mini-btn"
-			title="Crop the image to the selection bounding box"
-			onclick={() => commands.run('image.cropToSelection')}
-		>
-			✂ Crop to Selection
-		</button>
+		{#if $selectionActive}
+			<button
+				class="mini-btn"
+				title="Crop the image to the selection bounding box"
+				onclick={() => commands.run('image.cropToSelection')}
+			>
+				✂ Crop to Selection
+			</button>
+		{/if}
 	{:else}
 		<span class="tooloptions-placeholder">No tool options for the selected tool yet.</span>
 	{/if}

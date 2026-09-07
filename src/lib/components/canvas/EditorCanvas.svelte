@@ -28,7 +28,8 @@
 	} from '../../services/clipboardService';
 	import { dialog } from '../../services/dialogService';
 	import { commands } from '../../services/commandRegistry';
-	import { applyCheckerTheme } from '../../services/commands';	import {
+	import { applyCheckerTheme } from '../../services/commands';
+import {
 		deleteSelection,
 		deselect,
 		fillSelection,
@@ -55,6 +56,8 @@
 		showNotice
 	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
+	import { commitTextDraft as persistTextDraft } from '../../services/textService';
+	import type { TextContent } from '../../core/layers/Layer';
 	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
 	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
 	import {
@@ -66,9 +69,9 @@
 		textAlign,
 		textAction
 	} from '../../state/text';
-	import { commitTextToLayer } from '../../render/text';
 	import { commitShapeToLayer, shapePolygonPoints } from '../../render/shapes';
 	import { commitLineToLayer, arrowHeadLength, arrowHeadPoints } from '../../render/lines';
+	import { commitGradientToLayer, buildGradientSurface } from '../../render/gradients';
 	import {
 		shapeKind,
 		shapeWidth,
@@ -76,6 +79,7 @@
 		shapeDrawStyle
 	} from '../../state/shapes';
 	import { lineWidth, lineStyle, lineArrowStart, lineArrowEnd, lineAction } from '../../state/lines';
+	import { gradientMode, gradientRepeat, gradientAction } from '../../state/gradients';
 	import { applyFill } from '../../services/fillService';
 	import { applyWandSelection } from '../../services/wandService';
 	import { ensureSystemFontLoaded, withTimeout } from '../../services/fonts';
@@ -103,21 +107,24 @@ const EYEDROPPER = 'eyedropper';
 	let lastLoggedTool: string | null = null;
 	let lastTransformCursorDebug = '';
 
-	let host: HTMLDivElement;
-	let canvasEl: HTMLCanvasElement;
-	let ready = false;
+let host: HTMLDivElement;
+let canvasEl: HTMLCanvasElement;
+let ready = false;
 
-	let spaceHeld = false;
-	let panning = $state(false);
-	let panPointerId = -1;
-	let panStart = { x: 0, y: 0 };
-	let panStartView = { panX: 0, panY: 0 };
+// UI interaction state
+let spaceHeld = false;
+let panning = $state(false);
+let panPointerId = -1;
+let panStart = { x: 0, y: 0 };
+let panStartView = { panX: 0, panY: 0 };
 
-	let panArmed = $state(false);
-	let zoomArmed = $state(false);
-	let zoomRightHeld = $state(false);
+// Pointer arm state
+let panArmed = $state(false);
+let zoomArmed = $state(false);
+let zoomRightHeld = $state(false);
 
-	// painting state
+// Painting state
+// (see engine, painting, paintPointerId declarations below)
 	let engine: BrushEngine | null = null;
 	let painting = $state(false);
 	let paintPointerId = -1;
@@ -318,26 +325,59 @@ const EYEDROPPER = 'eyedropper';
 		(paintArmed || cloneArmed || recolorArmed) && !panning && !isPencil() && (pointerInside || painting || cloning || recoloring)
 	);
 
-	// text-tool draft (Paint.NET nub): click places an anchor, the overlay
-	// textarea edits, commit rasterises into the active layer (no live object).
-	let textDraft = $state<{ imgX: number; imgY: number; sx: number; sy: number; zoom: number } | null>(null);
+	// text-tool draft: click places an anchor, the overlay textarea edits.
+	// Clicking a text layer's box reopens it for editing (style controls
+	// sync); anywhere else starts a fresh draft. Commit renders into a text
+	// layer that stays editable.
+	let textDraft = $state<{
+		imgX: number;
+		imgY: number;
+		sx: number;
+		sy: number;
+		zoom: number;
+		layerId: string | null;
+	} | null>(null);
 	let textValue = $state('');
 	let textAreaEl: HTMLTextAreaElement | undefined = $state();
+
+	/** Syncs the text style controls (and fg colour) from stored content. */
+	function applyTextStyle(t: TextContent): void {
+		textFontFamily.set(t.family || 'Arial');
+		textFontSize.set(Math.max(8, Math.min(200, Math.round(t.size) || 24)));
+		textBold.set(t.bold);
+		textItalic.set(t.italic);
+		textUnderline.set(t.underline);
+		textStrike.set(t.strike);
+		textAlign.set(t.align);
+		foregroundColor.set({ ...t.color });
+	}
 
 	function openTextDraft(e: PointerEvent): void {
 		const doc = documentRegistry.active;
 		if (!doc) return;
-		if (textDraft) commitTextDraft();
+		if (textDraft) void commitTextDraft();
 		const sp = screenPoint(e);
 		const img = imageFromScreen(sp);
-		// Snap the anchor to whole image pixels: the committed raster always
-		// lands pixel-exact (no fractional blur), and the preview shows the
-		// exact screen projection of that pixel.
-		const imgX = Math.round(img.x);
-		const imgY = Math.round(img.y);
-		const snapped = imageToScreen(doc.view, imgX, imgY);
-		textValue = '';
-		textDraft = { imgX, imgY, sx: snapped.x, sy: snapped.y, zoom: doc.view.zoom };
+		// Edit the active text layer when the click lands inside its text
+		// box, otherwise start a fresh draft (new text layer on commit).
+		let layerId: string | null = null;
+		let ax = Math.round(img.x);
+		let ay = Math.round(img.y);
+		const active = doc.activeLayer;
+		const t = active?.kind === 'text' ? active.text : undefined;
+		if (active && t) {
+			const tol = 8 / Math.max(doc.view.zoom, 0.01);
+			if (img.x >= t.x - tol && img.y >= t.y - tol && img.x <= t.x + t.width + tol && img.y <= t.y + t.height + tol) {
+				layerId = active.id;
+				applyTextStyle(t);
+				textValue = t.text;
+				ax = t.x;
+				ay = t.y;
+			}
+		}
+		if (!layerId) textValue = '';
+		const snapped = imageToScreen(doc.view, ax, ay);
+		textDraft = { imgX: ax, imgY: ay, sx: snapped.x, sy: snapped.y, zoom: doc.view.zoom, layerId };
 		// Activate the family in the background so the overlay renders in it.
 		void ensureSystemFontLoaded(get(textFontFamily), { bold: get(textBold), italic: get(textItalic) });
 		// focus after the overlay mounts
@@ -349,11 +389,10 @@ const EYEDROPPER = 'eyedropper';
 		// Capture synchronously — the commit awaits font loading, during which
 		// a new draft may already reset these.
 		const text = textValue;
+		const layerId = draft?.layerId ?? null;
 		textDraft = null;
 		textValue = '';
 		if (!draft) return;
-		const doc = documentRegistry.active;
-		if (!doc) return;
 		if (!text.trim()) return;
 		const family = get(textFontFamily);
 		const size = get(textFontSize);
@@ -371,19 +410,22 @@ const EYEDROPPER = 'eyedropper';
 			} catch {
 				/* fall back to whatever is available */
 			}
-			const ok = commitTextToLayer(getEditorRenderer(), doc, {
-				x: draft.imgX,
-				y: draft.imgY,
-				text,
-				family,
-				size,
-				bold,
-				italic,
-				underline: get(textUnderline),
-				strike: get(textStrike),
-				align: get(textAlign),
-				color: get(foregroundColor)
-			});
+			const ok = persistTextDraft(
+				{
+					x: draft.imgX,
+					y: draft.imgY,
+					text,
+					family,
+					size,
+					bold,
+					italic,
+					underline: get(textUnderline),
+					strike: get(textStrike),
+					align: get(textAlign),
+					color: get(foregroundColor)
+				},
+				layerId
+			);
 			if (!ok) showNotice('Could not commit text.', 'error');
 		} catch (err) {
 			console.error('[text] commit failed', err);
@@ -440,6 +482,8 @@ const EYEDROPPER = 'eyedropper';
 		drawing: boolean;
 	} | null>(null);
 	let linePointerId = -1;
+	/** Nub index currently dragged via the forgiving canvas grab (or div). */
+	let lineNubDrag: 0 | 1 | 2 | 3 | null = null;
 
 	function straightLineControls(a: Point, b: Point): [Point, Point] {
 		return [
@@ -451,12 +495,14 @@ const EYEDROPPER = 'eyedropper';
 	function cancelLineDraft(): void {
 		lineDraft = null;
 		linePointerId = -1;
+		lineNubDrag = null;
 	}
 
 	function finishLineDraft(): void {
 		const draft = lineDraft;
 		lineDraft = null;
 		linePointerId = -1;
+		lineNubDrag = null;
 		if (!draft) return;
 		const doc = documentRegistry.active;
 		if (!doc) return;
@@ -488,22 +534,11 @@ const EYEDROPPER = 'eyedropper';
 		} catch {
 			/* ignore */
 		}
-		const keys = ['p0', 'p1', 'p2', 'p3'] as const;
-		const key = keys[i];
-		const move = (ev: PointerEvent) => {
-			if (!lineDraft) return;
-			const rect = host.getBoundingClientRect();
-			const img = imageFromScreen({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
-			lineDraft[key] = { x: img.x, y: img.y };
-		};
-		const up = () => {
-			nub.removeEventListener('pointermove', move as EventListener);
-			nub.removeEventListener('pointerup', up);
-			nub.removeEventListener('pointercancel', up);
-		};
-		nub.addEventListener('pointermove', move as EventListener);
-		nub.addEventListener('pointerup', up);
-		nub.addEventListener('pointercancel', up);
+		// The host pointer handlers perform the move (same as a near-canvas
+		// grab) — no element listeners, so nothing can leak.
+		lineNubDrag = i;
+		linePointerId = e.pointerId;
+		console.info('[line]', `grab nub ${i}`);
 	}
 
 	function finishShapeDraft(): void {
@@ -570,6 +605,166 @@ const EYEDROPPER = 'eyedropper';
 		nub.addEventListener('pointercancel', up);
 	}
 
+	// gradient-fill draft: the first drag draws the gradient line; after
+	// release only the 2 end nubs stay (the line itself is not drawn).
+	// A click elsewhere commits the open gradient first. Right-button drag
+	// swaps foreground/background.
+	let gradientDraft = $state<{
+		x0: number;
+		y0: number;
+		x1: number;
+		y1: number;
+		swap: boolean;
+		drawing: boolean;
+	} | null>(null);
+	let gradientPointerId = -1;
+	/** End index currently dragged via the forgiving canvas grab (or div). */
+	let gradientNubDrag: 0 | 1 | null = null;
+
+	function cancelGradientDraft(): void {
+		clearGradientPreview();
+		gradientDraft = null;
+		gradientPointerId = -1;
+		gradientNubDrag = null;
+	}
+
+	// Live gradient preview (Paint.NET shows the gradient while editing):
+	// rebuilt rAF-throttled into a preview surface instead of the layer.
+	let gradientPreviewId: string | null = $state(null);
+	let gradientPreviewQueued = false;
+
+	function clearGradientPreview(): void {
+		gradientPreviewQueued = false;
+		if (!gradientPreviewId) return;
+		const id = gradientPreviewId;
+		gradientPreviewId = null;
+		if (!ready) return;
+		try {
+			const renderer = getEditorRenderer();
+			// Detach first: the overlay must never reference a freed surface.
+			renderer.setActiveFloating(null);
+			if (renderer.surfaces.has(id)) renderer.surfaces.dispose(id);
+		} catch {
+			/* ignore */
+		}
+	}
+
+	function queueGradientPreview(): void {
+		if (!gradientDraft || !ready || !documentRegistry.active) return;
+		if (gradientPreviewQueued) return;
+		gradientPreviewQueued = true;
+		const docId = documentRegistry.active.id;
+		requestAnimationFrame(() => {
+			gradientPreviewQueued = false;
+			// The document may have closed/switched while queued — never
+			// render a preview onto a stale scene.
+			if (documentRegistry.active?.id !== docId) {
+				clearGradientPreview();
+				return;
+			}
+			renderGradientPreview();
+		});
+	}
+
+	function renderGradientPreview(): void {
+		const draft = gradientDraft;
+		const doc = documentRegistry.active;
+		if (!draft || !doc || !ready) {
+			clearGradientPreview();
+			return;
+		}
+		try {
+			const renderer = getEditorRenderer();
+			const fg = get(foregroundColor);
+			const bg = get(backgroundColor);
+			const layer = doc.activeLayer;
+			if (!layer || !renderer.surfaces.has(layer.surfaceId)) {
+				clearGradientPreview();
+				return;
+			}
+			const id = buildGradientSurface(renderer, doc, layer.surfaceId, {
+				x0: draft.x0,
+				y0: draft.y0,
+				x1: draft.x1,
+				y1: draft.y1,
+				mode: get(gradientMode),
+				repeat: get(gradientRepeat),
+				from: draft.swap ? bg : fg,
+				to: draft.swap ? fg : bg
+			});
+			const old = gradientPreviewId;
+			gradientPreviewId = id;
+			// Dedicated overlay sprite (above layers, below ants) — the layer
+			// sprites are never touched, so a freed preview can never dangle.
+			if (id) renderer.setActiveFloating(renderer.surfaces.getTexture(id), 0, 0);
+			else renderer.setActiveFloating(null);
+			if (old && renderer.surfaces.has(old)) renderer.surfaces.dispose(old);
+		} catch {
+			clearGradientPreview();
+		}
+	}
+
+	// Live-update the preview when gradient inputs change mid-edit.
+	// NOTE: plain get() does NOT subscribe (one-shot read) — the real
+	// subscriptions live in attach() below.
+
+	function finishGradientDraft(): void {
+		const draft = gradientDraft;
+		gradientDraft = null;
+		gradientPointerId = -1;
+		gradientNubDrag = null;
+		clearGradientPreview();
+		if (!draft) return;
+		const doc = documentRegistry.active;
+		if (!doc) return;
+		const fg = get(foregroundColor);
+		const bg = get(backgroundColor);
+		if (Math.round(fg.a) <= 0 && Math.round(bg.a) <= 0) {
+			showNotice('Gradient colours are fully transparent.', 'error');
+			return;
+		}
+		try {
+			console.info(
+				'[gradient]',
+				`line=(${Math.round(draft.x0)},${Math.round(draft.y0)})→(${Math.round(draft.x1)},${Math.round(draft.y1)})`,
+				`mode=${get(gradientMode)} repeat=${get(gradientRepeat)} swap=${draft.swap}`,
+				`from=(${fg.r},${fg.g},${fg.b},${fg.a}) to=(${bg.r},${bg.g},${bg.b},${bg.a})`
+			);
+			const ok = commitGradientToLayer(getEditorRenderer(), doc, {
+				x0: draft.x0,
+				y0: draft.y0,
+				x1: draft.x1,
+				y1: draft.y1,
+				mode: get(gradientMode),
+				repeat: get(gradientRepeat),
+				from: draft.swap ? bg : fg,
+				to: draft.swap ? fg : bg
+			});
+			if (!ok) showNotice('Could not draw gradient.', 'error');
+		} catch (err) {
+			console.error('[gradient] commit failed', err);
+			showNotice('Could not draw gradient.', 'error');
+		}
+	}
+
+	/** Drags one of the 2 gradient-line ends (same capture pattern as nubs). */
+	function onGradientNubDown(e: PointerEvent, i: 0 | 1): void {
+		if (!gradientDraft) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const nub = e.currentTarget as HTMLElement;
+		try {
+			nub.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
+		// The host pointer handlers perform the move (same as a near-canvas
+		// grab) — no element listeners, so nothing can leak.
+		gradientNubDrag = i;
+		gradientPointerId = e.pointerId;
+		console.info('[gradient]', `grab end ${i}`);
+	}
+
 	// OS pointer over the canvas: crosshair (the system "plus" cursor) while a
 	// paint tool OR a selection tool is armed and NOT painting; fully hidden
 	// while painting (only the preview ring + painted stroke are visible, like
@@ -611,7 +806,7 @@ const EYEDROPPER = 'eyedropper';
 			if (handle === 'pivot') return 'cursor: crosshair;';
 			return pointInTransformSelection(img, moveSelEngine?.transformState ?? transformUi) ? 'cursor: move;' : 'cursor: default;';
 		}
-		if (!(paintArmed || cloneArmed || recolorArmed || selectionArmed || get(activeToolId) === 'bucket' || get(activeToolId) === 'wand' || get(activeToolId) === 'shape' || get(activeToolId) === 'line'))
+		if (!(paintArmed || cloneArmed || recolorArmed || selectionArmed || get(activeToolId) === 'bucket' || get(activeToolId) === 'wand' || get(activeToolId) === 'shape' || get(activeToolId) === 'line' || get(activeToolId) === 'gradient'))
 			return '';
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
@@ -661,6 +856,8 @@ const EYEDROPPER = 'eyedropper';
 		if (get(activeToolId) !== 'shape' && shapeDraft) cancelShapeDraft();
 		// Same for the line tool's editable draft.
 		if (get(activeToolId) !== 'line' && lineDraft) cancelLineDraft();
+		// Same for the gradient line draft.
+		if (get(activeToolId) !== 'gradient' && gradientDraft) cancelGradientDraft();
 		// An interrupted clone/recolor stroke is discarded on tool switch.
 		if (cloning && get(activeToolId) !== 'clone-stamp') {
 			cloneEngine?.cancel();
@@ -727,6 +924,10 @@ const EYEDROPPER = 'eyedropper';
 		// selection (Paint.NET behaviour). Guarded against typing inputs and
 		// open modal dialogs so it never steals Escape from them.
 		if (e.key === 'Escape' && !typing && !get(dialog).kind) {
+			if (gradientDraft) {
+				cancelGradientDraft();
+				return;
+			}
 			if (lineDraft) {
 				cancelLineDraft();
 				return;
@@ -778,6 +979,12 @@ const EYEDROPPER = 'eyedropper';
 		if (lineDraft && !lineDraft.drawing && e.key === 'Enter' && !typing && !get(dialog).kind) {
 			e.preventDefault();
 			finishLineDraft();
+			return;
+		}
+		// Enter commits a finished gradient line (not while still drawing it).
+		if (gradientDraft && !gradientDraft.drawing && e.key === 'Enter' && !typing && !get(dialog).kind) {
+			e.preventDefault();
+			finishGradientDraft();
 			return;
 		}
 		// Undo / Redo and the selection commands — handled here directly
@@ -883,6 +1090,7 @@ const EYEDROPPER = 'eyedropper';
 		// A shape draft is view-dependent too — cancel it (nothing painted yet).
 		if (shapeDraft) cancelShapeDraft();
 		if (lineDraft) cancelLineDraft();
+		if (gradientDraft) cancelGradientDraft();
 		const doc = documentRegistry.active;
 		if (!doc || !ready) return;
 		const renderer = getEditorRenderer();
@@ -1200,9 +1408,10 @@ const EYEDROPPER = 'eyedropper';
 		const wantsPan = e.button === 1 || (e.button === 0 && (spaceHeld || panArmed));
 		if (wantsPan) {
 			// Panning would orphan the text-draft overlay — commit it first.
-			if (textDraft) commitTextDraft();
+			if (textDraft) void commitTextDraft();
 			if (shapeDraft) cancelShapeDraft();
 			if (lineDraft) cancelLineDraft();
+			if (gradientDraft) cancelGradientDraft();
 			e.preventDefault();
 			const doc = documentRegistry.active;
 			if (!doc) return;
@@ -1433,8 +1642,38 @@ const EYEDROPPER = 'eyedropper';
 		if (get(activeToolId) === 'line' && (e.button === 0 || e.button === 2)) {
 			if (e.target instanceof HTMLElement && e.target.closest('.line-nub')) return;
 			e.preventDefault();
+			const doc = documentRegistry.active;
+			if (!doc) return;
+			const sp = screenPoint(e);
+			// Forgiving grab: landing near a nub drags it instead of
+			// committing + restarting (easy to miss the 1xpx nub).
+			if (lineDraft && !lineDraft.drawing) {
+				const pts = [lineDraft.p0, lineDraft.p1, lineDraft.p2, lineDraft.p3].map((p) =>
+					imageToScreen(doc.view, p.x, p.y)
+				);
+				let best = -1;
+				let bestDist = 14;
+				for (let idx = 0; idx < pts.length; idx++) {
+					const d = Math.hypot(sp.x - pts[idx].x, sp.y - pts[idx].y);
+					if (d <= bestDist) {
+						bestDist = d;
+						best = idx;
+					}
+				}
+				if (best >= 0) {
+					lineNubDrag = best as 0 | 1 | 2 | 3;
+					linePointerId = e.pointerId;
+					try {
+						host.setPointerCapture(e.pointerId);
+					} catch {
+						/* ignore */
+					}
+					console.info('[line]', `grab nub ${best} near canvas`);
+					return;
+				}
+			}
 			if (lineDraft) finishLineDraft();
-			const img = imageFromScreen(screenPoint(e));
+			const img = imageFromScreen(sp);
 			const pt = { x: img.x, y: img.y };
 			lineDraft = { p0: pt, p1: { ...pt }, p2: { ...pt }, p3: { ...pt }, swap: e.button === 2, drawing: true };
 			linePointerId = e.pointerId;
@@ -1497,6 +1736,45 @@ const EYEDROPPER = 'eyedropper';
 			if (!started) return;
 			recoloring = true;
 			recolorPointerId = e.pointerId;
+			try {
+				host.setPointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+			return;
+		}
+		// Gradient tool: a drag draws the gradient line; release keeps 2
+		// draggable end nubs (the line itself is not drawn). A click
+		// elsewhere commits the open gradient first.
+		if (get(activeToolId) === 'gradient' && (e.button === 0 || e.button === 2)) {
+			if (e.target instanceof HTMLElement && e.target.closest('.gradient-nub')) return;
+			e.preventDefault();
+			const doc = documentRegistry.active;
+			if (!doc) return;
+			const sp = screenPoint(e);
+			// Forgiving grab: landing near an end drags it instead of
+			// committing + restarting (easy to miss the 1xpx nub).
+			if (gradientDraft && !gradientDraft.drawing) {
+				const a = imageToScreen(doc.view, gradientDraft.x0, gradientDraft.y0);
+				const b = imageToScreen(doc.view, gradientDraft.x1, gradientDraft.y1);
+				const d0 = Math.hypot(sp.x - a.x, sp.y - a.y);
+				const d1 = Math.hypot(sp.x - b.x, sp.y - b.y);
+				if (Math.min(d0, d1) <= 14) {
+					gradientNubDrag = d0 <= d1 ? 0 : 1;
+					gradientPointerId = e.pointerId;
+					try {
+						host.setPointerCapture(e.pointerId);
+					} catch {
+						/* ignore */
+					}
+					console.info('[gradient]', `grab end ${gradientNubDrag} near canvas`);
+					return;
+				}
+			}
+			if (gradientDraft) finishGradientDraft();
+			const img = imageFromScreen(sp);
+			gradientDraft = { x0: img.x, y0: img.y, x1: img.x, y1: img.y, swap: e.button === 2, drawing: true };
+			gradientPointerId = e.pointerId;
 			try {
 				host.setPointerCapture(e.pointerId);
 			} catch {
@@ -1572,6 +1850,28 @@ const EYEDROPPER = 'eyedropper';
 				lineDraft.p1 = c1;
 				lineDraft.p2 = c2;
 			}
+			if (lineDraft && lineNubDrag !== null && e.pointerId === linePointerId) {
+				const img = imageFromScreen(sp);
+				const key = (['p0', 'p1', 'p2', 'p3'] as const)[lineNubDrag];
+				lineDraft[key] = { x: img.x, y: img.y };
+			}
+			if (gradientDraft?.drawing && e.pointerId === gradientPointerId) {
+				const img = imageFromScreen(sp);
+				gradientDraft.x1 = img.x;
+				gradientDraft.y1 = img.y;
+				queueGradientPreview();
+			}
+			if (gradientDraft && gradientNubDrag !== null && e.pointerId === gradientPointerId) {
+				const img = imageFromScreen(sp);
+				if (gradientNubDrag === 0) {
+					gradientDraft.x0 = img.x;
+					gradientDraft.y0 = img.y;
+				} else {
+					gradientDraft.x1 = img.x;
+					gradientDraft.y1 = img.y;
+				}
+				queueGradientPreview();
+			}
 			if (cloning && e.pointerId === clonePointerId && cloneEngine) {
 				cloneEngine.lineTo(imageFromScreen(sp));
 			}
@@ -1643,6 +1943,21 @@ const EYEDROPPER = 'eyedropper';
 			} catch {
 				/* ignore */
 			}
+		}
+		if (lineDraft && lineNubDrag !== null && e.pointerId === linePointerId) {
+			lineNubDrag = null;
+		}
+		// Same for the gradient line (only its 2 end nubs stay).
+		if (gradientDraft?.drawing && e.pointerId === gradientPointerId) {
+			gradientDraft.drawing = false;
+			try {
+				host.releasePointerCapture(e.pointerId);
+			} catch {
+				/* ignore */
+			}
+		}
+		if (gradientDraft && gradientNubDrag !== null && e.pointerId === gradientPointerId) {
+			gradientNubDrag = null;
 		}
 		if (shapeDraft && e.pointerId === shapePointerId) {
 			finishShapeDraft();
@@ -1755,6 +2070,11 @@ const EYEDROPPER = 'eyedropper';
 		if (lineDraft?.drawing && e.pointerId === linePointerId) {
 			cancelLineDraft();
 		}
+		if (e.pointerId === linePointerId) lineNubDrag = null;
+		if (gradientDraft?.drawing && e.pointerId === gradientPointerId) {
+			cancelGradientDraft();
+		}
+		if (e.pointerId === gradientPointerId) gradientNubDrag = null;
 		if (shapeDraft && e.pointerId === shapePointerId) {
 			cancelShapeDraft();
 		}
@@ -1877,9 +2197,23 @@ const EYEDROPPER = 'eyedropper';
 				else cancelLineDraft();
 				lineAction.set(null);
 			});
+			// Gradient options strip → commit/cancel requests.
+			const unGradient = gradientAction.subscribe((a) => {
+				if (!a) return;
+				if (a === 'commit') finishGradientDraft();
+				else cancelGradientDraft();
+				gradientAction.set(null);
+			});
+			// Gradient inputs (mode, repeat, colours) live-update the preview
+			// mid-edit (get() alone would not subscribe).
+			const unGradientLive = [gradientMode, gradientRepeat, foregroundColor, backgroundColor].map((store) =>
+				store.subscribe(() => {
+					if (gradientDraft) queueGradientPreview();
+				})
+			);
 			// Distort toggle → move engine (also applied when created below).
 			const unDistort = moveDistort.subscribe((v) => moveEngine?.setDistortMode(v));
-			disposers.push(unTool, unSize, unPoly, unText, unLine, unDistort);
+			disposers.push(unTool, unSize, unPoly, unText, unLine, unGradient, ...unGradientLive, unDistort);
 
 			const onEnter = () => {
 				pointerInside = true;
@@ -2104,9 +2438,23 @@ const EYEDROPPER = 'eyedropper';
 			<div
 				class="line-nub absolute z-40"
 				class:line-ctrl={i === 1 || i === 2}
-				style="left:{q.x - 5}px; top:{q.y - 5}px;"
+				style="left:{q.x - 7}px; top:{q.y - 7}px;"
 				title={i === 0 ? 'Start point' : i === 3 ? 'End point' : 'Control point'}
 				onpointerdown={(e) => onLineNubDown(e, i as 0 | 1 | 2 | 3)}
+			></div>
+		{/each}
+	{/if}
+	{#if gradientDraft && documentRegistry.active}
+		{@const gd = gradientDraft}
+		{@const gdoc = documentRegistry.active}
+		{@const gq0 = imageToScreen(gdoc.view, gd.x0, gd.y0)}
+		{@const gq1 = imageToScreen(gdoc.view, gd.x1, gd.y1)}
+		{#each [gq0, gq1] as q, i (i)}
+			<div
+				class="line-nub absolute z-40"
+				style="left:{q.x - 7}px; top:{q.y - 7}px;"
+				title={i === 0 ? 'Gradient start (foreground)' : 'Gradient end (background)'}
+				onpointerdown={(e) => onGradientNubDown(e, i as 0 | 1)}
 			></div>
 		{/each}
 	{/if}

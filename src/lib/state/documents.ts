@@ -43,3 +43,18 @@ export const documents = readable<DocumentsSnapshot>(buildSnapshot(), (set) => {
 	sync();
 	return () => unsubs.forEach((u) => u());
 });
+
+/** True while the active document has a live selection. Re-emits on every
+ * registry change (selection edits notify via `touch`), so UI like the
+ * "Crop to Selection" button can react to selection state directly. */
+export const selectionActive = readable<boolean>(false, (set) => {
+	const sync = () => set(!!documentRegistry.active?.selection.active);
+	const unsubs = [
+		documentRegistry.events.on(RegistryEvents.opened, sync),
+		documentRegistry.events.on(RegistryEvents.closed, sync),
+		documentRegistry.events.on(RegistryEvents.active, sync),
+		documentRegistry.events.on(RegistryEvents.changed, sync)
+	];
+	sync();
+	return () => unsubs.forEach((u) => u());
+});

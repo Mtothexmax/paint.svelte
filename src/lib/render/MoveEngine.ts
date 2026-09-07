@@ -503,6 +503,7 @@ export class MoveEngine {
 		const origComposite = sel.composite;
 		const origInverted = sel.inverted;
 		const origOutlineLoops = sel.outlineLoops?.map((loop) => loop.map((pt) => ({ ...pt }))) ?? null;
+		const origTextPos = layer.text ? { x: layer.text.x, y: layer.text.y } : null;
 		const movedRect = origRect ? { x: origRect.x + dx, y: origRect.y + dy, width: origRect.width, height: origRect.height } : null;
 		const movedPoints = origPoints?.map((pt) => ({ x: pt.x + dx, y: pt.y + dy })) ?? null;
 		const movedBounds = origBounds ? { x: origBounds.x + dx, y: origBounds.y + dy, width: origBounds.width, height: origBounds.height } : null;
@@ -532,6 +533,12 @@ export class MoveEngine {
 		const afterOutlineLoops = sel.outlineLoops?.map((loop) => loop.map((pt) => ({ ...pt }))) ?? null;
 
 		layer.surfaceId = afterId;
+		// A moved text layer keeps its editable anchor glued to its pixels.
+		if (layer.text) {
+			layer.text.x += dx;
+			layer.text.y += dy;
+		}
+		const afterTextPos = layer.text ? { x: layer.text.x, y: layer.text.y } : null;
 		this.renderer.rebuildActiveLayers();
 		this.renderer.setActiveFloating(null);
 		if (this.previewId && surfaces.has(this.previewId)) surfaces.dispose(this.previewId);
@@ -556,6 +563,10 @@ export class MoveEngine {
 					layer.surfaceId = beforeId;
 					this.renderer.rebuildActiveLayers();
 				}
+				if (origTextPos && layer.text) {
+					layer.text.x = origTextPos.x;
+					layer.text.y = origTextPos.y;
+				}
 				if (sel.maskId === newMaskId) {
 					sel.maskId = oldMaskId;
 					sel.rect = origRect;
@@ -571,6 +582,10 @@ export class MoveEngine {
 				if (layer.surfaceId === beforeId) {
 					layer.surfaceId = afterId;
 					this.renderer.rebuildActiveLayers();
+				}
+				if (afterTextPos && layer.text) {
+					layer.text.x = afterTextPos.x;
+					layer.text.y = afterTextPos.y;
 				}
 				if (sel.maskId === oldMaskId) {
 					sel.maskId = newMaskId;

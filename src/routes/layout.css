@@ -315,9 +315,40 @@ body {
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 	top: 50%;
 	transform: translateY(-50%);
-	/* transparency checkerboard that shows through the (semi-transparent) colour */
-	background-image: repeating-conic-gradient(#383838 0% 25%, #1d1d1d 0% 50%);
-	background-size: 6px 6px;
+/* transparency checkerboard that shows through the (semi-transparent) colour */
+background-image: repeating-conic-gradient(#383838 0% 25%, #1d1d1d 0% 50%);
+background-size: 6px 6px;
+}
+.layer-thumb {
+	display: block;
+	height: 44px;
+	width: auto;
+	max-width: 44px;
+	flex-shrink: 0;
+	background-color: #1a1a1a;
+	background-image: conic-gradient(
+		#000 0 25%,
+		#1a1a1a 0 50%,
+		#000 0 75%,
+		#1a1a1a 0
+	);
+	background-size: 12px 12px;
+	position: relative;
+}
+.layer-thumb img {
+	display: block;
+	height: 100%;
+	width: auto;
+	max-width: 100%;
+	background-color: transparent;
+	position: relative;
+	z-index: 1;
+}
+img.layer-thumb {
+	max-width: 100%;
+	height: 44px;
+	width: auto;
+	display: block;
 }
 .cs-fill {
 	position: absolute;
@@ -617,10 +648,10 @@ body {
 	cursor: move;
 	touch-action: none;
 }
-/* nubs of the uncommitted spline: square for start/end, round for controls */
+/* nubs of uncommitted splines/lines: square for ends, round for controls */
 .line-nub {
-	width: 10px;
-	height: 10px;
+	width: 14px;
+	height: 14px;
 	background: var(--accent, #3b82f6);
 	border: 1px solid #fff;
 	box-shadow: 0 0 0 1px #1e3a8a;
@@ -736,6 +767,12 @@ body {
 .seg-btn.on {
 	background: var(--accent-soft);
 	color: var(--text);
+}
+.seg-icon {
+	width: 18px;
+	height: 18px;
+	object-fit: contain;
+	pointer-events: none;
 }
 .color-mode-body {
 	flex: 1 1 auto;

@@ -10,13 +10,34 @@ export type SurfaceId = string;
 
 export interface Layer {
 	id: LayerId;
-	/** Extensible union — non-raster kinds (text/shape/…) added later. */
-	kind: 'raster';
+	/** Extensible union — 'text' layers carry editable text (raster cache). */
+	kind: 'raster' | 'text';
 	name: string;
 	visible: boolean;
 	opacity: number; // 0..1
 	blendMode: string; // one of LAYER_BLEND_MODES ('normal' default)
 	surfaceId: SurfaceId;
+	/** Present on text layers: the editable content (surfaceId caches it). */
+	text?: TextContent;
+}
+
+/** Editable text content of a text layer (image px, straight RGBA bytes). */
+export interface TextContent {
+	/** Anchor: top-left of the text box in image px. */
+	x: number;
+	y: number;
+	/** Rasterized box size (hit-testing + re-edit origin). */
+	width: number;
+	height: number;
+	text: string;
+	family: string;
+	size: number;
+	bold: boolean;
+	italic: boolean;
+	underline: boolean;
+	strike: boolean;
+	align: 'left' | 'center' | 'right';
+	color: { r: number; g: number; b: number; a: number };
 }
 
 /** Creates a raster layer wrapping a render-layer surface handle. */
@@ -29,6 +50,20 @@ export function createRasterLayer(surfaceId: SurfaceId, name: string): Layer {
 		opacity: 1,
 		blendMode: 'normal',
 		surfaceId
+	};
+}
+
+/** Creates a text layer (editable content + raster cache surface). */
+export function createTextLayer(surfaceId: SurfaceId, name: string, text: TextContent): Layer {
+	return {
+		id: newId('layer'),
+		kind: 'text',
+		name,
+		visible: true,
+		opacity: 1,
+		blendMode: 'normal',
+		surfaceId,
+		text: { ...text, color: { ...text.color } }
 	};
 }
 

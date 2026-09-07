@@ -2,6 +2,7 @@
 // downloads it as a PNG.
 
 import { Container, RenderTexture, Sprite } from 'pixi.js';
+import { SPRITE_BLENDS } from '../render/SurfaceStore';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { EditorRenderer } from './EditorRenderer';
 
@@ -33,6 +34,7 @@ export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): P
 		const tex = renderer.surfaces.getTexture(layer.surfaceId);
 		const sprite = new Sprite(tex);
 		sprite.alpha = layer.opacity;
+		sprite.blendMode = SPRITE_BLENDS[layer.blendMode] ?? 'normal';
 		sprite.width = doc.width;
 		sprite.height = doc.height;
 		container.addChild(sprite);

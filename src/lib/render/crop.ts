@@ -73,7 +73,20 @@ export function cropToSelection(renderer: EditorRenderer): boolean {
 	doc.width = bounds.width;
 	doc.height = bounds.height;
 	doc.selection = emptySelection();
+	// Center the cropped image in the viewport (zoom kept); the selection
+	// indicator is gone with the cleared selection.
+	const beforeView = { ...doc.view };
+	if (renderer.viewWidth > 0 && renderer.viewHeight > 0) {
+		doc.view = {
+			...doc.view,
+			panX: (renderer.viewWidth - bounds.width * doc.view.zoom) / 2,
+			panY: (renderer.viewHeight - bounds.height * doc.view.zoom) / 2
+		};
+	}
+	const afterView = { ...doc.view };
 	renderer.rebuildActiveLayers();
+	renderer.refreshActiveView();
+	renderer.refreshActiveSelection();
 	doc.setDirty(true);
 	documentRegistry.notifyChange(doc);
 
@@ -83,23 +96,29 @@ export function cropToSelection(renderer: EditorRenderer): boolean {
 		undo: () => {
 			doc.width = beforeW;
 			doc.height = beforeH;
+			doc.view = { ...beforeView };
 			doc.selection = beforeSelection;
 			for (const s of swaps) {
 				const layer = doc.layers.find((l) => l.id === s.layerId);
 				if (layer && layer.surfaceId === s.after) layer.surfaceId = s.before;
 			}
 			renderer.rebuildActiveLayers();
+			renderer.refreshActiveView();
+			renderer.refreshActiveSelection();
 			documentRegistry.notifyChange(doc);
 		},
 		redo: () => {
 			doc.width = bounds.width;
 			doc.height = bounds.height;
+			doc.view = { ...afterView };
 			doc.selection = emptySelection();
 			for (const s of swaps) {
 				const layer = doc.layers.find((l) => l.id === s.layerId);
 				if (layer && layer.surfaceId === s.before) layer.surfaceId = s.after;
 			}
 			renderer.rebuildActiveLayers();
+			renderer.refreshActiveView();
+			renderer.refreshActiveSelection();
 			documentRegistry.notifyChange(doc);
 		},
 		dispose: () => {

@@ -3,6 +3,7 @@
 // per-tool selection logic anywhere (plan §4.6 mandate). Raster operations
 // (Delete) use the same surface-swap undo pattern as the paint/effect layers.
 
+import { derived, type Readable } from 'svelte/store';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
 import type { Point, Rect } from '../core/geometry';

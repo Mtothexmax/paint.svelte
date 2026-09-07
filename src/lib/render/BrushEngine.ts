@@ -431,6 +431,10 @@ export class BrushEngine {
 			this.cancel();
 			return false;
 		}
+		if (!stroke.target) {
+			this.cancel();
+			return false;
+		}
 		if (this.path.length === 0) {
 			this.cancel();
 			return false;
@@ -507,10 +511,13 @@ export class BrushEngine {
 			return false;
 		}
 		layerObj.surfaceId = afterId;
-		this.renderer.rebuildActiveLayers();
 
 		stroke.overlay.visible = false;
-		surfaces.renderInto(stroke.target, new Container(), true);
+		if (stroke.target) {
+			surfaces.renderInto(stroke.target, new Container(), true);
+		}
+
+		this.renderer.rebuildActiveLayers();
 
 		const label = s.kind === 'eraser' ? 'Eraser Stroke' : s.kind === 'pencil' ? 'Pencil Stroke' : 'Brush Stroke';
 		if (PENCIL_TRACE && s.kind === 'pencil') {
@@ -562,7 +569,9 @@ export class BrushEngine {
 			const stroke = this.renderer.getActiveStroke();
 			if (stroke) {
 				stroke.overlay.visible = false;
-				this.renderer.surfaces.renderInto(stroke.target, new Container(), true);
+				if (stroke.target) {
+					this.renderer.surfaces.renderInto(stroke.target, new Container(), true);
+				}
 			}
 		}
 		this.bufferActive = false;

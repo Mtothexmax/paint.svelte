@@ -1,11 +1,10 @@
-// Layer: render (pixi). Text-tool raster commit: draws the draft with an
-// offscreen 2D canvas, uploads it as a texture and composites it onto a copy
-// of the active layer (surface-swap undo, same pattern as BrushEngine).
-// After commit no live text object remains — Paint.NET behaviour.
+// Layer: render (pixi). Text rasterisation: draws a draft with an offscreen
+// 2D canvas and uploads it. Text LAYERS own their raster cache surface (kept
+// editable via the stored TextContent); services own the surface-swap undo.
 
 import { CanvasSource, Container, RenderTexture, Sprite, Texture } from 'pixi.js';
 import type { RGBA } from '../core/color';
-import { documentRegistry } from '../core/document/registry';
+import type { SurfaceId } from '../core/layers/Layer';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { EditorRenderer } from './EditorRenderer';
 import type { TextAlign } from '../state/text';
@@ -75,7 +74,7 @@ function measureHtmlBaseline(o: TextCommitOptions): number {
  * Rasterises the draft to an (unpadded-position, canvas) pair. Returns null
  * for blank text. The canvas origin maps to image (`x`, `y`).
  */
-function rasterize(o: TextCommitOptions): { canvas: HTMLCanvasElement; dx: number; dy: number } | null {
+export function rasterizeText(o: TextCommitOptions): { canvas: HTMLCanvasElement; dx: number; dy: number } | null {
 	const lines = o.text.split('\n');
 	if (!lines.some((l) => l.trim().length > 0)) return null;
 
@@ -133,25 +132,24 @@ function rasterize(o: TextCommitOptions): { canvas: HTMLCanvasElement; dx: numbe
 }
 
 /**
- * Commits the text draft onto the active layer. Returns false when there was
- * nothing to commit (blank text, missing doc/layer).
+ * Blits a rasterised text canvas into a FRESH doc-sized transparent surface
+ * (clipped by the active selection, same AlphaMask approach as the paint
+ * engines). Returns the new surface (caller-owned) or null.
  */
-export function commitTextToLayer(renderer: EditorRenderer, doc: ImageDocument, o: TextCommitOptions): boolean {
-	const layerObj = doc.layers.find((l) => l.id === doc.activeLayerId) ?? doc.layers[0];
-	if (!layerObj) return false;
-	const raster = rasterize(o);
-	if (!raster) return false;
-
+export function blitTextCanvas(
+	renderer: EditorRenderer,
+	doc: ImageDocument,
+	canvas: HTMLCanvasElement,
+	dx: number,
+	dy: number
+): SurfaceId | null {
 	const surfaces = renderer.surfaces;
-	const afterId = surfaces.copyRegion(layerObj.surfaceId, { x: 0, y: 0, width: doc.width, height: doc.height });
-
-	const source = new CanvasSource({ resource: raster.canvas });
+	const id = surfaces.create(doc.width, doc.height);
+	const source = new CanvasSource({ resource: canvas });
 	const tex = new Texture({ source });
 	const textSprite = new Sprite(tex);
-	textSprite.position.set(raster.dx, raster.dy);
+	textSprite.position.set(dx, dy);
 
-	// Selection clip (same AlphaMask approach as BrushEngine.finish): the text
-	// may only land inside the active selection.
 	const maskId = doc.selection.active ? doc.selection.maskId : null;
 	let clippedTex: RenderTexture | null = null;
 	let comp: Sprite;
@@ -173,35 +171,11 @@ export function commitTextToLayer(renderer: EditorRenderer, doc: ImageDocument, 
 	comp.alpha = 1;
 	const blendHolder = new Container();
 	blendHolder.addChild(comp);
-	surfaces.renderInto(surfaces.getTexture(afterId), blendHolder, false);
+	surfaces.renderInto(surfaces.getTexture(id), blendHolder, false);
 	// blendHolder owns `comp` (children:true destroys the sprite, not its
 	// texture). `tex` owns the uploaded canvas pixels — destroy it once.
 	blendHolder.destroy({ children: true });
 	tex.destroy(true);
 	if (clippedTex) clippedTex.destroy(true);
-
-	const beforeId = layerObj.surfaceId;
-	layerObj.surfaceId = afterId;
-	renderer.rebuildActiveLayers();
-
-	doc.history.push({
-		label: 'Text',
-		memoryBytes: doc.width * doc.height * 4 * 2,
-		undo: () => {
-			if (layerObj.surfaceId === afterId) {
-				layerObj.surfaceId = beforeId;
-				renderer.rebuildActiveLayers();
-			}
-		},
-		redo: () => {
-			if (layerObj.surfaceId === beforeId) {
-				layerObj.surfaceId = afterId;
-				renderer.rebuildActiveLayers();
-			}
-		},
-		dispose: () => {}
-	});
-	doc.setDirty(true);
-	documentRegistry.notifyChange(doc);
-	return true;
+	return id;
 }

@@ -22,6 +22,8 @@
 		type LayerRow
 	} from '../../services/layersService';
 	import { layerThumbnails } from '../../state/layerThumbnails';
+	import { openMenu } from '../../state/contextMenu';
+	import { convertTextToRaster } from '../../services/textService';
 
 	let rows = $state<LayerRow[]>([]);
 	let opacityVal = $state(100);
@@ -135,6 +137,17 @@
 		dropBelow = false;
 	}
 
+	/** Right-click menu per row — text layers offer raster conversion. */
+	function onRowContextMenu(e: MouseEvent, row: LayerRow): void {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!row.isText) return;
+		selectLayer(row.id);
+		openMenu(e.clientX, e.clientY, [
+			{ type: 'action', label: 'Convert to Raster Layer', action: () => convertTextToRaster(row.id) }
+		]);
+	}
+
 	// --- drop onto the empty list area = move to the very bottom ------------
 	function onListDragOver(e: DragEvent): void {
 		if (!draggedId) return;
@@ -244,18 +257,19 @@
 					class:drop-after={dropTarget?.id === row.id && !dropTarget.before}
 					draggable="true"
 					onclick={() => selectLayer(row.id)}
+					oncontextmenu={(e) => onRowContextMenu(e, row)}
 					ondragstart={(e) => onRowDragStart(e, row.id)}
 					ondragover={(e) => onRowDragOver(e, row.id)}
 					ondrop={(e) => onRowDrop(e, row.id)}
 					ondragend={onRowDragEnd}
 				>
-					{#if $layerThumbnails[row.id]}
-						<img
-							class="layer-thumb"
-							src={$layerThumbnails[row.id]}
-							alt=""
-							draggable="false"
-						/>
+{#if $layerThumbnails[row.id]}
+					<img
+						class="layer-thumb"
+						src={$layerThumbnails[row.id]}
+						alt=""
+						 draggable="false"
+					/>
 					{:else}
 						<div class="layer-thumb" aria-hidden="true"></div>
 					{/if}
