@@ -1,9 +1,14 @@
 <script lang="ts">
-	import { foregroundColor } from '../../state/ui';
+	import { foregroundColor, backgroundColor } from '../../state/ui';
 	import type { RGBA } from '../../core/color';
 
 	let areaEl: HTMLDivElement | undefined = $state();
 	let dragging = false;
+	let moved = false;
+	let downX = 0;
+	let downY = 0;
+	let lastClick = { button: -1, time: 0 };
+	const DOUBLE_MS = 400;
 
 	let h = $state(0);
 	let s = $state(0);
@@ -51,34 +56,68 @@
 		foregroundColor.set(hslToRgb(h, s, l));
 	}
 
+	function applySelected(hue: number, sat: number, lum: number, toBackground: boolean) {
+		const c = hslToRgb(hue, sat, lum);
+		if (toBackground) backgroundColor.set(c);
+		else foregroundColor.set(c);
+	}
+
 	function onBrightnessInput(e: Event) {
 		l = Number((e.currentTarget as HTMLInputElement).value);
 		commit();
 	}
 
-	function pointerPos(e: PointerEvent) {
+	function pointerPos(e: PointerEvent): [number, number] {
 		const rect = areaEl!.getBoundingClientRect();
-		s = Math.round(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * 100);
-		h = Math.round(Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)) * 360);
-		commit();
+		const sat = Math.round(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * 100);
+		const hue = Math.round(Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)) * 360);
+		return [hue, sat];
 	}
 
 	function onAreaDown(e: PointerEvent) {
-		dragging = true;
+		e.preventDefault();
+		moved = false;
+		downX = e.clientX;
+		downY = e.clientY;
 		const el = e.currentTarget as HTMLElement;
 		try {
 			el.setPointerCapture(e.pointerId);
 		} catch {
 			/* ignore */
 		}
-		pointerPos(e);
+		if (e.button === 2) return; // right click handled on pointerup
+		dragging = true;
+		const [nh, ns] = pointerPos(e);
+		h = nh;
+		s = ns;
+		commit();
 		el.blur();
 	}
 	function onAreaMove(e: PointerEvent) {
-		if (dragging) pointerPos(e);
+		if (!dragging) return;
+		if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) moved = true;
+		const [nh, ns] = pointerPos(e);
+		h = nh;
+		s = ns;
+		commit();
 	}
-	function onAreaUp() {
+	function onAreaUp(e: PointerEvent) {
+		const isRight = e.button === 2;
+		const isDouble = e.button === lastClick.button && e.timeStamp - lastClick.time < DOUBLE_MS;
+		lastClick = { button: e.button, time: e.timeStamp };
 		dragging = false;
+
+		if (isRight) {
+			const [nh, ns] = pointerPos(e);
+			if (isDouble) applySelected(nh, ns, 50, true); // double right-click: background at 50%
+			else applySelected(nh, ns, l, true); // right-click: background at slider brightness
+			return;
+		}
+		if (moved) return; // a left drag already set the foreground
+		if (isDouble) {
+			const [nh, ns] = pointerPos(e);
+			applySelected(nh, ns, 50, false); // double left-click: foreground at 50%
+		}
 	}
 	function onAreaKeyDown(e: KeyboardEvent) {
 		if (e.key === ' ' || e.key === 'Backspace' || e.key === 'Delete') {
@@ -108,6 +147,7 @@
 		onpointermove={onAreaMove}
 		onpointerup={onAreaUp}
 		onpointercancel={onAreaUp}
+		oncontextmenu={(e) => e.preventDefault()}
 		onkeydown={onAreaKeyDown}
 	>
 		<div class="fg-crosshair" style="left:{s}%; top:{(h / 360) * 100}%;"></div>

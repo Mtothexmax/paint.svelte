@@ -40,12 +40,21 @@
 	overflow: hidden;
 	border: 1px solid var(--border);
 	border-radius: 4px;
-	background: rgba(255, 255, 255, 0.05); /* neutral; the image shows its own shape */
+	background: #1a1a1a; /* dark backdrop; the image's own checkerboard hugs its content */
 }
 .fltab-thumb img {
 	max-width: 100%;
 	max-height: 100%;
+	display: block;
 	image-rendering: auto;
+	background-color: #1a1a1a;
+	background-image: conic-gradient(
+		#000 0 25%,
+		#1a1a1a 0 50%,
+		#000 0 75%,
+		#1a1a1a 0
+	);
+	background-size: 12px 12px; /* checkerboard, same as the layer thumbnails */
 }
 .fltab-noimg {
 	font-size: 16px;
