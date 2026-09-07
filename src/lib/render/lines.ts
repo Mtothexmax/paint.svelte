@@ -39,6 +39,14 @@ export function cubicPoint(p0: Vec, p1: Vec, p2: Vec, p3: Vec, t: number): Vec {
 	};
 }
 
+/** Control points at 1/3 and 2/3 along a straight segment (straight-line drag). */
+export function straightLineControls(a: Vec, b: Vec): [Vec, Vec] {
+	return [
+		{ x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 },
+		{ x: a.x + ((b.x - a.x) * 2) / 3, y: a.y + ((b.y - a.y) * 2) / 3 }
+	];
+}
+
 /** Unit tangent of the curve at t (zero vector when degenerate). */
 function cubicTangent(p0: Vec, p1: Vec, p2: Vec, p3: Vec, t: number): Vec {
 	const u = 1 - t;

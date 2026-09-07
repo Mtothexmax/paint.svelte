@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './FilterSlider.css';
 	// Layer: components. A labelled slider row for filter dialogs: a range track
 	// with the value shown as an EDITABLE number field on the right, plus an
 	// icon-only reset button that restores the default value. Changes flow up

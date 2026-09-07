@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './MovableDialog.css';
 	// Reusable MOVABLE popup (Paint.NET style): drag by the title bar, close
 	// button, optional close via Esc. Non-modal → the canvas stays interactive.
 	import type { Snippet } from 'svelte';

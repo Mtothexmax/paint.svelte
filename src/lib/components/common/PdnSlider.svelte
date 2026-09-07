@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './PdnSlider.css';
 	// Paint.NET-style slider: label + ":", then [−] track-with-inner-value [+].
 	// The inner number is rendered twice: light text underneath, dark text on top
 	// clipped to the fill area — so the part "covered" by the bar flips colour.

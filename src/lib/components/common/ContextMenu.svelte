@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './ContextMenu.css';
 	// Layer: components/common. Reusable, app-wide context-menu host. Renders
 	// whatever is open in the contextMenu store. Mount once (in App) — any code
 	// can open it via openMenu() from state/contextMenu.

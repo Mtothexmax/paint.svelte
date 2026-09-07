@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './ContextMenu.css';
 	// Reusable slider row used inside a context menu.
 	interface Props {
 		label: string;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './IconSplitButton.css';
 	// Generic split button without text: [ icon | ▾ ]
 	// - Clicking the icon part cycles through the options.
 	// - Clicking ▾ opens a menu listing every option (icon, title, description).

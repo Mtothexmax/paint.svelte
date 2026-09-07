@@ -1,0 +1,79 @@
+/* ---- Paint.NET-style slider ---- */
+.pdn-slider {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--text);
+}
+.pdn-label {
+	white-space: nowrap;
+	color: var(--text-dim);
+}
+.pdn-btn {
+	width: 18px;
+	height: 18px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 13px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0;
+}
+.pdn-btn:hover {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+.pdn-track {
+	position: relative;
+	width: 110px;
+	height: 16px;
+	background: #2f2f2f;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	overflow: hidden;
+	cursor: pointer;
+	touch-action: none;
+	user-select: none;
+}
+.pdn-fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	height: 100%;
+	background: var(--accent);
+	pointer-events: none;
+}
+.pdn-text {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 11px;
+	line-height: 1;
+	color: #ffffff; /* white text, also over the (dark) filled part */
+	pointer-events: none;
+}
+.pdn-text-dark {
+	color: #ffffff; /* keep white over the fill for readability in dark mode */
+}
+
+/* fit variant: fill available width (narrow panels) without affecting others */
+.pdn-slider.fit {
+	display: flex;
+	width: 100%;
+	min-width: 0;
+}
+.pdn-slider.fit .pdn-track {
+	width: auto;
+	flex: 1 1 auto;
+	min-width: 28px;
+}
+.pdn-slider.fit .pdn-label {
+	flex: 0 0 auto;
+}

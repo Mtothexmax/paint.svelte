@@ -4,7 +4,8 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
-	import type { Point } from '../../core/geometry';
+	import type { Point, Rect } from '../../core/geometry';
+	import { pointInPolygon, rectFromCorners } from '../../core/geometry';
 	import { screenToImage, imageToScreen, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
@@ -20,48 +21,30 @@
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import {
-		copySelection,
-		cutSelection,
-		hasClipboardImage,
-		pasteAsNewLayer,
 		pasteBitmapAsLayer
 	} from '../../services/clipboardService';
 	import { dialog } from '../../services/dialogService';
-	import { commands } from '../../services/commandRegistry';
 	import { applyCheckerTheme } from '../../services/commands';
-import {
-		deleteSelection,
-		deselect,
-		fillSelection,
-		invertSelection,
-		selectAll,
-	applySelectionMode,
-	applySelectionRect
-} from '../../services/selectionService';
+	import { applySelectionMode } from '../../services/selectionService';
 	import {
 		activeToolId,
 		statusBar,
 		brushSize,
-		brushOpacity,
-		brushHardness,
-		brushSpacing,
 		foregroundColor,
 		backgroundColor,
-		antiAliasMode,
 		moveDistort,
 		selectionMode,
 		selectionRatio,
-		selectionFixedRatio,
-		selectionFixedSize,
 		showNotice
 	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
 	import { commitTextDraft as persistTextDraft } from '../../services/textService';
 	import type { TextContent } from '../../core/layers/Layer';
-	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
-	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
+	import { cloneSize } from '../../state/clone';
+	import { recolorSize } from '../../state/recolor';
 	import {
-		textFontFamily,		textFontSize,
+		textFontFamily,
+		textFontSize,
 		textBold,
 		textItalic,
 		textUnderline,
@@ -69,8 +52,8 @@ import {
 		textAlign,
 		textAction
 	} from '../../state/text';
-	import { commitShapeToLayer, shapePolygonPoints } from '../../render/shapes';
-	import { commitLineToLayer, arrowHeadLength, arrowHeadPoints } from '../../render/lines';
+	import { commitShapeToLayer } from '../../render/shapes';
+	import { commitLineToLayer, straightLineControls } from '../../render/lines';
 	import { commitGradientToLayer, buildGradientSurface } from '../../render/gradients';
 	import {
 		shapeKind,
@@ -80,29 +63,33 @@ import {
 	} from '../../state/shapes';
 	import { lineWidth, lineStyle, lineArrowStart, lineArrowEnd, lineAction } from '../../state/lines';
 	import { gradientMode, gradientRepeat, gradientAction } from '../../state/gradients';
-	import { applyFill } from '../../services/fillService';
-	import { applyWandSelection } from '../../services/wandService';
 	import { ensureSystemFontLoaded, withTimeout } from '../../services/fonts';
-	import { sampleCompositeColorAt } from '../../render/eyedropper';
-	import { rgbaToHex, rgbaToCss } from '../../core/color';
-
-	const PAINT_TOOLS = new Set(['brush', 'pencil', 'eraser']);
-const EYEDROPPER = 'eyedropper';
-	const KIND: Record<string, 'brush' | 'pencil' | 'eraser'> = {
-		brush: 'brush',
-		pencil: 'pencil',
-		eraser: 'eraser'
-	};
-	const SELECT_TOOLS = new Set(['select-rect', 'select-ellipse', 'lasso', 'select-poly']);
-	const SELECT_KIND: Record<string, 'rect' | 'ellipse' | 'lasso'> = {
-		'select-rect': 'rect',
-		'select-ellipse': 'ellipse',
-		lasso: 'lasso'
-	};
+	import { rgbaToCss } from '../../core/color';
+	import {
+		PAINT_TOOLS,
+		SELECT_TOOLS
+	} from './tools';
+	import ShapePreview from './ShapePreview.svelte';
+	import LinePreview from './LinePreview.svelte';
+	import { handleKeyDown, handleKeyUp, isTextTarget, type KeyApi } from './keyboard';
+	import {
+		handleEndPointer,
+		handleCancelPointer,
+		clampSelectionPoint,
+		constrainRectCorner,
+		fixedRectAt,
+		selectionToolKind
+	} from './pointerRelease';
+	import type { PointerApi } from './pointerRelease';
+	import {
+		handlePointerDown,
+		type PointerDownApi,
+		type ShapeDraftState,
+		type LineDraftState,
+		type GradientDraftState
+	} from './pointerDown';
 	/** Polygon-lasso tool (click to place vertices). */
 	const isPolyTool = () => get(activeToolId) === 'select-poly';
-	/** Minimum pointer travel (screen px) before a selection drag commits. */
-	const SELECT_DRAG_MIN = 3;
 	// debug: last tool id that was logged (avoid console spam)
 	let lastLoggedTool: string | null = null;
 	let lastTransformCursorDebug = '';
@@ -142,23 +129,23 @@ let zoomRightHeld = $state(false);
 	// move-tool state (drag the selection content; commits on pointer-up)
 	let moveEngine: MoveEngine | null = null;
 	let moveArmed = $state(false);
-	let moveToolSelected = $state(false);
 	let moving = $state(false);
 	let movePointerId = -1;
 	let transformHandle: TransformHandle | null = null;
 	let lastTransformClick = { handle: null as TransformHandle | null, time: 0 };
-	let transformUi = $state<{
-		bounds: { x: number; y: number; width: number; height: number };
+	interface TransformUiState {
+		bounds: Rect;
 		pivot: Point;
 		offset: Point;
 		scaleX: number;
 		scaleY: number;
 		rotation: number;
-		skewX: number;
-		skewY: number;
-	} | null>(null);
+		skewX?: number;
+		skewY?: number;
+	}
+	let transformUi = $state<TransformUiState | null>(null);
 	let transformRevision = $state(0);
-	let handleBounds = $state<{ x: number; y: number; width: number; height: number } | null>(null);
+	let handleBounds = $state<Rect | null>(null);
 
 	const transformPoints = $derived.by(() => {
 		transformRevision;
@@ -173,8 +160,8 @@ let zoomRightHeld = $state(false);
 			scaleX: t.scaleX,
 			scaleY: t.scaleY,
 			rotation: t.rotation,
-			skewX: t.skewX,
-			skewY: t.skewY
+			skewX: t.skewX ?? 0,
+			skewY: t.skewY ?? 0
 		};
 		const point = (x: number, y: number) => affinePoint(state, { x, y });
 		return [
@@ -450,20 +437,6 @@ let zoomRightHeld = $state(false);
 	} | null>(null);
 	let shapePointerId = -1;
 
-	function normShapeRect(d: { startX: number; startY: number; curX: number; curY: number }): {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	} {
-		return {
-			x: Math.min(d.startX, d.curX),
-			y: Math.min(d.startY, d.curY),
-			width: Math.abs(d.curX - d.startX),
-			height: Math.abs(d.curY - d.startY)
-		};
-	}
-
 	function cancelShapeDraft(): void {
 		shapeDraft = null;
 		shapePointerId = -1;
@@ -484,13 +457,6 @@ let zoomRightHeld = $state(false);
 	let linePointerId = -1;
 	/** Nub index currently dragged via the forgiving canvas grab (or div). */
 	let lineNubDrag: 0 | 1 | 2 | 3 | null = null;
-
-	function straightLineControls(a: Point, b: Point): [Point, Point] {
-		return [
-			{ x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 },
-			{ x: a.x + ((b.x - a.x) * 2) / 3, y: a.y + ((b.y - a.y) * 2) / 3 }
-		];
-	}
 
 	function cancelLineDraft(): void {
 		lineDraft = null;
@@ -529,11 +495,7 @@ let zoomRightHeld = $state(false);
 		e.preventDefault();
 		e.stopPropagation();
 		const nub = e.currentTarget as HTMLElement;
-		try {
-			nub.setPointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
+		capturePointer(e, nub);
 		// The host pointer handlers perform the move (same as a near-canvas
 		// grab) — no element listeners, so nothing can leak.
 		lineNubDrag = i;
@@ -548,7 +510,7 @@ let zoomRightHeld = $state(false);
 		if (!draft) return;
 		const doc = documentRegistry.active;
 		if (!doc) return;
-		const r = normShapeRect(draft);
+		const r = rectFromCorners({ x: draft.startX, y: draft.startY }, { x: draft.curX, y: draft.curY });
 		if (r.width < 2 || r.height < 2) return; // click without drag paints nothing
 		const fg = get(foregroundColor);
 		const bg = get(backgroundColor);
@@ -573,11 +535,7 @@ let zoomRightHeld = $state(false);
 		e.preventDefault();
 		e.stopPropagation();
 		const nub = e.currentTarget as HTMLElement;
-		try {
-			nub.setPointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
+		capturePointer(e, nub);
 		const move = (ev: PointerEvent) => {
 			if (!textDraft) return;
 			const rect = host.getBoundingClientRect();
@@ -753,11 +711,7 @@ let zoomRightHeld = $state(false);
 		e.preventDefault();
 		e.stopPropagation();
 		const nub = e.currentTarget as HTMLElement;
-		try {
-			nub.setPointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
+		capturePointer(e, nub);
 		// The host pointer handlers perform the move (same as a near-canvas
 		// grab) — no element listeners, so nothing can leak.
 		gradientNubDrag = i;
@@ -784,9 +738,7 @@ let zoomRightHeld = $state(false);
 			if (!pointerInside) return '';
 			const img = imageFromScreen({ x: pointerX, y: pointerY });
 			if (transformHandleAt(img) === 'rotate') {
-				const pivot = moveEngine?.transformState?.pivot ?? transformUi?.pivot;
-				const cursor = pivot && img.x < pivot.x ? rotateCounterclockwiseCursor : rotateClockwiseCursor;
-				return `cursor: url("${cursor}") 12 12, grab;`;
+				return rotateCursor(moveEngine?.transformState?.pivot ?? transformUi?.pivot, img);
 			}
 			return moveEngine?.floating && moveEngine.pointInSelection(img) ? 'cursor: default;' : 'cursor: move;';
 		}
@@ -795,9 +747,7 @@ let zoomRightHeld = $state(false);
 			const img = imageFromScreen({ x: pointerX, y: pointerY });
 			const handle = transformHandleAt(img);
 			if (handle === 'rotate') {
-				const pivot = moveSelEngine?.transformState?.pivot ?? transformUi?.pivot;
-				const cursor = pivot && img.x < pivot.x ? rotateCounterclockwiseCursor : rotateClockwiseCursor;
-				return `cursor: url("${cursor}") 12 12, grab;`;
+				return rotateCursor(moveSelEngine?.transformState?.pivot ?? transformUi?.pivot, img);
 			}
 			if (handle === 'nw' || handle === 'se') return 'cursor: nwse-resize;';
 			if (handle === 'ne' || handle === 'sw') return 'cursor: nesw-resize;';
@@ -811,11 +761,22 @@ let zoomRightHeld = $state(false);
 		return pointerInside ? 'cursor: crosshair;' : '';
 	});
 
-	const isPaintTool = () => PAINT_TOOLS.has(get(activeToolId)) && !!documentRegistry.active;
-
 	function screenPoint(e: { clientX: number; clientY: number }) {
 		const rect = host.getBoundingClientRect();
 		return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+	}
+
+	function capturePointer(e: PointerEvent, element: HTMLElement = host): void {
+		try {
+			element.setPointerCapture(e.pointerId);
+		} catch {
+			/* ignore */
+		}
+	}
+
+	function rotateCursor(pivot: Point | undefined, img: Point): string {
+		const cursor = pivot && img.x < pivot.x ? rotateCounterclockwiseCursor : rotateClockwiseCursor;
+		return `cursor: url("${cursor}") 12 12, grab;`;
 	}
 
 	function updateStatus(doc = documentRegistry.active, cursor?: { x: number; y: number }) {
@@ -908,179 +869,233 @@ let zoomRightHeld = $state(false);
 		refreshRing();
 	}
 
-	function isTextTarget(target: EventTarget | null): boolean {
-		if (!(target instanceof HTMLElement)) return false;
-		if (target.tagName === 'TEXTAREA') return true;
-		if (target.tagName === 'INPUT') {
-			const t = (target as HTMLInputElement).type;
-			return ['text', 'search', 'number', 'email', 'url', 'password', 'tel'].includes(t);
+	const canvasInput: KeyApi & PointerApi & PointerDownApi = {
+		// gesture flags
+		gradientDraft: () => !!gradientDraft,
+		gradientDrawing: () => !!gradientDraft?.drawing,
+		setGradientDrawing: (v: boolean) => {
+			if (gradientDraft) gradientDraft.drawing = v;
+		},
+		lineDraft: () => !!lineDraft,
+		lineDrawing: () => !!lineDraft?.drawing,
+		setLineDrawing: (v: boolean) => {
+			if (lineDraft) lineDraft.drawing = v;
+		},
+		shapeDraft: () => !!shapeDraft,
+		selecting: () => selecting,
+		setSelecting: (v: boolean) => {
+			selecting = v;
+		},
+		polyBuilding: () => polyBuilding,
+		moveFloating: () => !!moveEngine?.floating,
+		moveSelDragging: () => !!moveSelEngine?.dragging,
+		spaceHeld: () => spaceHeld,
+		setSpaceHeld: (v: boolean) => {
+			spaceHeld = v;
+		},
+		// pointer-gesture flags + ids
+		zoomRightHeld: () => zoomRightHeld,
+		setZoomRightHeld: (v: boolean) => {
+			zoomRightHeld = v;
+		},
+		cloning: () => cloning,
+		setCloning: (v: boolean) => {
+			cloning = v;
+		},
+		clonePointerId: () => clonePointerId,
+		setClonePointerId: (v: number) => {
+			clonePointerId = v;
+		},
+		recoloring: () => recoloring,
+		setRecoloring: (v: boolean) => {
+			recoloring = v;
+		},
+		recolorPointerId: () => recolorPointerId,
+		setRecolorPointerId: (v: number) => {
+			recolorPointerId = v;
+		},
+		linePointerId: () => linePointerId,
+		lineNubDrag: () => lineNubDrag,
+		setLineNubDrag: (v: 0 | 1 | 2 | 3 | null) => {
+			lineNubDrag = v;
+		},
+		gradientPointerId: () => gradientPointerId,
+		gradientNubDrag: () => gradientNubDrag,
+		setGradientNubDrag: (v: 0 | 1 | null) => {
+			gradientNubDrag = v;
+		},
+		shapePointerId: () => shapePointerId,
+		painting: () => painting,
+		setPainting: (v: boolean) => {
+			painting = v;
+		},
+		paintPointerId: () => paintPointerId,
+		setPaintPointerId: (v: number) => {
+			paintPointerId = v;
+		},
+		moving: () => moving,
+		setMoving: (v: boolean) => {
+			moving = v;
+		},
+		movePointerId: () => movePointerId,
+		setMovePointerId: (v: number) => {
+			movePointerId = v;
+		},
+		movingSelection: () => movingSelection,
+		setMovingSelection: (v: boolean) => {
+			movingSelection = v;
+		},
+		moveSelPointerId: () => moveSelPointerId,
+		setMoveSelPointerId: (v: number) => {
+			moveSelPointerId = v;
+		},
+		clearTransformHandle: () => {
+			transformHandle = null;
+		},
+		panning: () => panning,
+		setPanning: (v: boolean) => {
+			panning = v;
+		},
+		panPointerId: () => panPointerId,
+		setPanPointerId: (v: number) => {
+			panPointerId = v;
+		},
+		selectPointerId: () => selectPointerId,
+		setSelectPointerId: (v: number) => {
+			selectPointerId = v;
+		},
+		selStart: () => selStart,
+		setSelStart: (v: Point | null) => {
+			selStart = v;
+		},
+		lassoPts: () => lassoPts,
+		setLassoPts: (v: Point[]) => {
+			lassoPts = v;
+		},
+		selDownClient: () => selDownClient,
+		dragMode: () => dragMode,
+		ready: () => ready,
+		textDraft: () => !!textDraft,
+		getLastTransformClick: () => lastTransformClick,
+		setPanStart: (v: Point) => {
+			panStart = v;
+		},
+		setPanStartView: (v: { panX: number; panY: number }) => {
+			panStartView = v;
+		},
+		setSelDownClient: (v: Point) => {
+			selDownClient = v;
+		},
+		setDragMode: (v: 'replace' | 'add' | 'subtract') => {
+			dragMode = v;
+		},
+		setTransformHandle: (v: TransformHandle | null) => {
+			transformHandle = v;
+		},
+		setLastTransformClick: (v: { handle: TransformHandle | null; time: number }) => {
+			lastTransformClick = v;
+		},
+		setShapeDraft: (v: ShapeDraftState | null) => {
+			shapeDraft = v;
+		},
+		setShapePointerId: (v: number) => {
+			shapePointerId = v;
+		},
+		setLineDraft: (v: LineDraftState | null) => {
+			lineDraft = v;
+		},
+		setLinePointerId: (v: number) => {
+			linePointerId = v;
+		},
+		setGradientDraft: (v: GradientDraftState | null) => {
+			gradientDraft = v;
+		},
+		setGradientPointerId: (v: number) => {
+			gradientPointerId = v;
+		},
+		// engines
+		cloneEngine: () => cloneEngine,
+		recolorEngine: () => recolorEngine,
+		brushEngine: () => engine,
+		moveEngine: () => moveEngine,
+		moveSelEngine: () => moveSelEngine,
+		setCloneEngine: (v: CloneEngine | null) => {
+			cloneEngine = v;
+		},
+		setRecolorEngine: (v: RecolorEngine | null) => {
+			recolorEngine = v;
+		},
+		setBrushEngine: (v: BrushEngine | null) => {
+			engine = v;
+		},
+		setMoveEngine: (v: MoveEngine | null) => {
+			moveEngine = v;
+		},
+		setMoveSelEngine: (v: MoveSelectionEngine | null) => {
+			moveSelEngine = v;
+		},
+		// conversion / capture / actions
+		toImage: (pe: PointerEvent) => pointerToImage(pe),
+		toScreen: (pe: { clientX: number; clientY: number }) => screenPoint(pe),
+		capture: (e: PointerEvent) => capturePointer(e),
+		release: (id: number) => {
+			try {
+				host.releasePointerCapture(id);
+			} catch {
+				/* ignore */
+			}
+		},
+		movePointer,
+		updateStatus,
+		refreshRing,
+		commitTextDraft,
+		openTextDraft,
+		polyClick,
+		transformHandleAt,
+		beginTransformDrag,
+		resetPivotToCenter,
+		startMoveDrag,
+		lineNubPoint: (i: number) => {
+			const doc = documentRegistry.active;
+			if (!doc || !lineDraft) return { x: 0, y: 0 };
+			const p = [lineDraft.p0, lineDraft.p1, lineDraft.p2, lineDraft.p3][i];
+			return imageToScreen(doc.view, p.x, p.y);
+		},
+		gradientEndPoint: (i: number) => {
+			const doc = documentRegistry.active;
+			if (!doc || !gradientDraft) return { x: 0, y: 0 };
+			return i === 0
+				? imageToScreen(doc.view, gradientDraft.x0, gradientDraft.y0)
+				: imageToScreen(doc.view, gradientDraft.x1, gradientDraft.y1);
+		},
+		finishShapeDraft,
+		cancelShapeDraft,
+		cancelLineDraft,
+		cancelGradientDraft,
+		cancelSelectDrag,
+		syncTransformUi,
+		cancelPolygon,
+		finishPolygon,
+		finishLineDraft,
+		finishGradientDraft,
+		dropMove: () => moveEngine?.drop(),
+		cancelMove: () => {
+			moveEngine?.cancel();
+			moving = false;
+			movePointerId = -1;
+		},
+		cancelMoveSelection: () => {
+			moveSelEngine?.cancel();
+			movingSelection = false;
+			moveSelPointerId = -1;
 		}
-		return target.isContentEditable;
-	}
+	};
 
 	function onKeyDown(e: KeyboardEvent) {
-		const typing = isTextTarget(e.target);
-		// Escape cancels an in-progress selection drag AND clears an active
-		// selection (Paint.NET behaviour). Guarded against typing inputs and
-		// open modal dialogs so it never steals Escape from them.
-		if (e.key === 'Escape' && !typing && !get(dialog).kind) {
-			if (gradientDraft) {
-				cancelGradientDraft();
-				return;
-			}
-			if (lineDraft) {
-				cancelLineDraft();
-				return;
-			}
-			if (shapeDraft) {
-				cancelShapeDraft();
-				return;
-			}
-			if (polyBuilding) {
-				cancelPolygon();
-				return;
-			}
-			if (selecting) cancelSelectDrag();
-			// Escape always ends with NO selection: a floating move is first
-			// cancelled (content returns to its source), then the selection —
-			// if any — is dropped.
-			if (moveEngine?.floating) {
-				moveEngine.cancel();
-				moving = false;
-				movePointerId = -1;
-			}
-			// A move-selection drag is also interrupted: the selection reverts
-			// to its original position before the selection itself is dropped.
-			if (moveSelEngine?.dragging) {
-				moveSelEngine.cancel();
-				movingSelection = false;
-				moveSelPointerId = -1;
-			}
-			if (documentRegistry.active?.selection.active) deselect();
-			return;
-		}
-		// Enter drops (applies) a floating selection.
-		if (moveEngine?.floating && e.key === 'Enter' && !typing && !get(dialog).kind) {
-			e.preventDefault();
-			moveEngine.drop();
-			return;
-		}
-		// While a floating selection exists the document is in a transient state
-		// — no other keyboard action may interleave. Escape cancels and Enter
-		// drops; everything else waits until the selection is dropped.
-		if (moveEngine?.floating) return;
-		// Enter finishes an in-progress polygon-lasso selection.
-		if (polyBuilding && e.key === 'Enter' && !typing && !get(dialog).kind) {
-			e.preventDefault();
-			finishPolygon();
-			return;
-		}
-		// Enter commits an editable line draft (not while still drawing it).
-		if (lineDraft && !lineDraft.drawing && e.key === 'Enter' && !typing && !get(dialog).kind) {
-			e.preventDefault();
-			finishLineDraft();
-			return;
-		}
-		// Enter commits a finished gradient line (not while still drawing it).
-		if (gradientDraft && !gradientDraft.drawing && e.key === 'Enter' && !typing && !get(dialog).kind) {
-			e.preventDefault();
-			finishGradientDraft();
-			return;
-		}
-		// Undo / Redo and the selection commands — handled here directly
-		// (layout-robust on every keyboard) so a brush stroke can always be
-		// reverted with Ctrl+Z / Ctrl+Y and selections via Ctrl+A/D/I. The
-		// stopPropagation below is required: the commands also carry shortcut
-		// strings for the menu, and without it the global shortcut service
-		// would run them a second time.
-		if (!typing && (e.ctrlKey || e.metaKey) && !e.altKey && !get(dialog).kind) {
-			const doc = documentRegistry.active;
-			if (doc) {
-				const key = e.key.toLowerCase();
-				if (key === 'z') {
-					e.preventDefault();
-					e.stopPropagation();
-					if (e.shiftKey) doc.history.redo();
-					else doc.history.undo();
-					documentRegistry.notifyChange(doc);
-					return;
-				}
-				if (key === 'y') {
-					e.preventDefault();
-					e.stopPropagation();
-					doc.history.redo();
-					documentRegistry.notifyChange(doc);
-					return;
-				}
-				if (key === 'a') {
-					e.preventDefault();
-					e.stopPropagation();
-					selectAll();
-					syncTransformUi();
-					return;
-				}
-				if (key === 'd') {
-					e.preventDefault();
-					e.stopPropagation();
-					deselect();
-					return;
-				}
-				if (key === 'i') {
-					e.preventDefault();
-					e.stopPropagation();
-					if (e.shiftKey) commands.run('adjustments.invertColors');
-					else invertSelection();
-					return;
-				}
-				// Copy/Cut always act on the selection (or the whole layer when
-				// nothing is selected). Paste uses the internal clipboard; with an
-				// empty one the keydown is left alone so the native paste event
-				// (onPaste below) can pick up an OS-clipboard image.
-				if (key === 'c' && !e.shiftKey) {
-					e.preventDefault();
-					e.stopPropagation();
-					copySelection();
-					return;
-				}
-				if (key === 'x' && !e.shiftKey) {
-					e.preventDefault();
-					e.stopPropagation();
-					cutSelection();
-					return;
-				}
-				if (key === 'v' && hasClipboardImage()) {
-					e.preventDefault();
-					e.stopPropagation();
-					pasteAsNewLayer();
-					return;
-				}
-			}
-		}
-		// Delete erases the selection content on the active layer (no
-		// modifiers; guarded against typing in inputs and open dialogs).
-		if (!typing && !get(dialog).kind && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Delete') {
-			if (documentRegistry.active?.selection.active) {
-				e.preventDefault();
-				e.stopPropagation();
-				deleteSelection();
-				return;
-			}
-		}
-		// Backspace fills the active layer (or the current selection, when one
-		// exists) with the foreground colour.
-		if (!typing && !get(dialog).kind && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Backspace') {
-			e.preventDefault();
-			e.stopPropagation();
-			fillSelection(get(foregroundColor));
-			return;
-		}
-		if (e.code === 'Space' && !typing) {
-			spaceHeld = true;
-			e.preventDefault();
-		}
+		handleKeyDown(e, canvasInput);
 	}
 	function onKeyUp(e: KeyboardEvent) {
-		if (e.code === 'Space') spaceHeld = false;
+		handleKeyUp(e, canvasInput);
 	}
 
 	function onWheel(e: WheelEvent) {
@@ -1108,56 +1123,17 @@ let zoomRightHeld = $state(false);
 		return screenToImage(doc.view, sp.x, sp.y);
 	}
 
+	/** Pointer event → image-pixel coordinates (host-relative client point). */
+	function pointerToImage(e: PointerEvent): { x: number; y: number } {
+		return imageFromScreen(screenPoint(e));
+	}
+
 	// --- selection tools (rect / ellipse / lasso) -------------------------
-
-	function selectionToolKind(): 'rect' | 'ellipse' | 'lasso' | null {
-		const kind = SELECT_KIND[get(activeToolId)];
-		return kind ?? null;
-	}
-
-	function clampSelectionPoint(point: Point): Point {
-		const doc = documentRegistry.active;
-		if (!doc) return point;
-		return {
-			x: Math.max(0, Math.min(doc.width, point.x)),
-			y: Math.max(0, Math.min(doc.height, point.y))
-		};
-	}
-
-	/** Returns the opposite (drag) corner for the RECTANGLE tool according to the
-	 * selected Ratio mode: free (pass-through), fixed aspect ratio, or a fixed
-	 * size. `start` is the anchor point, `cur` the raw pointer position. */
-	function constrainRectCorner(start: Point, cur: Point): Point {
-		const mode = get(selectionRatio);
-		if (mode === 'normal') return cur;
-		const dirX = cur.x >= start.x ? 1 : -1;
-		const dirY = cur.y >= start.y ? 1 : -1;
-		if (mode === 'fixedSize') {
-			const s = get(selectionFixedSize);
-			return {
-				x: start.x + dirX * Math.max(1, s.width),
-				y: start.y + dirY * Math.max(1, s.height)
-			};
-		}
-		// fixed ratio
-		const r = get(selectionFixedRatio);
-		const ratio = r.height > 0 ? r.width / r.height : 1;
-		let w = Math.max(1, Math.abs(cur.x - start.x));
-		let h = Math.max(1, Math.abs(cur.y - start.y));
-		if (w / h > ratio) w = h * ratio;
-		else h = w / ratio;
-		return { x: start.x + dirX * Math.max(1, Math.round(w)), y: start.y + dirY * Math.max(1, Math.round(h)) };
-	}
-
-	/** The free-floating Fixed-Size rectangle whose top-left follows the pointer. */
-	function fixedRectAt(cur: Point): { x: number; y: number; width: number; height: number } {
-		const s = get(selectionFixedSize);
-		return { x: Math.round(cur.x), y: Math.round(cur.y), width: Math.max(1, s.width), height: Math.max(1, s.height) };
-	}
 
 	/** Live draft outline (solid) for the drag in progress. `cur` is the
 	 * current pointer position in image px. */
-	function showSelectDraft(cur: Point): void {		if (!ready) return;
+	function showSelectDraft(cur: Point): void {
+		if (!ready) return;
 		const kind = selectionToolKind();
 		const start = selStart ? clampSelectionPoint(selStart) : null;
 		const boundedCur = clampSelectionPoint(cur);
@@ -1170,7 +1146,7 @@ let zoomRightHeld = $state(false);
 		// rect/ellipse: outline follows the current pointer position (rectangle
 		// tool honours the Free/Fixed-Ratio/Fixed-Size mode; Fixed Size moves a
 		// free-floating box with its top-left under the pointer).
-		let rect: { x: number; y: number; width: number; height: number };
+		let rect: Rect;
 		if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {
 			rect = fixedRectAt(boundedCur);
 		} else {
@@ -1210,7 +1186,7 @@ let zoomRightHeld = $state(false);
 	 * browsers, so the double-click is detected by time + distance instead. */
 	function polyClick(e: PointerEvent): void {
 		const doc = documentRegistry.active;
-		const img = imageFromScreen(screenPoint(e));
+		const img = pointerToImage(e);
 		const now = performance.now();
 		const nearLast = !!polyLastClick && Math.hypot(img.x - polyLastClick.pt.x, img.y - polyLastClick.pt.y) < 8 / Math.max(doc?.view.zoom ?? 1, 1e-4);
 		if (polyBuilding && polyPts.length >= 2 && polyLastClick && nearLast && now - polyLastClick.time < 500) {
@@ -1260,11 +1236,7 @@ let zoomRightHeld = $state(false);
 		moveEngine?.beginTransform('move', img);
 		moving = true;
 		movePointerId = e.pointerId;
-		try {
-			host.setPointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
+		capturePointer(e);
 	}
 
 	function transformHandleAt(img: Point): TransformHandle | null {
@@ -1301,7 +1273,7 @@ let zoomRightHeld = $state(false);
 		return null;
 	}
 
-	function pointInTransformSelection(img: Point, t: { bounds: { x: number; y: number; width: number; height: number }; pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number; skewX?: number; skewY?: number } | null): boolean {
+	function pointInTransformSelection(img: Point, t: TransformUiState | null): boolean {
 		if (!t) return false;
 		const b = t.bounds;
 		const corners = [
@@ -1362,16 +1334,6 @@ let zoomRightHeld = $state(false);
 		}
 	}
 
-	function pointInPolygon(p: Point, polygon: Point[]): boolean {
-		let inside = false;
-		for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-			const a = polygon[i];
-			const b = polygon[j];
-			if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-		}
-		return inside;
-	}
-
 	function beginTransformDrag(e: PointerEvent, img: Point, handle: TransformHandle): void {
 		if (get(activeToolId) === 'move-selection') {
 			if (!moveSelEngine) return;
@@ -1383,11 +1345,7 @@ let zoomRightHeld = $state(false);
 		transformHandle = handle;
 		moving = true;
 		movePointerId = e.pointerId;
-		try {
-			host.setPointerCapture(e.pointerId);
-		} catch {
-			/* ignore */
-		}
+		capturePointer(e);
 	}
 
 	function resetPivotToCenter(): void {
@@ -1400,427 +1358,8 @@ let zoomRightHeld = $state(false);
 		syncTransformUi();
 	}
 
-	function onPointerDown(e: PointerEvent) {
-		if (!ready) return;
-		// Clicks inside the text-draft editor belong to the textarea.
-		if (isTextTarget(e.target)) return;
-		movePointer(screenPoint(e));
-		const wantsPan = e.button === 1 || (e.button === 0 && (spaceHeld || panArmed));
-		if (wantsPan) {
-			// Panning would orphan the text-draft overlay — commit it first.
-			if (textDraft) void commitTextDraft();
-			if (shapeDraft) cancelShapeDraft();
-			if (lineDraft) cancelLineDraft();
-			if (gradientDraft) cancelGradientDraft();
-			e.preventDefault();
-			const doc = documentRegistry.active;
-			if (!doc) return;
-			panning = true;
-			panPointerId = e.pointerId;
-			panStart = { x: e.clientX, y: e.clientY };
-			panStartView = { panX: doc.view.panX, panY: doc.view.panY };
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		// Zoom tool: left click zooms in (×1.5), right click zooms out (÷1.5),
-		// anchored at the pointer so the image pixel under the cursor stays put.
-		if (zoomArmed && (e.button === 0 || e.button === 2)) {
-			e.preventDefault();
-			if (e.button === 2) zoomRightHeld = true;
-			const doc = documentRegistry.active;
-			if (!doc || !ready) return;
-			const anchor = screenPoint(e);
-			const factor = e.button === 0 ? 1.5 : 1 / 1.5;
-			doc.view = zoomBy(doc.view, anchor, factor);
-			getEditorRenderer().refreshActiveView();
-			syncTransformUi();
-			updateStatus(doc);
-			refreshRing();
-			return;
-		}
-		// Text tool: a click places the editing nub (committing any open draft
-		// first, Paint.NET behaviour). Space-pan and the zoom tool above still
-		// take precedence. The draft's own drag nub is handled separately.
-		if (get(activeToolId) === 'text' && (e.button === 0 || e.button === 2)) {
-			if (e.target instanceof HTMLElement && e.target.closest('.text-nub')) return;
-			e.preventDefault();
-			openTextDraft(e);
-			return;
-		}
-		// Polygon lasso: clicks place vertices (left = chosen mode with
-		// Ctrl/Shift = add, Alt = subtract; right button always subtracts);
-		// a double-click finishes the polygon.
-		if ((e.button === 0 || e.button === 2) && selectionArmed && isPolyTool()) {
-			e.preventDefault();
-			polyClick(e);
-			return;
-		}
-		// Selection tools: a LEFT drag selects with the chosen mode (Ctrl or
-		// Shift = add, Alt = subtract, else the options-strip mode); a
-		// RIGHT-button drag always subtracts. The draft outline is shown live
-		// and committed on pointer-up.
-		if ((e.button === 0 || e.button === 2) && selectionArmed && selectionToolKind()) {
-			dragMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey || e.shiftKey ? 'add' : get(selectionMode);
-			console.log('[editor] pointerdown: selection tool', get(activeToolId), 'kind', selectionToolKind(), 'mode', dragMode);
-			e.preventDefault();
-			selecting = true;
-			selectPointerId = e.pointerId;
-			selDownClient = { x: e.clientX, y: e.clientY };
-			selStart = clampSelectionPoint(imageFromScreen(screenPoint(e)));
-			lassoPts = [selStart];
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			getEditorRenderer().previewSelectionOutline(null, false);
-			return;
-		}
-		// Move tool, Paint.NET style: the FIRST press inside the selection lifts
-		// the content into a floating preview; further presses inside re-drag it;
-		// a press OUTSIDE the selection drops (applies) it and is consumed.
-		if (e.button === 0 && moveArmed) {
-			e.preventDefault();
-			const img = imageFromScreen(screenPoint(e));
-			if (!moveEngine) {
-				moveEngine = new MoveEngine(getEditorRenderer());
-				moveEngine.setDistortMode(get(moveDistort));
-			}
-			// Refresh the handle geometry before hit-testing. The engine is
-			// authoritative while a floating selection is being transformed.
-			syncTransformUi();
-			const handle = transformHandleAt(img);
-			logTransformDebug('canvas.pointerdown', {
-				pointer: img,
-				handle,
-				floating: moveEngine.floating,
-				transform: moveEngine.transformState
-			});
-			const now = performance.now();
-			if (handle === 'pivot' && lastTransformClick.handle === 'pivot' && now - lastTransformClick.time < 400) {
-				resetPivotToCenter();
-				lastTransformClick = { handle: null, time: 0 };
-				return;
-			}
-			lastTransformClick = { handle, time: now };
-			if (moveEngine.floating) {
-				if (handle) beginTransformDrag(e, img, handle);
-				else if (moveEngine.pointInSelection(img)) startMoveDrag(e, img);
-				else moveEngine.drop();
-				return;
-			}
-			const mdoc = documentRegistry.active;
-			if (!mdoc) return;
-			if (!mdoc.selection.active) {
-				showNotice('Draw a selection first.');
-				return;
-			}
-			if (moveEngine.begin() === 'ok') {
-				const activeHandle = handle ?? 'move';
-				if (activeHandle === 'move' && !moveEngine.pointInSelection(img)) {
-					moveEngine.cancel();
-				} else beginTransformDrag(e, img, activeHandle);
-			}
-			return;
-		}
-		// Move-Selection tool: drags the SELECTION (mask + outline), NOT the
-		// pixels. Click outside a live selection drops the selection (Paint.NET
-		// behaviour). Click inside arms a drag — release commits the move.
-		if (e.button === 0 && moveSelArmed) {
-			e.preventDefault();
-			const doc = documentRegistry.active;
-			if (!doc) return;
-			if (!doc.selection.active) {
-				showNotice('Draw a selection first.');
-				return;
-			}
-			if (!moveSelEngine) moveSelEngine = new MoveSelectionEngine(getEditorRenderer());
-			const img = imageFromScreen(screenPoint(e));
-			if (moveSelEngine.begin(img)) {
-				syncTransformUi();
-				const handle = transformHandleAt(img);
-				logTransformDebug('canvas.selectionPointerdown', {
-					pointer: img,
-					handle,
-					transform: moveSelEngine.transformState
-				});
-				transformHandle = handle;
-				if (handle) moveSelEngine.beginTransform(handle, img);
-				movingSelection = true;
-				moveSelPointerId = e.pointerId;
-				try {
-					host.setPointerCapture(e.pointerId);
-				} catch {
-					/* ignore */
-				}
-			} else {
-				// No usable selection (e.g. mask surface is missing): drop it.
-				deselect();
-			}
-			return;
-		}
-		// Any other tool/action first drops a floating selection (Paint.NET
-		// behaviour): the content is stamped at its current position.
-		if (moveEngine?.floating) moveEngine.drop();
-		// Paint with the LEFT button in the foreground colour and with the RIGHT
-		// button in the background colour (Paint.NET behaviour). Right-button
-		// painting also suppresses the context menu (preventDefault + the
-		// App-level oncontextmenu guard), so it never interrupts a stroke.
-		if (get(activeToolId) === EYEDROPPER) {
-			// Eyedropper stays active (Paint.NET behaviour): left click samples
-			// into the foreground slot, right click into the background slot.
-			if (e.button !== 0 && e.button !== 2) return;
-			e.preventDefault();
-			const img = imageFromScreen(screenPoint(e));
-			const doc = documentRegistry.active;
-			if (!doc || img.x < 0 || img.y < 0 || img.x >= doc.width || img.y >= doc.height) {
-				showNotice('Outside canvas.');
-				return;
-			}
-			const sampled = sampleCompositeColorAt(getEditorRenderer(), doc, img.x, img.y);
-			if (!sampled) {
-				showNotice('Could not sample colour.', 'error');
-				return;
-			}
-			if (e.button === 2) {
-				backgroundColor.set(sampled);
-				showNotice(`Background ${rgbaToHex(sampled)}`);
-			} else {
-				foregroundColor.set(sampled);
-				showNotice(`Foreground ${rgbaToHex(sampled)}`);
-			}
-			return;
-		}
-		// Paint bucket: left click fills with the foreground colour, right click
-		// with the background colour (Paint.NET behaviour). The tool stays
-		// active; tolerance + contiguous/global come from the options strip.
-		if (get(activeToolId) === 'bucket' && (e.button === 0 || e.button === 2)) {
-			e.preventDefault();
-			const img = imageFromScreen(screenPoint(e));
-			const result = applyFill(img.x, img.y, e.button === 2 ? get(backgroundColor) : get(foregroundColor));
-			if (result === 'out-of-bounds') showNotice('Outside canvas.');
-			else if (result === 'outside-selection') showNotice('Outside the selection.', 'error');
-			else if (result === 'transparent') showNotice('Fill colour is fully transparent.', 'error');
-			else if (result === 'failed') showNotice('Nothing to fill.', 'error');
-			return;
-		}
-		// Magic wand: same flood region as the bucket (tolerance +
-		// contiguous/global from the options strip), committed as a selection.
-		// Modifier behaviour mirrors the other selection tools (Ctrl/Shift =
-		// add, Alt = subtract, right button always subtracts).
-		if (get(activeToolId) === 'wand' && (e.button === 0 || e.button === 2)) {
-			e.preventDefault();
-			const img = imageFromScreen(screenPoint(e));
-			const selMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey || e.shiftKey ? 'add' : get(selectionMode);
-			const result = applyWandSelection(img.x, img.y, selMode);
-			if (result === 'out-of-bounds') showNotice('Outside canvas.');
-			else if (result === 'empty') showNotice('No matching pixels.', 'error');
-			else if (result === 'no-selection') showNotice('Nothing to subtract from.', 'error');
-			else if (result === 'failed') showNotice('Could not select.', 'error');
-			return;
-		}
-		// Shapes tool: drag defines the bounding box (any direction); release
-		// rasterises. Right-button drag swaps outline/fill colours.
-		if (get(activeToolId) === 'shape' && (e.button === 0 || e.button === 2)) {
-			e.preventDefault();
-			const img = imageFromScreen(screenPoint(e));
-			shapeDraft = { startX: img.x, startY: img.y, curX: img.x, curY: img.y, swap: e.button === 2 };
-			shapePointerId = e.pointerId;
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		// Line tool: a drag draws straight (controls follow); release keeps 4
-		// editable nubs. A click elsewhere commits the open line first.
-		if (get(activeToolId) === 'line' && (e.button === 0 || e.button === 2)) {
-			if (e.target instanceof HTMLElement && e.target.closest('.line-nub')) return;
-			e.preventDefault();
-			const doc = documentRegistry.active;
-			if (!doc) return;
-			const sp = screenPoint(e);
-			// Forgiving grab: landing near a nub drags it instead of
-			// committing + restarting (easy to miss the 1xpx nub).
-			if (lineDraft && !lineDraft.drawing) {
-				const pts = [lineDraft.p0, lineDraft.p1, lineDraft.p2, lineDraft.p3].map((p) =>
-					imageToScreen(doc.view, p.x, p.y)
-				);
-				let best = -1;
-				let bestDist = 14;
-				for (let idx = 0; idx < pts.length; idx++) {
-					const d = Math.hypot(sp.x - pts[idx].x, sp.y - pts[idx].y);
-					if (d <= bestDist) {
-						bestDist = d;
-						best = idx;
-					}
-				}
-				if (best >= 0) {
-					lineNubDrag = best as 0 | 1 | 2 | 3;
-					linePointerId = e.pointerId;
-					try {
-						host.setPointerCapture(e.pointerId);
-					} catch {
-						/* ignore */
-					}
-					console.info('[line]', `grab nub ${best} near canvas`);
-					return;
-				}
-			}
-			if (lineDraft) finishLineDraft();
-			const img = imageFromScreen(sp);
-			const pt = { x: img.x, y: img.y };
-			lineDraft = { p0: pt, p1: { ...pt }, p2: { ...pt }, p3: { ...pt }, swap: e.button === 2, drawing: true };
-			linePointerId = e.pointerId;
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		// Clone stamp: Alt+click sets the source anchor, otherwise a stroke
-		// stamps the source with an aligned offset.
-		if (get(activeToolId) === 'clone-stamp' && (e.button === 0 || e.button === 2)) {
-			e.preventDefault();
-			if (!cloneEngine) cloneEngine = new CloneEngine(getEditorRenderer());
-			const img = imageFromScreen(screenPoint(e));
-			if (e.altKey) {
-				cloneEngine.setSource(img);
-				showNotice('Clone source set.');
-				return;
-			}
-			const started = cloneEngine.begin(
-				{
-					size: get(cloneSize),
-					opacity: get(cloneOpacity) / 100,
-					hardness: get(cloneHardness) / 100,
-					spacingRatio: get(brushSpacing) / 100
-				},
-				img
-			);
-			if (started === 'no-source') {
-				showNotice('Alt+click to set the clone source.', 'error');
-				return;
-			}
-			if (started === 'none') return;
-			cloning = true;
-			clonePointerId = e.pointerId;
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		// Recolor brush: paints the foreground colour, destination alpha kept.
-		if (get(activeToolId) === 'recolor' && (e.button === 0 || e.button === 2)) {
-			e.preventDefault();
-			if (!recolorEngine) recolorEngine = new RecolorEngine(getEditorRenderer());
-			const img = imageFromScreen(screenPoint(e));
-			const started = recolorEngine.begin(
-				{
-					size: get(recolorSize),
-					opacity: get(recolorOpacity) / 100,
-					hardness: get(recolorHardness) / 100,
-					spacingRatio: get(brushSpacing) / 100,
-					color: get(foregroundColor)
-				},
-				img
-			);
-			if (!started) return;
-			recoloring = true;
-			recolorPointerId = e.pointerId;
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		// Gradient tool: a drag draws the gradient line; release keeps 2
-		// draggable end nubs (the line itself is not drawn). A click
-		// elsewhere commits the open gradient first.
-		if (get(activeToolId) === 'gradient' && (e.button === 0 || e.button === 2)) {
-			if (e.target instanceof HTMLElement && e.target.closest('.gradient-nub')) return;
-			e.preventDefault();
-			const doc = documentRegistry.active;
-			if (!doc) return;
-			const sp = screenPoint(e);
-			// Forgiving grab: landing near an end drags it instead of
-			// committing + restarting (easy to miss the 1xpx nub).
-			if (gradientDraft && !gradientDraft.drawing) {
-				const a = imageToScreen(doc.view, gradientDraft.x0, gradientDraft.y0);
-				const b = imageToScreen(doc.view, gradientDraft.x1, gradientDraft.y1);
-				const d0 = Math.hypot(sp.x - a.x, sp.y - a.y);
-				const d1 = Math.hypot(sp.x - b.x, sp.y - b.y);
-				if (Math.min(d0, d1) <= 14) {
-					gradientNubDrag = d0 <= d1 ? 0 : 1;
-					gradientPointerId = e.pointerId;
-					try {
-						host.setPointerCapture(e.pointerId);
-					} catch {
-						/* ignore */
-					}
-					console.info('[gradient]', `grab end ${gradientNubDrag} near canvas`);
-					return;
-				}
-			}
-			if (gradientDraft) finishGradientDraft();
-			const img = imageFromScreen(sp);
-			gradientDraft = { x0: img.x, y0: img.y, x1: img.x, y1: img.y, swap: e.button === 2, drawing: true };
-			gradientPointerId = e.pointerId;
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			return;
-		}
-		if ((e.button === 0 || e.button === 2) && isPaintTool()) {
-			e.preventDefault();
-			painting = true;
-			paintPointerId = e.pointerId;
-			try {
-				host.setPointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			if (!engine) engine = new BrushEngine(getEditorRenderer());
-			const img = imageFromScreen(screenPoint(e));
-			const toolId = get(activeToolId);
-			const isPencilStroke = toolId === 'pencil';
-			const kind = KIND[toolId] ?? 'brush';
-			const rawColor = e.button === 2 ? get(backgroundColor) : get(foregroundColor);
-			const color = rawColor;
-			engine.begin(
-				isPencilStroke
-					? {
-							kind: 'pencil',
-							size: 1,
-							opacity: 1,
-							hardness: 1,
-							spacingRatio: 0,
-							antiAlias: false,
-							color
-						}
-					: {
-							kind,
-							size: get(brushSize),
-							opacity: get(brushOpacity) / 100,
-							hardness: get(brushHardness) / 100,
-							spacingRatio: get(brushSpacing) / 100,
-							antiAlias: get(antiAliasMode) === 'smooth',
-							color
-						},
-				img
-			);
-		}
+function onPointerDown(e: PointerEvent) {
+		handlePointerDown(e, canvasInput);
 	}
 
 	function onPointerMove(e: PointerEvent) {
@@ -1913,194 +1452,11 @@ let zoomRightHeld = $state(false);
 	}
 
 	function endPointer(e: PointerEvent) {
-		zoomRightHeld = false;
-		if (cloning && e.pointerId === clonePointerId) {
-			cloneEngine?.finish();
-			cloning = false;
-			clonePointerId = -1;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (recoloring && e.pointerId === recolorPointerId) {
-			recolorEngine?.finish();
-			recoloring = false;
-			recolorPointerId = -1;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		// Release of the initial line drag arms the 4 nubs (no commit yet).
-		// Nub releases bubble here too but drawing is already false then.
-		if (lineDraft?.drawing && e.pointerId === linePointerId) {
-			lineDraft.drawing = false;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (lineDraft && lineNubDrag !== null && e.pointerId === linePointerId) {
-			lineNubDrag = null;
-		}
-		// Same for the gradient line (only its 2 end nubs stay).
-		if (gradientDraft?.drawing && e.pointerId === gradientPointerId) {
-			gradientDraft.drawing = false;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (gradientDraft && gradientNubDrag !== null && e.pointerId === gradientPointerId) {
-			gradientNubDrag = null;
-		}
-		if (shapeDraft && e.pointerId === shapePointerId) {
-			finishShapeDraft();
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (painting && e.pointerId === paintPointerId) {
-			engine?.finish();
-			painting = false;
-			paintPointerId = -1;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (moving && e.pointerId === movePointerId) {
-			// release only ends the drag — the floating selection stays floating
-			// until it is dropped (click outside / Enter / tool switch)
-			moving = false;
-			movePointerId = -1;
-			transformHandle = null;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-			syncTransformUi();
-			logTransformDebug('canvas.pointerup', { transform: moveEngine?.transformState });
-		}
-		if (movingSelection && e.pointerId === moveSelPointerId) {
-			// pointer-up commits the move as a single history entry (no-op when
-			// the user clicked without dragging)
-			moveSelEngine?.commit();
-			movingSelection = false;
-			moveSelPointerId = -1;
-			transformHandle = null;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (panning && e.pointerId === panPointerId) {
-			panning = false;
-			panPointerId = -1;
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-		if (selecting && e.pointerId === selectPointerId) {
-			commitSelect(e);
-			try {
-				host.releasePointerCapture(e.pointerId);
-			} catch {
-				/* ignore */
-			}
-		}
-	}
-
-	/** Commits the selection drag (mask fill + model update) when it was a real
-	 * drag and not a plain click. */
-	function commitSelect(e: PointerEvent): void {
-		const doc = documentRegistry.active;
-		const kind = selectionToolKind();
-		const start = selStart;
-		selecting = false;
-		selectPointerId = -1;
-		selStart = null;
-		if (!doc || !kind || !start) {
-			lassoPts = [];
-			if (ready) getEditorRenderer().refreshActiveSelection();
-			return;
-		}
-		const upRaw = clampSelectionPoint(imageFromScreen(screenPoint(e)));
-		const up =
-			kind === 'rect' && get(selectionRatio) !== 'fixedSize' ? constrainRectCorner(start, upRaw) : upRaw;
-		if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {
-			// Fixed Size: freely place the fixed box at the release point.
-			applySelectionRect(dragMode, 'rect', fixedRectAt(upRaw));
-		} else if (kind === 'lasso') {
-			const last = lassoPts[lassoPts.length - 1];
-			if (!last || Math.hypot(upRaw.x - last.x, upRaw.y - last.y) >= 1) lassoPts.push(upRaw);
-			if (lassoPts.length >= 2) applySelectionMode(dragMode, 'lasso', start, start, lassoPts);
-		} else if (Math.hypot(e.clientX - selDownClient.x, e.clientY - selDownClient.y) >= SELECT_DRAG_MIN) {
-			applySelectionMode(dragMode, kind, start, up, []);
-		}
-		lassoPts = [];
-		// The draft wiped the committed ants — redraw whatever the model now says.
-		if (ready) getEditorRenderer().refreshActiveSelection();
+		handleEndPointer(e, canvasInput);
 	}
 
 	function cancelPointer(e: PointerEvent) {
-		zoomRightHeld = false;
-		if (cloning && e.pointerId === clonePointerId) {
-			cloneEngine?.cancel();
-			cloning = false;
-			clonePointerId = -1;
-		}
-		if (recoloring && e.pointerId === recolorPointerId) {
-			recolorEngine?.cancel();
-			recoloring = false;
-			recolorPointerId = -1;
-		}
-		if (lineDraft?.drawing && e.pointerId === linePointerId) {
-			cancelLineDraft();
-		}
-		if (e.pointerId === linePointerId) lineNubDrag = null;
-		if (gradientDraft?.drawing && e.pointerId === gradientPointerId) {
-			cancelGradientDraft();
-		}
-		if (e.pointerId === gradientPointerId) gradientNubDrag = null;
-		if (shapeDraft && e.pointerId === shapePointerId) {
-			cancelShapeDraft();
-		}
-		if (painting && e.pointerId === paintPointerId) {
-			engine?.cancel();
-			painting = false;
-			paintPointerId = -1;
-		}
-		if (moving && e.pointerId === movePointerId) {
-			// interrupted drag: keep the floating selection where it was
-			moving = false;
-			movePointerId = -1;
-		}
-		if (movingSelection && e.pointerId === moveSelPointerId) {
-			// interrupted drag: keep the new selection position (mirrors MoveEngine
-			// behaviour; the user can still drop via click-outside / Enter)
-			movingSelection = false;
-			moveSelPointerId = -1;
-		}
-		if (selecting && e.pointerId === selectPointerId) {
-			cancelSelectDrag();
-		}
-		if (panning && e.pointerId === panPointerId) {
-			panning = false;
-			panPointerId = -1;
-		}
+		handleCancelPointer(e, canvasInput);
 	}
 
 	function onDragOver(e: DragEvent) {
@@ -2171,7 +1527,6 @@ let zoomRightHeld = $state(false);
 				})
 			);
 			const unTool = activeToolId.subscribe((tool) => {
-				moveToolSelected = tool === 'move-pixels';
 				updateArmed();
 				syncTransformUi();
 			});
@@ -2274,77 +1629,8 @@ let zoomRightHeld = $state(false);
 >
 	<canvas bind:this={canvasEl} class="absolute inset-0 block h-full w-full" style="touch-action:none;"></canvas>
 	{#if shapeDraft && documentRegistry.active}
-		{@const sd = shapeDraft}
-		{@const sr = normShapeRect(sd)}
-		{@const sdoc = documentRegistry.active}
-		{@const sp0 = imageToScreen(sdoc.view, sr.x, sr.y)}
-		{@const szw = Math.max(sdoc.view.zoom, 1e-4)}
-		{@const ssw = Math.max(sr.width * szw, 0.01)}
-		{@const ssh = Math.max(sr.height * szw, 0.01)}
-		{@const slw = Math.max($shapeWidth * szw, 0.5)}
-		{@const sfill = $shapeDrawStyle === 'outline' ? 'none' : rgbaToCss(sd.swap ? $foregroundColor : $backgroundColor)}
-		{@const sstroke = $shapeDrawStyle === 'fill' ? 'none' : rgbaToCss(sd.swap ? $backgroundColor : $foregroundColor)}
-		{@const sdash = $shapeLineStyle === 'dashed' ? `${3 * slw} ${2 * slw}` : $shapeLineStyle === 'dotted' ? `0.1 ${1.6 * slw}` : 'none'}
-		<svg
-			class="pointer-events-none absolute z-30"
-			style="left:{sp0.x}px; top:{sp0.y}px; overflow:visible;"
-			width={ssw}
-			height={ssh}
-		>
-			{#if $shapeKind === 'rectangle'}
-				<rect
-					x="0"
-					y="0"
-					width={ssw}
-					height={ssh}
-					fill={sfill}
-					stroke={sstroke}
-					stroke-width={slw}
-					stroke-dasharray={sdash}
-					stroke-linejoin="round"
-					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
-				/>
-			{:else if $shapeKind === 'rounded-rect'}
-				<rect
-					x="0"
-					y="0"
-					width={ssw}
-					height={ssh}
-					rx={Math.min(ssw, ssh) * 0.25}
-					fill={sfill}
-					stroke={sstroke}
-					stroke-width={slw}
-					stroke-dasharray={sdash}
-					stroke-linejoin="round"
-					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
-				/>
-			{:else if $shapeKind === 'ellipse'}
-				<ellipse
-					cx={ssw / 2}
-					cy={ssh / 2}
-					rx={ssw / 2}
-					ry={ssh / 2}
-					fill={sfill}
-					stroke={sstroke}
-					stroke-width={slw}
-					stroke-dasharray={sdash}
-					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
-				/>
-			{:else}
-				{@const spts = shapePolygonPoints($shapeKind, 0, 0, ssw, ssh)
-					.map((p) => `${p.x},${p.y}`)
-					.join(' ')}
-				<polygon
-					points={spts}
-					fill={sfill}
-					stroke={sstroke}
-					stroke-width={slw}
-					stroke-dasharray={sdash}
-					stroke-linejoin="round"
-					stroke-linecap={$shapeLineStyle === 'dotted' ? 'round' : 'butt'}
-				/>
-			{/if}
-		</svg>
+		{@const act = documentRegistry.active}
+		<ShapePreview draft={shapeDraft} view={act.view} />
 	{/if}
 	{#if textDraft}
 		{@const td = textDraft}
@@ -2385,55 +1671,13 @@ let zoomRightHeld = $state(false);
 		></textarea>
 	{/if}
 	{#if lineDraft && documentRegistry.active}
+		{@const act = documentRegistry.active}
 		{@const ld = lineDraft}
-		{@const ldoc = documentRegistry.active}
-		{@const lzw = Math.max(ldoc.view.zoom, 1e-4)}
-		{@const lq0 = imageToScreen(ldoc.view, ld.p0.x, ld.p0.y)}
-		{@const lq1 = imageToScreen(ldoc.view, ld.p1.x, ld.p1.y)}
-		{@const lq2 = imageToScreen(ldoc.view, ld.p2.x, ld.p2.y)}
-		{@const lq3 = imageToScreen(ldoc.view, ld.p3.x, ld.p3.y)}
-		{@const llw = Math.max($lineWidth * lzw, 0.5)}
-		{@const lcol = rgbaToCss(ld.swap ? $backgroundColor : $foregroundColor)}
-		{@const ldash = $lineStyle === 'dashed' ? `${3 * llw} ${2 * llw}` : $lineStyle === 'dotted' ? `0.1 ${1.6 * llw}` : 'none'}
-		{@const lahLen = arrowHeadLength($lineWidth)}
-		{@const lah0 = $lineArrowStart
-			? arrowHeadPoints(ld.p0, ld.p1, ld.p2, ld.p3, true, lahLen)
-			: null}
-		{@const lah3 = $lineArrowEnd
-			? arrowHeadPoints(ld.p0, ld.p1, ld.p2, ld.p3, false, lahLen)
-			: null}
-		<svg class="pointer-events-none absolute inset-0 z-30 h-full w-full" style="overflow:visible;">
-			<path
-				d="M {lq0.x} {lq0.y} C {lq1.x} {lq1.y}, {lq2.x} {lq2.y}, {lq3.x} {lq3.y}"
-				fill="none"
-				stroke={lcol}
-				stroke-width={llw}
-				stroke-dasharray={ldash}
-				stroke-linecap="round"
-			/>
-			{#if lah0}
-				<polygon
-					points={lah0
-						.map((p) => {
-							const s = imageToScreen(ldoc.view, p.x, p.y);
-							return `${s.x},${s.y}`;
-						})
-						.join(' ')}
-					fill={lcol}
-				/>
-			{/if}
-			{#if lah3}
-				<polygon
-					points={lah3
-						.map((p) => {
-							const s = imageToScreen(ldoc.view, p.x, p.y);
-							return `${s.x},${s.y}`;
-						})
-						.join(' ')}
-					fill={lcol}
-				/>
-			{/if}
-		</svg>
+		{@const lq0 = imageToScreen(act.view, ld.p0.x, ld.p0.y)}
+		{@const lq1 = imageToScreen(act.view, ld.p1.x, ld.p1.y)}
+		{@const lq2 = imageToScreen(act.view, ld.p2.x, ld.p2.y)}
+		{@const lq3 = imageToScreen(act.view, ld.p3.x, ld.p3.y)}
+		<LinePreview draft={lineDraft} view={act.view} />
 		{#each [lq0, lq1, lq2, lq3] as q, i (i)}
 			<div
 				class="line-nub absolute z-40"

@@ -1,0 +1,28 @@
+/* ---- history panel ---- */
+.history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 2px 0;
+}
+.history-row {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	font-size: 12px;
+	text-align: left;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--text-dim);
+	cursor: pointer;
+}
+.history-row:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+.history-row.on {
+	background: var(--accent-soft);
+	color: var(--text);
+}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './FontDropdown.css';
 	// Layer: components/common. Font-family dropdown for the text tool: each
 	// row shows the family name in the standard UI font, then (after a tab)
 	// a pangram rendered in that family. Web/system fonts resolve

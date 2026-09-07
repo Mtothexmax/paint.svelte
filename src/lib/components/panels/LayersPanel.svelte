@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './LayersPanel.css';
 	// Layer: components/panels. Layers panel — list, selection, visibility,
 	// opacity, add/duplicate/delete/reorder. All ops go through the service
 	// (which records undoable history).

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './TabBar.css';
 	// Layer: components. Floating document switcher: one small cell per open
 	// image showing a thumbnail + a tiny filename. Horizontally scrollable.
 	import { documents } from '../../state/documents';

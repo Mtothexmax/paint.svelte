@@ -1,0 +1,55 @@
+/* ---- movable dialog (filter popups) ---- */
+.m-dialog {
+	position: fixed;
+	z-index: 1200;
+	background: var(--bg-elev);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+.m-title {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 8px 6px 12px;
+	background: #353535;
+	cursor: move;
+	user-select: none;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text);
+	touch-action: none;
+}
+.m-title-text {
+	pointer-events: none;
+}
+.m-close {
+	background: none;
+	border: none;
+	color: var(--text-dim);
+	font-size: 13px;
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: 4px;
+}
+.m-close:hover {
+	background: rgba(255, 255, 255, 0.1);
+	color: var(--text);
+}
+.m-body {
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	overflow: auto;
+}
+.m-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	padding: 10px 12px;
+	border-top: 1px solid var(--border);
+}

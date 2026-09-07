@@ -1,4 +1,5 @@
 <script lang="ts">
+	import './HistoryPanel.css';
 	// Layer: components/panels. History panel — undoable step list with
 	// click-to-travel (Paint.NET behaviour).
 	import { onMount } from 'svelte';
