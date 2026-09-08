@@ -25,6 +25,7 @@
 	} from '../../services/clipboardService';
 	import { dialog } from '../../services/dialogService';
 	import { applyCheckerTheme } from '../../services/commands';
+	import { restoreSession, startSessionPersistence, type SessionPersistence } from '../../services/sessionService';
 	import { applySelectionMode } from '../../services/selectionService';
 	import {
 		activeToolId,
@@ -152,8 +153,6 @@ let zoomRightHeld = $state(false);
 		const t = transformUi;
 		if (!t) return [];
 		const b = t.bounds;
-		const ox = t.offset.x;
-		const oy = t.offset.y;
 		const state = {
 			pivot: t.pivot,
 			offset: t.offset,
@@ -165,15 +164,15 @@ let zoomRightHeld = $state(false);
 		};
 		const point = (x: number, y: number) => affinePoint(state, { x, y });
 		return [
-			{ handle: 'nw' as TransformHandle, x: b.x + ox, y: b.y + oy },
-			{ handle: 'n' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y + oy },
-			{ handle: 'ne' as TransformHandle, x: b.x + b.width + ox, y: b.y + oy },
-			{ handle: 'e' as TransformHandle, x: b.x + b.width + ox, y: b.y + b.height / 2 + oy },
-			{ handle: 'se' as TransformHandle, x: b.x + b.width + ox, y: b.y + b.height + oy },
-			{ handle: 's' as TransformHandle, x: b.x + b.width / 2 + ox, y: b.y + b.height + oy },
-			{ handle: 'sw' as TransformHandle, x: b.x + ox, y: b.y + b.height + oy },
-			{ handle: 'w' as TransformHandle, x: b.x + ox, y: b.y + b.height / 2 + oy },
-			{ handle: 'pivot' as TransformHandle, x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y }
+			{ handle: 'nw' as TransformHandle, x: b.x, y: b.y },
+			{ handle: 'n' as TransformHandle, x: b.x + b.width / 2, y: b.y },
+			{ handle: 'ne' as TransformHandle, x: b.x + b.width, y: b.y },
+			{ handle: 'e' as TransformHandle, x: b.x + b.width, y: b.y + b.height / 2 },
+			{ handle: 'se' as TransformHandle, x: b.x + b.width, y: b.y + b.height },
+			{ handle: 's' as TransformHandle, x: b.x + b.width / 2, y: b.y + b.height },
+			{ handle: 'sw' as TransformHandle, x: b.x, y: b.y + b.height },
+			{ handle: 'w' as TransformHandle, x: b.x, y: b.y + b.height / 2 },
+			{ handle: 'pivot' as TransformHandle, x: t.pivot.x, y: t.pivot.y }
 		].map((p) => {
 			const screen = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
 			const transformed = point(p.x, p.y);
@@ -1088,6 +1087,32 @@ let zoomRightHeld = $state(false);
 			moveSelEngine?.cancel();
 			movingSelection = false;
 			moveSelPointerId = -1;
+		},
+		// Arrow keys: nudge a floating selection first (whatever lifted it),
+		// else the selection itself when a move tool is active.
+		nudgeSelection: (dx: number, dy: number) => {
+			const doc = documentRegistry.active;
+			if (!doc || !ready || !doc.selection.active) return;
+			if (moveEngine?.floating) {
+				moveEngine.nudge(dx, dy);
+				syncTransformUi();
+				return;
+			}
+			const tool = get(activeToolId);
+			if (tool === 'move-pixels') {
+				if (!moveEngine) {
+					moveEngine = new MoveEngine(getEditorRenderer());
+					moveEngine.setDistortMode(get(moveDistort));
+				}
+				moveEngine.nudge(dx, dy);
+				syncTransformUi();
+				return;
+			}
+			if (tool === 'move-selection') {
+				if (!moveSelEngine) moveSelEngine = new MoveSelectionEngine(getEditorRenderer());
+				moveSelEngine.nudge(dx, dy);
+				syncTransformUi();
+			}
 		}
 	};
 
@@ -1140,7 +1165,19 @@ let zoomRightHeld = $state(false);
 		if (!kind || !start) return;
 		if (kind === 'lasso') {
 			const boundedPoints = lassoPts.map(clampSelectionPoint);
-			if (boundedPoints.length >= 2) getEditorRenderer().previewSelectionOutline([boundedPoints], false);
+			if (boundedPoints.length >= 2) {
+				const xs = boundedPoints.map((p) => p.x);
+				const ys = boundedPoints.map((p) => p.y);
+				statusBar.update((s) => ({
+					...s,
+					selW: Math.round(Math.max(...xs) - Math.min(...xs)),
+					selH: Math.round(Math.max(...ys) - Math.min(...ys))
+				}));
+				getEditorRenderer().previewSelectionOutline([boundedPoints], false);
+			} else {
+				statusBar.update((s) => ({ ...s, selW: 0, selH: 0 }));
+				getEditorRenderer().previewSelectionOutline(null, false);
+			}
 			return;
 		}
 		// rect/ellipse: outline follows the current pointer position (rectangle
@@ -1158,6 +1195,7 @@ let zoomRightHeld = $state(false);
 				height: Math.abs(eff.y - start.y)
 			};
 		}
+		statusBar.update((s) => ({ ...s, selW: Math.round(rect.width), selH: Math.round(rect.height) }));
 		const loop = selectionOutlinePoints(kind, rect, null);
 		getEditorRenderer().previewSelectionOutline(loop.length ? [loop] : null, false);
 	}
@@ -1168,6 +1206,7 @@ let zoomRightHeld = $state(false);
 		selectPointerId = -1;
 		selStart = null;
 		lassoPts = [];
+		statusBar.update((s) => ({ ...s, selW: null, selH: null }));
 		if (ready) getEditorRenderer().refreshActiveSelection();
 	}
 
@@ -1506,6 +1545,7 @@ function onPointerDown(e: PointerEvent) {
 	onMount(() => {
 		let alive = true;
 		const disposers: Array<() => void> = [];
+		let sessionHandle: SessionPersistence | null = null;
 
 		const attach = () => {
 			ready = true;
@@ -1612,11 +1652,15 @@ function onPointerDown(e: PointerEvent) {
 		};
 
 		void initEditorRenderer(canvasEl).then(() => {
-			if (alive) attach();
+			if (!alive) return;
+			attach();
+			sessionHandle = startSessionPersistence();
+			void restoreSession();
 		});
 
 		return () => {
 			alive = false;
+			sessionHandle?.stop();
 			for (const d of disposers) d();
 		};
 	});

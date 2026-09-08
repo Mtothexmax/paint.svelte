@@ -46,7 +46,10 @@ export const statusBar = writable<{
 	imageH: number | null;
 	cursorX: number | null;
 	cursorY: number | null;
-}>({ zoomPct: null, imageW: null, imageH: null, cursorX: null, cursorY: null });
+	/** Live W×H of an in-progress selection drag (null outside a drag). */
+	selW: number | null;
+	selH: number | null;
+}>({ zoomPct: null, imageW: null, imageH: null, cursorX: null, cursorY: null, selW: null, selH: null });
 
 export type NoticeKind = 'info' | 'error';
 

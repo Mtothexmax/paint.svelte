@@ -48,6 +48,7 @@ export interface KeyApi {
 	finishLineDraft(): void;
 	finishGradientDraft(): void;
 	syncTransformUi(): void;
+	nudgeSelection(dx: number, dy: number): void;
 }
 
 export function isTextTarget(target: EventTarget | null): boolean {
@@ -131,6 +132,24 @@ export function handleKeyDown(e: KeyboardEvent, a: KeyApi): void {
 	// modal dialogs so it never steals Escape from them.
 	if (e.key === 'Escape' && !typing && !modal) {
 		escapeKey(a);
+		return;
+	}
+	// Arrow keys nudge the selection (Move Selected Pixels / Move Selection
+	// tools): 1 px per press, 10 px with Ctrl/⌘. Placed before the floating
+	// guard so a floating selection always moves — like Paint.NET, where the
+	// floating pixels follow the arrows regardless of what lifted them.
+	const ARROW_STEP: Record<string, [number, number]> = {
+		ArrowLeft: [-1, 0],
+		ArrowRight: [1, 0],
+		ArrowUp: [0, -1],
+		ArrowDown: [0, 1]
+	};
+	const arrow = ARROW_STEP[e.key];
+	if (arrow && !typing && !modal && !a.selecting() && documentRegistry.active) {
+		e.preventDefault();
+		e.stopPropagation();
+		const step = e.ctrlKey || e.metaKey ? 10 : 1;
+		a.nudgeSelection(arrow[0] * step, arrow[1] * step);
 		return;
 	}
 	// While a floating selection exists the document is in a transient state —

@@ -7,6 +7,7 @@ import { createRasterLayer, type SurfaceId } from '../core/layers/Layer';
 import type { Rect } from '../core/geometry';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import { blitMaskedInto } from '../render/selection';
+import { writeSurfaceToSystemClipboard } from '../render/export';
 import { deleteSelection } from './selectionService';
 import { showNotice } from '../state/ui';
 
@@ -61,6 +62,9 @@ export function copySelection(): boolean {
 	dropContent();
 	content = { surfaceId: regionId, width: bounds.width, height: bounds.height };
 	showNotice('Copied.');
+	void writeSurfaceToSystemClipboard(renderer, regionId, bounds.width, bounds.height).catch(() => {
+		showNotice('Copied. System clipboard unavailable here.', 'error');
+	});
 	return true;
 }
 

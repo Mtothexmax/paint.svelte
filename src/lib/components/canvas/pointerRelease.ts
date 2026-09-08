@@ -7,7 +7,7 @@ import type { Point, Rect } from '../../core/geometry';
 import { documentRegistry } from '../../core/document/registry';
 import { getEditorRenderer } from '../../render/EditorRenderer';
 import { logTransformDebug } from '../../render/transformDebug';
-import { activeToolId, selectionRatio, selectionFixedRatio, selectionFixedSize } from '../../state/ui';
+import { activeToolId, selectionRatio, selectionFixedRatio, selectionFixedSize, statusBar } from '../../state/ui';
 import { applySelectionMode, applySelectionRect } from '../../services/selectionService';
 import { SELECT_DRAG_MIN, SELECT_KIND } from './tools';
 
@@ -145,6 +145,7 @@ export function commitSelect(e: PointerEvent, a: PointerApi): void {
 	a.setSelecting(false);
 	a.setSelectPointerId(-1);
 	a.setSelStart(null);
+	statusBar.update((s) => ({ ...s, selW: null, selH: null }));
 	if (!doc || !kind || !start) {
 		a.setLassoPts([]);
 		if (a.ready()) getEditorRenderer().refreshActiveSelection();

@@ -198,6 +198,27 @@ export class MoveEngine {
 		this.previewId = previewId;
 	}
 
+	/** Nudges the floating selection by whole image pixels (arrow keys). Lifts
+	 * the selection first when no session is active, so a first nudge starts
+	 * the move (Paint.NET behaviour). The session stays floating until an
+	 * explicit drop/cancel — exactly like a mouse drag. */
+	nudge(dx: number, dy: number): void {
+		if (!this.active) {
+			if (this.begin() !== 'ok') return;
+		}
+		if (!this.active || !this.doc || !this.bounds) return;
+		const nx = this.offset.x + Math.round(dx);
+		const ny = this.offset.y + Math.round(dy);
+		if (nx === this.offset.x && ny === this.offset.y) return;
+		this.offset = { x: nx, y: ny };
+		const surfaces = this.renderer.surfaces;
+		if (!this.floatingId || !surfaces.has(this.floatingId)) return;
+		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + nx, this.bounds.y + ny);
+		this.applyFloatingTransform();
+		this.updateLivePreview();
+		this.applyPreviewTransform();
+	}
+
 	private applyPreviewTransform(): void {
 		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
 		this.renderer.setActiveTintTransform(

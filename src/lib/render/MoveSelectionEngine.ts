@@ -99,6 +99,7 @@ export class MoveSelectionEngine {
 	}
 
 	get transformState() {
+		if (!this.active) return null;
 		const bounds = this.origBounds ?? { x: 0, y: 0, width: this.doc?.width ?? 0, height: this.doc?.height ?? 0 };
 		return { bounds: { ...bounds }, pivot: { ...this.pivot }, offset: { ...this.offset }, scaleX: this.scaleX, scaleY: this.scaleY, rotation: this.rotation };
 	}
@@ -186,6 +187,25 @@ export class MoveSelectionEngine {
 		this.offset = { x: dx, y: dy };
 		this.recreateMask();
 		logTransformDebug('selection.moveTo', { pointer: p, offset: this.offset });
+	}
+
+	/** Nudges the selection by whole image pixels (arrow keys) and commits as
+	 * one undoable step. Starts a session on demand when none is in progress. */
+	nudge(dx: number, dy: number): void {
+		if (!this.active) {
+			const doc = documentRegistry.active;
+			const sel = doc?.selection;
+			if (!doc || !sel || !sel.active || !sel.maskId) return;
+			if (!this.renderer.surfaces.has(sel.maskId)) return;
+			// Keyboard sessions have no pointer origin — arrows never use it.
+			this.begin({ x: doc.width / 2, y: doc.height / 2 });
+		}
+		if (!this.active || !this.doc) return;
+		this.offset = { x: this.offset.x + Math.round(dx), y: this.offset.y + Math.round(dy) };
+		this.recreateMask();
+		logTransformDebug('selection.nudge', { offset: this.offset });
+		this.commit();
+		if (this.doc) documentRegistry.notifyChange(this.doc);
 	}
 
 	/** Rebuilds the mask surface at the current offset and pushes the new

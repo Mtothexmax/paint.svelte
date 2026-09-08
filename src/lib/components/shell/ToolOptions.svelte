@@ -75,7 +75,17 @@
 	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
 	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
 	import { commands } from '../../services/commandRegistry';
-	import { selectionActive } from '../../state/documents';
+	import { selectionActive, activeLayerIsText } from '../../state/documents';
+	import { convertTextToRaster } from '../../services/textService';
+	import { documentRegistry } from '../../core/document/registry';
+
+	/** Rasterizes the active text layer in place (used by the hint button). */
+	function rasterizeTextLayer(): void {
+		const doc = documentRegistry.active;
+		if (!doc) return;
+		const layer = doc.layers.find((l) => l.id === doc.activeLayerId);
+		if (layer?.kind === 'text') convertTextToRaster(layer.id);
+	}
 
 	/** Material Symbols (rounded) per shape kind — black glyphs are lightened
 	 * via CSS (.shape-kind-ic) for the dark strip. */
@@ -271,7 +281,16 @@
 </script>
 
 	<div class="flex h-full w-full items-center gap-4 px-2 text-xs select-none" style="color:var(--text-dim);">
-	{#if isPaint && !isPencil}
+	{#if isPaint && $activeLayerIsText}
+		<span class="tooloptions-placeholder">This is a text layer — rasterize it before painting on it.</span>
+		<button
+			class="mini-btn"
+			title="Convert this text layer to a plain raster layer so paint tools can edit it"
+			onclick={rasterizeTextLayer}
+		>
+			Render Layer to Raster Layer
+		</button>
+	{:else if isPaint && !isPencil}
 		<PdnSlider label="Size" min={1} max={300} step={1} bind:value={$brushSize} />
 		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$brushOpacity} />
 		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$brushHardness} />

@@ -14,6 +14,7 @@
 	import Sidebar from './shell/Sidebar.svelte';
 	import ColorBar from './shell/ColorBar.svelte';
 	import StatusBar from './shell/StatusBar.svelte';
+	import ZoomBar from './shell/ZoomBar.svelte';
 	import EditorCanvas from './canvas/EditorCanvas.svelte';
 	import StartScreen from './start/StartScreen.svelte';
 	import DialogHost from './dialogs/DialogHost.svelte';
@@ -74,6 +75,7 @@
 		<div class="flex h-full flex-1 items-stretch border-l" style="border-color:#3a3a3a;">
 			<StatusBar />
 		</div>
+		<ZoomBar />
 	</div>
 
 	<DialogHost />

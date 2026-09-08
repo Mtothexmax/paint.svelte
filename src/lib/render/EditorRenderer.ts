@@ -143,6 +143,12 @@ export class EditorRenderer {
 		return this.activeScene.ensureStroke();
 	}
 
+	/** Re-inserts the live stroke overlay above the ACTIVE layer sprite. Called
+	 * when a stroke begins so the preview composites at the right z-position. */
+	setStrokeOverlayPosition(): void {
+		this.activeScene?.setStrokeOverlayPosition();
+	}
+
 	/** Rebuilds the active scene's layer sprites (e.g. after a surface swap). */
 	rebuildActiveLayers(): void {
 		if (this.activeScene) this.activeScene.resync(this.surfaces);

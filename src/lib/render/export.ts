@@ -57,3 +57,42 @@ export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): P
 	const baseName = doc.name.replace(/\.[^.]+$/, '');
 	downloadBlob(blob, `${baseName}.png`);
 }
+
+/** Encodes a surface's pixels at 100% into a PNG blob. The surface keeps its
+ * alpha (suitable for clipboard copies of selections). */
+export async function surfaceToPngBlob(
+	renderer: EditorRenderer,
+	surfaceId: string,
+	w: number,
+	h: number
+): Promise<Blob> {
+	const rt = RenderTexture.create({ width: w, height: h, resolution: 1 });
+	const sprite = new Sprite(renderer.surfaces.getTexture(surfaceId));
+	const holder = new Container();
+	holder.addChild(sprite);
+	renderer.app.renderer.render({ container: holder, target: rt, clear: true });
+
+	const probe = new Sprite(rt);
+	const canvas = renderer.app.renderer.extract.canvas({ target: probe, resolution: 1 }) as HTMLCanvasElement;
+	const blob = await canvasToBlob(canvas);
+	probe.destroy();
+	sprite.destroy();
+	holder.destroy();
+	rt.destroy(true);
+	return blob;
+}
+
+/** Writes a surface to the SYSTEM clipboard as PNG (readable by external image
+ * editors). Rejects if the Clipboard API or a permission is unavailable. */
+export async function writeSurfaceToSystemClipboard(
+	renderer: EditorRenderer,
+	surfaceId: string,
+	w: number,
+	h: number
+): Promise<void> {
+	if (typeof navigator === 'undefined' || !navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+		throw new Error('Clipboard API not available in this browser.');
+	}
+	const blob = await surfaceToPngBlob(renderer, surfaceId, w, h);
+	await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+}

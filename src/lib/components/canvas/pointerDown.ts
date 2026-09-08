@@ -35,6 +35,8 @@ import { recolorHardness, recolorOpacity, recolorSize } from '../../state/recolo
 import { applyFill } from '../../services/fillService';
 import { applyWandSelection } from '../../services/wandService';
 import { deselect } from '../../services/selectionService';
+import { convertTextToRaster } from '../../services/textService';
+import { openDialog } from '../../services/dialogService';
 import { isTextTarget } from './keyboard';
 import { selectionToolKind, type PointerApi } from './pointerRelease';
 import { EYEDROPPER, KIND, PAINT_TOOLS, SELECT_TOOLS } from './tools';
@@ -462,39 +464,55 @@ export function handlePointerDown(e: PointerEvent, a: PointerDownApi): void {
 	}
 	if ((e.button === 0 || e.button === 2) && PAINT_TOOLS.has(tool) && hasDoc) {
 		e.preventDefault();
-		a.setPainting(true);
-		a.setPaintPointerId(e.pointerId);
-		a.capture(e);
-		if (!a.brushEngine()) a.setBrushEngine(new BrushEngine(getEditorRenderer()));
-		const engine = a.brushEngine()!;
-		const img = a.toImage(e);
-		const isPencilStroke = tool === 'pencil';
-		const kind = KIND[tool] ?? 'brush';
-		const rawColor = e.button === 2 ? get(backgroundColor) : get(foregroundColor);
-		const color = rawColor;
-		engine.begin(
-			isPencilStroke
-				? {
-						kind: 'pencil',
-						size: 1,
-						opacity: 1,
-						hardness: 1,
-						spacingRatio: 0,
-						antiAlias: false,
-						color
-					}
-				: {
-						kind,
-						size: get(brushSize),
-						opacity: get(brushOpacity) / 100,
-						hardness: get(brushHardness) / 100,
-						spacingRatio: get(brushSpacing) / 100,
-						antiAlias: get(antiAliasMode) === 'smooth',
-						color
-					},
-			img
-		);
+		const paintDoc = documentRegistry.active;
+		const activeLayer = paintDoc?.layers.find((l) => l.id === paintDoc.activeLayerId);
+		if (activeLayer?.kind === 'text') {
+			// Text layers only accept paint once they are rasterised. Ask first
+			// (the confirmation resumes this exact stroke afterwards).
+			openDialog('rasterizeConfirm', {
+				onConfirm: () => {
+					convertTextToRaster(activeLayer.id);
+					startPaintStroke(a, e, tool);
+				}
+			});
+			return;
+		}
+		startPaintStroke(a, e, tool);
 	}
+}
+
+function startPaintStroke(a: PointerDownApi, e: PointerEvent, tool: string): void {
+	a.setPainting(true);
+	a.setPaintPointerId(e.pointerId);
+	a.capture(e);
+	if (!a.brushEngine()) a.setBrushEngine(new BrushEngine(getEditorRenderer()));
+	const engine = a.brushEngine()!;
+	const img = a.toImage(e);
+	const isPencilStroke = tool === 'pencil';
+	const kind = KIND[tool] ?? 'brush';
+	const color = e.button === 2 ? get(backgroundColor) : get(foregroundColor);
+	engine.begin(
+		isPencilStroke
+			? {
+					kind: 'pencil',
+					size: 1,
+					opacity: 1,
+					hardness: 1,
+					spacingRatio: 0,
+					antiAlias: false,
+					color
+				}
+			: {
+					kind,
+					size: get(brushSize),
+					opacity: get(brushOpacity) / 100,
+					hardness: get(brushHardness) / 100,
+					spacingRatio: get(brushSpacing) / 100,
+					antiAlias: get(antiAliasMode) === 'smooth',
+					color
+				},
+		img
+	);
 }
 
 function clampImage(p: Point): Point {

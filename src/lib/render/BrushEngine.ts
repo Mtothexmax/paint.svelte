@@ -10,13 +10,14 @@
 // sampling is distance-based (independent of pointer event frequency and
 // velocity).
 
-import { CanvasSource, Container, Rectangle, RenderTexture, Sprite, Texture } from 'pixi.js';
+import { CanvasSource, Container, Rectangle, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js';
 import type { Point, Rect } from '../core/geometry';
 import type { RGBA } from '../core/color';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
 import type { SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
+import { checkerTexture } from './checkerboard';
 
 export type PaintToolKind = 'brush' | 'pencil' | 'eraser';
 
@@ -151,6 +152,10 @@ export class BrushEngine {
 	private dirtyRect: Rect | null = null;
 	private rafPending = false;
 	private strokeId = 0;
+	/** Rect-sized RT holding the live ERASER preview (layer minus stroke). */
+	private previewTex: RenderTexture | null = null;
+	/** Scratch RT: the layer with the stroke erased out (holes transparent). */
+	private reducedTex: RenderTexture | null = null;
 
 	constructor(renderer: EditorRenderer) {
 		this.renderer = renderer;
@@ -189,6 +194,10 @@ export class BrushEngine {
 		const eff = settings.kind === 'eraser' ? 0.45 : settings.opacity * (settings.color.a / 255);
 		stroke.overlay.alpha = eff;
 		stroke.overlay.tint = settings.kind === 'eraser' ? 0xffffff : rgbToInt(settings.color);
+		stroke.overlay.texture = stroke.target;
+		stroke.overlay.position.set(0, 0);
+		stroke.overlay.blendMode = 'normal';
+		this.renderer.setStrokeOverlayPosition();
 
 		if (start) this.lineTo(start);
 		return true;
@@ -224,9 +233,6 @@ export class BrushEngine {
 			this.rafPending = true;
 			requestAnimationFrame(() => {
 				this.rafPending = false;
-				if (PENCIL_TRACE && isPencilStroke) {
-					console.log('[pencil] stroke #%s RAF fire pathLen=%s', this.strokeId, this.path.length);
-				}
 				this.rasterize();
 			});
 		}
@@ -419,6 +425,79 @@ export class BrushEngine {
 
 		this.renderer.app.renderer.render({ container: wrap2, target: stroke.target, clear: true });
 		wrap2.destroy({ children: true });
+
+		if (s.kind === 'eraser') this.renderEraserPreview();
+	}
+
+	/** Renders the live ERASER preview: the ACTIVE LAYER with the dab mask
+	 * erased out, composited OVER the transparency checkerboard, into a
+	 * rect-sized texture shown at the layer's stack position. The eraser
+	 * therefore acts "in real time on its layer" instead of painting a
+	 * whitish/transparent preview on top of everything. (Without the checker
+	 * pass the erased holes would stay transparent and reveal the still-opaque
+	 * layer underneath, making the preview look like nothing happened.) */
+	private renderEraserPreview(): void {
+		const stroke = this.renderer.getActiveStroke();
+		const doc = this.doc;
+		const s = this.settings;
+		const rect = this.dirtyRect;
+		if (!stroke || !doc || !s || this.layerId === null || !rect) return;
+		const dw = rect.width;
+		const dh = rect.height;
+		if (dw <= 0 || dh <= 0) return;
+
+		if (!this.previewTex || this.previewTex.width < dw || this.previewTex.height < dh) {
+			this.previewTex?.destroy(true);
+			this.previewTex = RenderTexture.create({ width: dw, height: dh, resolution: 1 });
+		}
+		if (!this.reducedTex || this.reducedTex.width < dw || this.reducedTex.height < dh) {
+			this.reducedTex?.destroy(true);
+			this.reducedTex = RenderTexture.create({ width: dw, height: dh, resolution: 1 });
+		}
+		const eraseAlpha = Math.max(0, Math.min(1, s.opacity));
+
+		// Pass 1 — the layer with the stroke ALREADY erased out of it. The dab
+		// mask lives in doc coordinates, so both sprites share the -(rect.x/rect.y)
+		// shift that maps doc space into this sub-rect texture.
+		const reduced = new Container();
+		const layerSprite = new Sprite(this.renderer.surfaces.getTexture(this.layerId));
+		layerSprite.position.set(-rect.x, -rect.y);
+		reduced.addChild(layerSprite);
+		const dabSprite = new Sprite(stroke.target);
+		dabSprite.position.set(-rect.x, -rect.y);
+		dabSprite.blendMode = 'erase';
+		dabSprite.alpha = eraseAlpha;
+		reduced.addChild(dabSprite);
+		this.renderer.app.renderer.render({ container: reduced, target: this.reducedTex, clear: true });
+		reduced.destroy({ children: true });
+
+		// Pass 2 — `reduced` composited OVER the same checkerboard the scene
+		// draws. The erased holes are transparent in `reduced`, so the checker
+		// shows through them and the live preview looks exactly like the
+		// committed result (checkerboard behind a half-erased layer) instead of
+		// revealing the still-opaque layer beneath the overlay.
+		const composite = new Container();
+		const checker = new TilingSprite({
+			texture: checkerTexture(8, this.renderer.checkerDark ? 'dark' : 'bright'),
+			width: doc.width,
+			height: doc.height
+		});
+		// Keep the preview's checker phase/scale identical to the scene's
+		// (DocScene applyView uses tileScale = 1/zoom in doc space).
+		const zoom = Math.max(0.001, doc.view?.zoom ?? 1);
+		checker.tileScale.set(1 / zoom, 1 / zoom);
+		composite.addChild(checker);
+		const reducedSprite = new Sprite(this.reducedTex);
+		composite.addChild(reducedSprite);
+		this.renderer.app.renderer.render({ container: composite, target: this.previewTex, clear: true });
+		composite.destroy({ children: true });
+
+		stroke.overlay.texture = this.previewTex;
+		stroke.overlay.position.set(rect.x, rect.y);
+		stroke.overlay.tint = 0xffffff;
+		stroke.overlay.alpha = 1;
+		stroke.overlay.blendMode = 'normal';
+		stroke.overlay.visible = true;
 	}
 
 	/** Commits the stroke into the layer, records undo/redo, cleans up. */
@@ -513,8 +592,18 @@ export class BrushEngine {
 		layerObj.surfaceId = afterId;
 
 		stroke.overlay.visible = false;
+		stroke.overlay.texture = stroke.target;
+		stroke.overlay.position.set(0, 0);
 		if (stroke.target) {
 			surfaces.renderInto(stroke.target, new Container(), true);
+		}
+		if (this.previewTex) {
+			this.previewTex.destroy(true);
+			this.previewTex = null;
+		}
+		if (this.reducedTex) {
+			this.reducedTex.destroy(true);
+			this.reducedTex = null;
 		}
 
 		this.renderer.rebuildActiveLayers();
@@ -569,10 +658,20 @@ export class BrushEngine {
 			const stroke = this.renderer.getActiveStroke();
 			if (stroke) {
 				stroke.overlay.visible = false;
+				stroke.overlay.texture = stroke.target;
+				stroke.overlay.position.set(0, 0);
 				if (stroke.target) {
 					this.renderer.surfaces.renderInto(stroke.target, new Container(), true);
 				}
 			}
+		}
+		if (this.previewTex) {
+			this.previewTex.destroy(true);
+			this.previewTex = null;
+		}
+		if (this.reducedTex) {
+			this.reducedTex.destroy(true);
+			this.reducedTex = null;
 		}
 		this.bufferActive = false;
 		this.doc = null;

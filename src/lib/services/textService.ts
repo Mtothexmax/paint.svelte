@@ -60,14 +60,18 @@ export function commitTextDraft(input: TextDraftInput, existingLayerId?: string 
 		color: { ...input.color }
 	};
 
+	const singleLine = input.text.replace(/\s+/g, ' ').trim();
+
 	const existing =
 		existingLayerId != null ? doc.layers.find((l) => l.id === existingLayerId && l.kind === 'text') : undefined;
 	if (existing) {
 		const layer = existing;
 		const beforeId = layer.surfaceId;
+		const beforeName = layer.name;
 		const beforeText = layer.text ? { ...layer.text, color: { ...layer.text.color } } : undefined;
 		layer.surfaceId = afterId;
 		layer.text = content;
+		layer.name = `Text Layer: ${singleLine}`;
 		renderer.rebuildActiveLayers();
 		doc.setDirty(true);
 		documentRegistry.notifyChange(doc);
@@ -77,6 +81,7 @@ export function commitTextDraft(input: TextDraftInput, existingLayerId?: string 
 			undo: () => {
 				if (layer.surfaceId === afterId) {
 					layer.surfaceId = beforeId;
+					layer.name = beforeName;
 					if (beforeText) layer.text = beforeText;
 					renderer.rebuildActiveLayers();
 				}
@@ -84,6 +89,7 @@ export function commitTextDraft(input: TextDraftInput, existingLayerId?: string 
 			redo: () => {
 				if (layer.surfaceId === beforeId) {
 					layer.surfaceId = afterId;
+					layer.name = `Text Layer: ${singleLine}`;
 					layer.text = { ...content, color: { ...content.color } };
 					renderer.rebuildActiveLayers();
 				}
@@ -96,7 +102,7 @@ export function commitTextDraft(input: TextDraftInput, existingLayerId?: string 
 		return true;
 	}
 
-	const layer = createTextLayer(afterId, `Text ${doc.layers.length + 1}`, content);
+	const layer = createTextLayer(afterId, `Text Layer: ${singleLine}`, content);
 	const index = doc.layers.length;
 	doc.insertLayer(layer, index);
 	doc.setActiveLayer(layer.id);
@@ -135,9 +141,11 @@ export function convertTextToRaster(id: string): void {
 	if (!layer || layer.kind !== 'text') return;
 	const renderer = getEditorRenderer();
 	const text = layer.text ? { ...layer.text, color: { ...layer.text.color } } : undefined;
+	const beforeName = layer.name;
 
 	layer.kind = 'raster';
 	layer.text = undefined;
+	layer.name = layer.name.replace(/^Text Layer:\s*/, '');
 	renderer.rebuildActiveLayers();
 	doc.setDirty(true);
 	documentRegistry.notifyChange(doc);
@@ -146,6 +154,7 @@ export function convertTextToRaster(id: string): void {
 		label: 'Convert to Raster',
 		undo: () => {
 			layer.kind = 'text';
+			layer.name = beforeName;
 			if (text) layer.text = text;
 			renderer.rebuildActiveLayers();
 			documentRegistry.notifyChange(doc);
@@ -153,6 +162,7 @@ export function convertTextToRaster(id: string): void {
 		redo: () => {
 			layer.kind = 'raster';
 			layer.text = undefined;
+			layer.name = beforeName.replace(/^Text Layer:\s*/, '');
 			renderer.rebuildActiveLayers();
 			documentRegistry.notifyChange(doc);
 		},

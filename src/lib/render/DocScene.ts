@@ -103,8 +103,8 @@ export class DocScene {
 			height: doc.height
 		});
 		this.checker.roundPixels = false;
-		this.root.addChild(this.checker);
-		this.rebuildLayers(surfaces);
+this.root.addChild(this.checker);
+			this.rebuildLayers(surfaces);
 		this.top.addChild(this.tintShape);
 		this.top.addChild(this.ants);
 		this.top.addChild(this.transformHandles);
@@ -135,8 +135,24 @@ export class DocScene {
 			this.root.addChild(sprite);
 			return sprite;
 		});
-		if (this.strokeOverlay) this.root.addChild(this.strokeOverlay); // keep stroke on top
+		this.setStrokeOverlayPosition(); // stroke preview composites at its layer
 		this.raiseTop(); // selection indicator + ants stay above everything
+	}
+
+	/** Re-inserts the live stroke overlay directly ABOVE the ACTIVE layer sprite
+	 * so an in-progress stroke composites at the correct layer position instead
+	 * of painting over every layer until release. */
+	setStrokeOverlayPosition(): void {
+		const overlay = this.strokeOverlay;
+		if (!overlay) return;
+		if (overlay.parent !== this.root) this.root.addChild(overlay);
+		const idx = this.doc.layers.findIndex((layer) => layer.id === this.doc.activeLayerId);
+		const anchor = idx >= 0 ? this.layerSprites[idx] : null;
+		if (!anchor || anchor.parent !== this.root) return;
+		this.root.removeChild(overlay);
+		const next = this.root.children[this.root.getChildIndex(anchor) + 1];
+		if (next) this.root.addChildAt(overlay, this.root.getChildIndex(next));
+		else this.root.addChild(overlay);
 	}
 
 	/** Rebuilds layer sprites after a surface swap (e.g. after an effect). */
@@ -195,6 +211,7 @@ export class DocScene {
 				this.strokeBuffer.source.style.update();
 			}
 			this.root.addChild(this.strokeOverlay);
+			this.setStrokeOverlayPosition();
 			// A selection may already be active when the overlay is created —
 			// apply the pending clip texture now.
 			if (this.strokeClipTexture) this.applyStrokeClip(this.strokeClipTexture);

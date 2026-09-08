@@ -58,3 +58,45 @@ export const selectionActive = readable<boolean>(false, (set) => {
 	sync();
 	return () => unsubs.forEach((u) => u());
 });
+
+/** True while the ACTIVE LAYER of the active document is a text layer.
+ * Drives the "Render Layer to Raster Layer" hint and the paint guard. */
+export const activeLayerIsText = readable<boolean>(false, (set) => {
+	const sync = () => {
+		const doc = documentRegistry.active;
+		if (!doc) return set(false);
+		const layer = doc.layers.find((l) => l.id === doc.activeLayerId);
+		set(!!layer && layer.kind === 'text');
+	};
+	const unsubs = [
+		documentRegistry.events.on(RegistryEvents.opened, sync),
+		documentRegistry.events.on(RegistryEvents.closed, sync),
+		documentRegistry.events.on(RegistryEvents.active, sync),
+		documentRegistry.events.on(RegistryEvents.changed, sync)
+	];
+	sync();
+	return () => unsubs.forEach((u) => u());
+});
+
+/** Selection bounding size (W×H in px) of the active document, or null. */
+export const selectionSize = readable<{ w: number; h: number } | null>(null, (set) => {
+	const sync = () => {
+		const sel = documentRegistry.active?.selection;
+		if (sel?.active && sel.bounds) {
+			set({
+				w: Math.max(1, Math.round(sel.bounds.width)),
+				h: Math.max(1, Math.round(sel.bounds.height))
+			});
+		} else {
+			set(null);
+		}
+	};
+	const unsubs = [
+		documentRegistry.events.on(RegistryEvents.opened, sync),
+		documentRegistry.events.on(RegistryEvents.closed, sync),
+		documentRegistry.events.on(RegistryEvents.active, sync),
+		documentRegistry.events.on(RegistryEvents.changed, sync)
+	];
+	sync();
+	return () => unsubs.forEach((u) => u());
+});

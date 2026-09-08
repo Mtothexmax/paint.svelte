@@ -109,18 +109,37 @@
 		};
 	}
 
-	function ensureLoaded(): void {
-		// Enumerate the installed OS fonts (async; no-op where unsupported).
-		// Built-ins stay pinned on top, system families append alphabetically.
-		// Previews activate lazily per visible row (see lazyConfirm).
-		void querySystemFontFamilies().then((system) => {
-			if (!system.length) return;
-			const known = new Set(families.map((f) => f.toLowerCase()));
-			const extra = system.filter((f) => !known.has(f.toLowerCase()));
-			if (!extra.length) return;
-			systemCount = extra.length;
-			families = [...families, ...extra];
-		});
+	/** True once the user opted to enumerate the installed OS fonts (via the
+	 * footer button). Enumeration is never automatic — it triggers the
+	 * browser's Local Font Access permission prompt, which must be explicit. */
+	let systemFontsRequested = $state(false);
+	let systemFontsLoading = $state(false);
+	let systemFontsError = $state(false);
+
+	/** Enumerates the installed OS fonts on demand (first click prompts for
+	 * the Local Font Access permission). Built-ins stay pinned on top; system
+	 * families append alphabetically. Previews activate lazily per visible
+	 * row (see lazyConfirm). */
+	function loadSystemFonts(): void {
+		if (systemFontsRequested || systemFontsLoading) return;
+		systemFontsRequested = true;
+		systemFontsLoading = true;
+		systemFontsError = false;
+		void querySystemFontFamilies()
+			.then((system) => {
+				if (!system.length) return;
+				const known = new Set(families.map((f) => f.toLowerCase()));
+				const extra = system.filter((f) => !known.has(f.toLowerCase()));
+				if (!extra.length) return;
+				systemCount = extra.length;
+				families = [...families, ...extra];
+			})
+			.finally(() => {
+				systemFontsLoading = false;
+			})
+			.catch(() => {
+				systemFontsError = true;
+			});
 	}
 
 	function toggle(): void {
@@ -128,7 +147,6 @@
 		if (open) {
 			filter = '';
 			scrolledCount = -1;
-			ensureLoaded();
 		}
 	}
 
@@ -210,6 +228,26 @@
 				<div class="fontdrop-foot">{visible.length} of {families.length}</div>
 			{:else if systemCount > 0}
 				<div class="fontdrop-foot">{systemCount} system fonts</div>
+			{/if}
+			{#if !filter.trim()}
+				<button
+					type="button"
+					class="fontdrop-sys"
+					disabled={systemFontsRequested && (!systemFontsError && (systemCount > 0 || systemFontsLoading))}
+					onclick={loadSystemFonts}
+				>
+					{#if systemFontsLoading}
+						Laden…
+					{:else if systemCount > 0}
+						System-Schriftarten geladen ({systemCount})
+					{:else if systemFontsRequested && !systemFontsError}
+						Keine System-Schriftarten verfügbar
+					{:else if systemFontsRequested && systemFontsError}
+						System-Schriftarten konnten nicht geladen werden
+					{:else}
+						System-Schriftarten laden
+					{/if}
+				</button>
 			{/if}
 		</div>
 	{/if}

@@ -2,11 +2,16 @@
 
 import { writable } from 'svelte/store';
 
-export type DialogKind = 'newImage' | 'blur' | 'hueSat' | 'brightCont' | null;
+export type DialogKind = 'newImage' | 'blur' | 'hueSat' | 'brightCont' | 'rasterizeConfirm' | null;
 
 export interface DialogState {
 	kind: DialogKind;
 	payload?: unknown;
+}
+
+/** Payload for the 'rasterizeConfirm' dialog: invoked when the user confirms. */
+export interface RasterizeConfirmPayload {
+	onConfirm: () => void;
 }
 
 export const dialog = writable<DialogState>({ kind: null });
