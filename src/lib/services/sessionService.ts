@@ -3,8 +3,21 @@
 // the next launch, so closing/reloading the tab keeps your open tabs.
 //
 // A doc is stored only while it is open; closing a tab removes it from the
-// snapshot. Saves are debounced on document change plus a background flush, and
-// a final flush runs on pagehide.
+// snapshot.
+//
+// Reliability model
+// ----------------
+// - Serialisation (slow: GPU readbacks + PNG encode) starts IMMEDIATELY on
+//   every change and is cached; superseded runs are dropped. This means a
+//   snapshot with the latest pixels is usually ready by the time the user
+//   closes/reloads the tab, instead of only being started after a debounce.
+// - The DB write itself is cheap and runs right after each completed
+//   serialisation (plus a pagehide flush). It uses ONE readwrite transaction
+//   (clear + puts), so a reload mid-write can never leave an empty store.
+//
+// IndexedDB transactions auto-commit when control returns to the event loop,
+// so all transaction work is arranged synchronously after the async
+// serialisation completes.
 
 import { documentRegistry, RegistryEvents } from '../core/document/registry';
 import { ImageDocument } from '../core/document/ImageDocument';
@@ -17,6 +30,8 @@ import type { EditorRenderer } from '../render/EditorRenderer';
 const DB_NAME = 'paint.svelte';
 const DB_VERSION = 2;
 const STORE = 'documents';
+
+const WRITE_DEBOUNCE_MS = 350;
 
 interface SavedLayer {
 	kind: 'raster' | 'text';
@@ -42,12 +57,12 @@ interface SavedDoc {
 function openDb(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
 		const req = indexedDB.open(DB_NAME, DB_VERSION);
-req.onupgradeneeded = () => {
-		// Records are keyed by an auto-increment number so getAll() (which
-		// returns records in key order) preserves the original tab order.
-		if (req.result.objectStoreNames.contains(STORE)) req.result.deleteObjectStore(STORE);
-		req.result.createObjectStore(STORE, { autoIncrement: true });
-	};
+		req.onupgradeneeded = () => {
+			// Records are keyed by an auto-increment number so getAll() (which
+			// returns records in key order) preserves the original tab order.
+			if (req.result.objectStoreNames.contains(STORE)) req.result.deleteObjectStore(STORE);
+			req.result.createObjectStore(STORE, { autoIncrement: true });
+		};
 		req.onsuccess = () => resolve(req.result);
 		req.onerror = () => reject(req.error ?? new Error('Could not open the session database.'));
 	});
@@ -62,24 +77,24 @@ function getAll(db: IDBDatabase): Promise<SavedDoc[]> {
 	});
 }
 
-function clearStore(db: IDBDatabase): Promise<void> {
+function txCompleted(tx: IDBTransaction): Promise<void> {
 	return new Promise((resolve, reject) => {
-		const tx = db.transaction(STORE, 'readwrite');
-		tx.objectStore(STORE).clear();
 		tx.oncomplete = () => resolve();
-		tx.onerror = () => reject(tx.error ?? new Error('Could not clear saved sessions.'));
+		tx.onerror = () => reject(tx.error ?? new Error('Could not persist the session.'));
 	});
 }
 
-function openTx(db: IDBDatabase): { store: IDBObjectStore; done: Promise<void> } {
+/** Writes the whole snapshot atomically (clear + puts in ONE transaction). */
+async function writeRecords(records: SavedDoc[]): Promise<void> {
+	const db = await openDb();
 	const tx = db.transaction(STORE, 'readwrite');
-	return {
-		store: tx.objectStore(STORE),
-		done: new Promise((resolve, reject) => {
-			tx.oncomplete = () => resolve();
-			tx.onerror = () => reject(tx.error ?? new Error('Could not persist the session.'));
-		})
-	};
+	const store = tx.objectStore(STORE);
+	store.clear();
+	for (const record of records) {
+		store.put(record);
+	}
+	await txCompleted(tx);
+	db.close();
 }
 
 async function serializeDoc(renderer: EditorRenderer, doc: ImageDocument): Promise<SavedDoc> {
@@ -110,49 +125,113 @@ async function serializeDoc(renderer: EditorRenderer, doc: ImageDocument): Promi
 	};
 }
 
-// Serialises whole-session saves so concurrent calls (event-triggered, pagehide,
-// restore) never interleave DB clear + writes.
-let persistChain: Promise<void> = Promise.resolve();
-
-/** Writes the current set of open documents to IndexedDB. */
-export function persistSession(): Promise<void> {
-	persistChain = persistChain.then(() => doPersist());
-	return persistChain;
-}
-
-async function doPersist(): Promise<void> {
-	if (typeof indexedDB === 'undefined') return;
-	if (documentRegistry.count === 0) {
-		await clearStore(await openDb());
-		return;
-	}
-	const renderer = hasEditorRenderer() ? getEditorRenderer() : await rendererReady;
-	// Serialize (async GPU readbacks) BEFORE opening the transaction: IDB
-	// transactions auto-commit when control returns to the event loop.
+async function serializeAll(renderer: EditorRenderer): Promise<SavedDoc[]> {
+	if (documentRegistry.count === 0) return [];
 	const pending: SavedDoc[] = [];
 	for (const doc of documentRegistry.all) {
 		pending.push(await serializeDoc(renderer, doc));
 	}
-	const db = await openDb();
-	await clearStore(db);
-	const tx = openTx(db);
-	for (const record of pending) {
-		tx.store.put(record);
-	}
-	await tx.done;
-	db.close();
+	return pending;
 }
 
+// --- snapshot pipeline -----------------------------------------------------
+//
+// dirtyVersion: bumps on every session-affecting event.
+// preparedVersion: the version whose serialisation is currently cached.
+// writtenVersion: the version currently in the DB.
+// latestSerialized: the freshest completed snapshot.
+
+let dirtyVersion = 0;
+let preparedVersion = 0;
+let writtenVersion = 0;
+let latestSerialized: SavedDoc[] | null = null;
+let prepareChain: Promise<void> = Promise.resolve();
+let writeTimer: ReturnType<typeof setTimeout> | null = null;
 let restoring = false;
+
+function schedulePrepare(): void {
+	const v = dirtyVersion;
+	prepareChain = prepareChain.then(async () => {
+		if (v !== dirtyVersion) return; // superseded before this run even started
+		try {
+			const renderer = hasEditorRenderer() ? getEditorRenderer() : await rendererReady;
+			const snapshot = await serializeAll(renderer);
+			if (v !== dirtyVersion) return; // superseded mid-flight — drop it
+			latestSerialized = snapshot;
+			preparedVersion = v;
+			scheduleWrite();
+		} catch {
+			// Serialisation can fail transiently (context loss); a later event
+			// re-triggers it. Ignored.
+		}
+	});
+}
+
+/** Debounces DB writes so rapid edits don't hammer IndexedDB. */
+function scheduleWrite(): void {
+	if (writeTimer) clearTimeout(writeTimer);
+	writeTimer = setTimeout(() => void writePrepared(), WRITE_DEBOUNCE_MS);
+}
+
+let writeChain: Promise<void> = Promise.resolve();
+
+function writePrepared(): Promise<void> {
+	if (writeTimer) {
+		clearTimeout(writeTimer);
+		writeTimer = null;
+	}
+	const v = preparedVersion;
+	if (v <= writtenVersion) return Promise.resolve();
+	const snapshot = latestSerialized;
+	if (!snapshot) return Promise.resolve();
+	writeChain = writeChain
+		.then(() => writeRecords(snapshot))
+		.then(() => {
+			if (v > writtenVersion) writtenVersion = v;
+		})
+		.catch(() => undefined);
+	return writeChain;
+}
+
+/** Marks the session dirty and starts the background snapshot pipeline. */
+function markSessionDirty(): void {
+	dirtyVersion++;
+	schedulePrepare();
+}
+
+/**
+ * Forces a write of the freshest possible snapshot: bumps the version, waits
+ * until it is serialised, then writes immediately. Used on open (so a fresh
+ * tab survives a quick reload) and on pagehide (best-effort flush).
+ */
+let persistChain: Promise<void> = Promise.resolve();
+
+export function persistSession(): Promise<void> {
+	const run = async () => {
+		dirtyVersion++;
+		const v = dirtyVersion;
+		let guard = 0;
+		while (preparedVersion < v && guard++ < 64) {
+			await prepareChain;
+		}
+		await writePrepared();
+	};
+	persistChain = persistChain.then(run);
+	return persistChain;
+}
+
+// --- restore ---------------------------------------------------------------
 
 /** Re-opens the documents stored by the previous session (if any). */
 export async function restoreSession(): Promise<void> {
 	if (typeof indexedDB === 'undefined') return;
 	restoring = true;
+	preparedVersion = dirtyVersion; // existing cached snapshots belong to the old session
+	writtenVersion = dirtyVersion;
 	try {
 		const db = await openDb();
 		const saved = await getAll(db);
-		await clearStore(db);
+		await writeRecords([]); // atomically empty the store; the rebuilt set is saved below
 		db.close();
 		if (!saved.length) return;
 
@@ -216,43 +295,21 @@ export interface SessionPersistence {
 	stop: () => void;
 }
 
-let persistTimer: ReturnType<typeof setTimeout> | null = null;
-
-function schedulePersist(): void {
-	if (restoring || persistTimer) return;
-	persistTimer = setTimeout(() => {
-		persistTimer = null;
-		void persistSession();
-	}, 1200);
-}
-
-/** Wires document events to debounced persistence. Returns a cleanup function. */
+/** Wires document events to the snapshot pipeline. Returns a cleanup function. */
 export function startSessionPersistence(): SessionPersistence {
-	const onEvent = () => schedulePersist();
+	const mark = () => markSessionDirty();
 	const onOpen = () => {
-		// A freshly opened tab should survive an immediate reload, so save it
-		// right away (no debounce). The persist queue serialises this with any
-		// in-flight save.
+		// A freshly opened tab should survive an immediate reload: start the
+		// snapshot right away and force a write once it is ready.
+		markSessionDirty();
 		void persistSession();
 	};
 	documentRegistry.events.on(RegistryEvents.opened, onOpen);
-	documentRegistry.events.on(RegistryEvents.closed, onEvent);
-	documentRegistry.events.on(RegistryEvents.changed, onEvent);
-	documentRegistry.events.on(RegistryEvents.active, onEvent);
-
-	const background = setInterval(() => {
-		if (persistTimer) {
-			clearTimeout(persistTimer);
-			persistTimer = null;
-			void persistSession();
-		}
-	}, 5000);
+	documentRegistry.events.on(RegistryEvents.closed, mark);
+	documentRegistry.events.on(RegistryEvents.changed, mark);
+	documentRegistry.events.on(RegistryEvents.active, mark);
 
 	const onPageHide = () => {
-		if (persistTimer) {
-			clearTimeout(persistTimer);
-			persistTimer = null;
-		}
 		void persistSession();
 	};
 	window.addEventListener('pagehide', onPageHide);
@@ -260,14 +317,13 @@ export function startSessionPersistence(): SessionPersistence {
 	return {
 		stop: () => {
 			documentRegistry.events.off(RegistryEvents.opened, onOpen);
-			documentRegistry.events.off(RegistryEvents.closed, onEvent);
-			documentRegistry.events.off(RegistryEvents.changed, onEvent);
-			documentRegistry.events.off(RegistryEvents.active, onEvent);
-			clearInterval(background);
+			documentRegistry.events.off(RegistryEvents.closed, mark);
+			documentRegistry.events.off(RegistryEvents.changed, mark);
+			documentRegistry.events.off(RegistryEvents.active, mark);
 			window.removeEventListener('pagehide', onPageHide);
-			if (persistTimer) {
-				clearTimeout(persistTimer);
-				persistTimer = null;
+			if (writeTimer) {
+				clearTimeout(writeTimer);
+				writeTimer = null;
 			}
 		}
 	};
