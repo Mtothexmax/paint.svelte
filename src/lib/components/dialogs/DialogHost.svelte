@@ -6,6 +6,7 @@
 	import HueSatDialog from './HueSatDialog.svelte';
 	import BrightContDialog from './BrightContDialog.svelte';
 	import RasterizeConfirmDialog from './RasterizeConfirmDialog.svelte';
+	import ImageSizeDialog from './ImageSizeDialog.svelte';
 </script>
 
 {#if $dialog.kind === 'newImage'}
@@ -18,4 +19,6 @@
 	<BrightContDialog />
 {:else if $dialog.kind === 'rasterizeConfirm'}
 	<RasterizeConfirmDialog />
+{:else if $dialog.kind === 'imageSize'}
+	<ImageSizeDialog />
 {/if}

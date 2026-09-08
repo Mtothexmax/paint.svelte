@@ -33,6 +33,8 @@
 		'layers.add': '➕',
 		'layers.duplicate': '⧉',
 		'layers.delete': '🗑️',
+		'image.resize': '📐',
+		'image.canvasSize': '⬜',
 		'adjustments.hueSat': '🌈',
 		'adjustments.invertColors': '🔁',
 		'effects.blur': '💧'

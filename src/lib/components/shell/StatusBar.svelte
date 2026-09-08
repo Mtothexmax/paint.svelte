@@ -2,6 +2,7 @@
 	// Layer: components. Bottom status bar: notice, document size, zoom, cursor.
 	import { statusBar, notice } from '../../state/ui';
 	import { selectionSize } from '../../state/documents';
+	import { openDialog } from '../../services/dialogService';
 </script>
 
 	<div class="flex h-full w-full items-center gap-4 overflow-hidden px-3 text-xs select-none" style="color:#bdbdbd;">
@@ -9,7 +10,14 @@
 		<span class="notice" class:error={$notice.kind === 'error'}>{$notice.text}</span>
 	{/if}
 	{#if $statusBar.imageW !== null}
-		<span>{$statusBar.imageW} × {$statusBar.imageH}</span>
+		<button
+			type="button"
+			class="status-dim"
+			title="Change image or canvas size"
+			onclick={() => openDialog('imageSize')}
+		>
+			{$statusBar.imageW} × {$statusBar.imageH}
+		</button>
 	{/if}
 	{#if $statusBar.selW !== null}
 		<span>{$statusBar.selW} × {$statusBar.selH}</span>

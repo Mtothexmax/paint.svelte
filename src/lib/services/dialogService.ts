@@ -2,7 +2,7 @@
 
 import { writable } from 'svelte/store';
 
-export type DialogKind = 'newImage' | 'blur' | 'hueSat' | 'brightCont' | 'rasterizeConfirm' | null;
+export type DialogKind = 'newImage' | 'blur' | 'hueSat' | 'brightCont' | 'rasterizeConfirm' | 'imageSize' | null;
 
 export interface DialogState {
 	kind: DialogKind;
@@ -12,6 +12,11 @@ export interface DialogState {
 /** Payload for the 'rasterizeConfirm' dialog: invoked when the user confirms. */
 export interface RasterizeConfirmPayload {
 	onConfirm: () => void;
+}
+
+/** Payload for the 'imageSize' dialog: which tab to start on. */
+export interface ImageSizeDialogPayload {
+	mode?: 'resize' | 'canvas';
 }
 
 export const dialog = writable<DialogState>({ kind: null });

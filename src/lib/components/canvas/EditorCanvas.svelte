@@ -1563,6 +1563,7 @@ function onPointerDown(e: PointerEvent) {
 			);
 			disposers.push(
 				documentRegistry.events.on(RegistryEvents.changed, () => {
+					updateStatus(documentRegistry.active);
 					syncTransformUi();
 				})
 			);

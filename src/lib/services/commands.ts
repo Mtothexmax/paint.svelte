@@ -197,6 +197,18 @@ export function registerBuiltinCommands(): void {
 				}
 			},
 			isEnabled: () => !!documentRegistry.active?.selection.active
+		},
+		{
+			id: 'image.resize',
+			label: 'Resize…',
+			run: () => openDialog('imageSize', { mode: 'resize' }),
+			isEnabled: hasDoc
+		},
+		{
+			id: 'image.canvasSize',
+			label: 'Canvas Size…',
+			run: () => openDialog('imageSize', { mode: 'canvas' }),
+			isEnabled: hasDoc
 		}
 	]);
 
