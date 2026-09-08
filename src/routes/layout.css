@@ -421,6 +421,19 @@ background-size: 6px 6px;
 .notice.error {
 	color: #fca5a5;
 }
+.status-dim {
+	background: none;
+	border: none;
+	padding: 0;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+	border-radius: 3px;
+}
+.status-dim:hover {
+	text-decoration: underline;
+	color: #e8e8e8;
+}
 
 /* ---- Paint.NET-style brush preview ring (canvas cursor) ---- */
 .brush-preview-ring {
