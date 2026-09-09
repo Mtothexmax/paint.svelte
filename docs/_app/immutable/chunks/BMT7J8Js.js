@@ -1,0 +1,1 @@
+import{r as e}from"../nodes/2.D4rdJuri.js";export{e as createNewDocument};
