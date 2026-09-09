@@ -1,0 +1,702 @@
+
+> paint.svelte@0.0.1 dev
+> vite dev
+
+
+  [32m[1mVITE[22m v8.2.2[39m  [2mready in [0m[1m1244[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+
+[1;31m[404] GET /favicon.ico[0m
+6:11:09 PM [vite-plugin-svelte] src/lib/components/App.svelte:42:0 `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:09 PM [vite-plugin-svelte] src/lib/components/shell/ColorPickerPanel.svelte:192:0 `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:09 PM [vite-plugin-svelte] src/lib/components/shell/ColorPickerPanel.svelte:214:5 Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props
+6:11:09 PM [vite-plugin-svelte] src/lib/components/shell/ColorPickerPanel.svelte:230:6 Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props
+6:11:09 PM [vite-plugin-svelte] src/lib/components/shell/ColorPickerPanel.svelte:241:6 Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props
+6:11:10 PM [vite-plugin-svelte] src/lib/components/canvas/EditorCanvas.svelte:1682:2 `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/canvas/EditorCanvas.svelte:1727:3 `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/canvas/EditorCanvas.svelte:1742:3 `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/ContextMenu.svelte:54:1 `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/ContextMenu.svelte:10:5 `root` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/EffectPanel.svelte:238:0 `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/EffectPanel.svelte:239:1 `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/EffectPanel.svelte:262:5 Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/EffectPanel.svelte:262:5 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/EffectPanel.svelte:288:2 `<div>` with a dragover or drop handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/EffectPanel.svelte:290:4 Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/EffectPanel.svelte:290:4 `<div>` with a click, dragstart, dragover, drop or dragend handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/shell/TabBar.svelte:27:3 Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/EffectDialog.svelte:23:24 This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/ImageSizeDialog.svelte:105:0 Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/ImageSizeDialog.svelte:105:0 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/ImageSizeDialog.svelte:106:1 Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/ImageSizeDialog.svelte:106:1 Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/CurvesDialog.svelte:203:2 `<svg>` with a pointerdown, pointermove, pointerup or dblclick handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/LayerEffectDialog.svelte:27:24 This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/LayerEffectDialog.svelte:30:2 This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/LayerEffectDialog.svelte:31:22 This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/NewImageDialog.svelte:72:0 Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/NewImageDialog.svelte:72:0 `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/NewImageDialog.svelte:73:1 Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/NewImageDialog.svelte:73:1 Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/LevelsDialog.svelte:363:4 `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/dialogs/LevelsDialog.svelte:377:4 `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/ContextSlider.svelte:14:18 This reference only captures the initial value of `value`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/IconSplitButton.svelte:74:1 Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/IconSplitButton.svelte:74:1 `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/IconSplitButton.svelte:75:20 Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/IconSplitButton.svelte:75:20 `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/IconSplitButton.svelte:76:1 Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/IconSplitButton.svelte:76:1 `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/LayersPanel.svelte:320:2 `<div>` with a dragover or drop handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/LayersPanel.svelte:327:4 Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events
+6:11:10 PM [vite-plugin-svelte] src/lib/components/panels/LayersPanel.svelte:327:4 `<div>` with a click, contextmenu, dragstart, dragover, drop, dragend, pointerenter or pointerleave handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+6:11:10 PM [vite-plugin-svelte] src/lib/components/common/MovableDialog.svelte:56:1 `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions
+
+[1;31m[404] GET /favicon.ico[0m
+[2m6:12:01 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css[22m
+[2m6:12:01 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2mscripts/_shrinkdbg.mjs[22m
+
+[1;31m[404] GET /favicon.ico[0m
+
+[1;31m[404] GET /favicon.ico[0m
+
+[1;31m[404] GET /favicon.ico[0m
+
+[1;31m[404] GET /favicon.ico[0m
+
+[1;31m[404] GET /favicon.ico[0m
+[2m6:21:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/shell/ToolOptions.svelte, /src/routes/layout.css[22m
+[2m6:21:15 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/shell/ToolOptions.svelte[22m
+[2m6:21:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/shell/ToolOptions.svelte, /src/routes/layout.css[22m
+[2m6:21:19 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/shell/ToolOptions.svelte[22m
+[2m6:21:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/components/shell/ToolOptions.svelte, /src/routes/layout.css[22m
+[2m6:21:24 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/shell/ToolOptions.svelte[22m
+[2m6:21:32 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/canvas/EditorCanvas.svelte[22m
+[2m6:21:32 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/canvas/pointerDown.ts[22m
+[2m6:21:36 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/canvas/EditorCanvas.svelte[22m
+[2m6:21:36 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/canvas/pointerDown.ts[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:21:47 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:22:14 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/0.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/1.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/app.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/nodes/2.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/client/matchers.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/shared/error-template.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/server/internal.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.js[22m
+[2m6:22:16 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2m.svelte-kit/generated/root.svelte[22m
+[2m6:24:45 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/shell/ColorBar.svelte, /src/lib/components/shell/ColorPickerPanel.svelte, /src/lib/components/shell/StatusBar.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/Toolbar.svelte, /src/lib/components/shell/ToolOptions.svelte, /src/lib/components/shell/ZoomBar.svelte, /src/lib/components/start/StartScreen.svelte and 7 more[22m
+[2m6:24:45 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/state/ui.ts[22m
+[2m6:32:26 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:32:26 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:32:29 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:32:29 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:35:38 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:35:38 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:35:42 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:35:42 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:35:42 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:35:42 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:35:49 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:35:49 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:35:49 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:35:49 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:36:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:36:16 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:36:30 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:36:30 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:36:54 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:36:54 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:37:22 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:37:22 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:37:39 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:37:39 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:38:11 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:38:11 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:38:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:38:19 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:38:21 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:38:21 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:38:27 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:38:27 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:39:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:39:03 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:39:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:39:15 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:39:17 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:39:17 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:39:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:39:18 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:39:29 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:39:29 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:41:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:41:14 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:41:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:41:15 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:41:17 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:41:17 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:41:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:41:18 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:41:27 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:41:27 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:41:38 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:41:38 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:41:46 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/LayersPanel.css[22m
+[2m6:41:46 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/LayersPanel.css[22m
+[2m6:53:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m6:53:15 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m6:53:15 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-d319df09-9070-4607-9027-9d2651e7ac2a
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m6:54:59 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m6:54:59 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m6:54:59 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-fa21bfdb-06e5-44b5-a679-14f794db82f0
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m6:55:22 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m6:55:22 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m6:55:23 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-fa21bfdb-06e5-44b5-a679-14f794db82f0
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m6:56:34 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/panels/EffectPanel.css[22m
+[2m6:56:34 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/components/panels/EffectPanel.css[22m
+[2m6:58:31 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m6:58:31 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m6:58:32 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-92d66bc4-470d-440f-9210-e73e280eccf6
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m6:58:45 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m6:58:45 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m6:58:45 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-92d66bc4-470d-440f-9210-e73e280eccf6
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m6:58:55 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m6:58:55 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m6:58:56 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-92d66bc4-470d-440f-9210-e73e280eccf6
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m6:59:13 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m6:59:13 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m6:59:14 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-92d66bc4-470d-440f-9210-e73e280eccf6
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:01:04 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:01:04 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:01:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-6beb745f-8662-4637-a928-1ac2b78dbf23
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:01:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:01:14 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:01:14 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-6beb745f-8662-4637-a928-1ac2b78dbf23
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:04:37 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:04:37 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:04:38 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-9e11c392-99a5-4308-bfa6-5d51ff241817
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:04:49 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:04:49 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:04:49 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-9e11c392-99a5-4308-bfa6-5d51ff241817
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:05:05 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:05:06 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:05:06 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-9e11c392-99a5-4308-bfa6-5d51ff241817
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:05:22 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:05:22 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:05:22 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-9e11c392-99a5-4308-bfa6-5d51ff241817
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:07:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:07:19 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:07:19 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-892dc198-9f49-446c-a75d-21905c5b92e5
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:07:30 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:07:30 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:07:30 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-892dc198-9f49-446c-a75d-21905c5b92e5
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:07:42 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:07:42 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:07:42 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-892dc198-9f49-446c-a75d-21905c5b92e5
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:07:58 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:07:58 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:07:58 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-892dc198-9f49-446c-a75d-21905c5b92e5
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:08:05 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:08:05 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:08:05 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-892dc198-9f49-446c-a75d-21905c5b92e5
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:08:21 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:08:21 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:08:21 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-892dc198-9f49-446c-a75d-21905c5b92e5
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:11:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:11:18 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:11:18 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-40eb4ca0-cc47-4a3a-affa-839fd3415b09
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > src/lib/render/DocScene.ts:140:62
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:16:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:16:03 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:16:03 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-65874c2d-7c9b-42b4-a12b-ed25f02bf47b
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:16:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:16:14 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m
+[2m7:16:14 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mError[22m: Unknown surface: sfc-65874c2d-7c9b-42b4-a12b-ed25f02bf47b
+[39m > SurfaceStore.getTexture src/lib/render/SurfaceStore.ts:90:18
+    88 |  	getTexture(id: SurfaceId): RenderTexture {
+    89 |  		const tex = this.surfaces.get(id);
+    90 |  		if (!tex) throw new Error(`Unknown surface: ${id}`);
+       |                    ^
+    91 |  		return tex;
+    92 |  	}
+ > DocScene.renderEffectChain src/lib/render/DocScene.ts:181:32
+ > DocScene.layerEffectTexture src/lib/render/DocScene.ts:160:21
+ > src/lib/render/DocScene.ts:140:24
+ > DocScene.rebuildLayers src/lib/render/DocScene.ts:139:38
+ > new DocScene src/lib/render/DocScene.ts:116:8
+ > EditorRenderer.addDoc src/lib/render/EditorRenderer.ts:78:26
+ > EditorRenderer.init src/lib/render/EditorRenderer.ts:54:47
+ > initEditorRenderer src/lib/render/EditorRenderer.ts:433:1
+
+[2m7:17:33 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mERROR: 0:56: 'weightSum' : undeclared identifier
+ERROR: 0:56: 'sum' : undeclared identifier
+ERROR: 0:56: 'weightSum' : undeclared identifier
+WARNING: 0:56: '/' : Zero divided by zero during constant folding generated NaN
+ERROR: 0:57: 'emin' : undeclared identifier
+WARNING: 0:57: '=' : global variable initializers should be constant expressions (uniforms and globals are allowed in global initializers for legacy compatibility)
+ERROR: 0:60: 'c' : syntax error
+ 
+[2m7:17:33 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22m0: #define SHADER_NAME custom-effect-fragment
+1: 
+2: 
+3:         #ifdef GL_ES // This checks if it is WebGL1
+4:         #define in varying
+5:         #define finalColor gl_FragColor
+6:         #define texture texture2D
+7:         #endif
+8:         precision mediump float;
+9: 
+10: 	in vec2 vTextureCoord;
+11: 	
+12: 
+13: 	uniform sampler2D uTexture;
+14: 	uniform highp vec4 uInputSize;
+15: 	uniform float uRadius;
+16: 	uniform float uShrink;
+17: 
+18: 	void main()
+19: 	{
+20: 		vec4 c = texture(uTexture, vTextureCoord);
+21: 		float originalAlpha = c.a;
+22: 		vec2 px = uInputSize.zw;
+23: 		float r = min(uRadius, 10.0);
+24: 		float s = min(uShrink, 20.0);
+25: 		float sigma = max(r * 0.5, 0.0001);
+26: 		float maxDist = 3.0 * sigma;
+27: 		float R = ceil(maxDist);
+28: 		const float gaussCutoff = 0.011109;
+29: 
+30: 		float emin = c.a;
+31: 		float sum = 0.0;
+32: 		float weightSum = 0.0;
+33: 
+34: 	
+35: 	for (int x = -20; x <= 20; x++) {
+36: 		float ax = abs(float(x));
+37: 		if (ax > R) continue;
+38: 		for (int y = -20; y <= 20; y++) {
+39: 			float ay = abs(float(y));
+40: 			float d = max(ax, ay);
+41: 			if (d > R) continue;
+42: 			float a = texture(uTexture, vTextureCoord + vec2(float(x), float(y)) * px).a;
+43: 			if (d <= s) {
+44: 					emin = min(emin, a);
+45: 				}
+46: 			if (d <= maxDist) {
+47:     float gauss = exp(- (d * d) / (2.0 * sigma * sigma));
+48:     float w = max(0.0, gauss - gaussCutoff) / (1.0 - gaussCutoff);
+49:     sum += a * w;
+50:     weightSum += w;
+51: }
+52: 				}
+53: 		}
+54: 	}
+55: 		float blurred = weightSum > 0.0 ? sum / weightSum : 0.0;
+56:         float newAlpha = min(emin, blurred);
+57:         
+58:             // Apply new alpha without premultiplying RGB; clear RGB when fully transparent
+59:             c.a = newAlpha;
+60:             if (newAlpha <= 0.0) {
+61:                 finalColor = vec4(0.0);
+62:             } else {
+63:                 finalColor = vec4(c.rgb, newAlpha);
+64:             }
+65: 	}
+66: 
+67:         
+[2m7:17:33 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mPixiJS Error: Could not initialize shader.
+[2m7:17:33 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mPixiJS Warning: gl.getProgramInfoLog() Fragment shader is not compiled.
+ 
+[2m7:17:33 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mPixiJS Warning:  Attribute aPosition is not present in the shader, but is present in the geometry. Unable to infer attribute details.
+[2m7:18:26 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/layout.css, /src/lib/components/App.svelte, /src/lib/components/canvas/EditorCanvas.svelte, /src/lib/components/panels/EffectPanel.svelte, /src/lib/components/shell/MenuBar.svelte, /src/lib/components/dialogs/EffectDialog.svelte, /src/lib/components/dialogs/CurvesDialog.svelte, /src/lib/components/dialogs/LayerEffectDialog.svelte, /src/lib/components/dialogs/LevelsDialog.svelte, /src/lib/components/panels/LayersPanel.svelte, /src/lib/components/shell/TabBar.svelte and 5 more[22m
+[2m7:18:26 PM[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/lib/effects/object/feather.ts[22m

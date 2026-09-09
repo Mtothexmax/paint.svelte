@@ -10,7 +10,7 @@ const BEVEL_FRAGMENT = `
 	out vec4 finalColor;
 
 	uniform sampler2D uTexture;
-	uniform vec4 uInputSize;
+	uniform highp vec4 uInputSize;
 	uniform float uDepth;
 	uniform float uAngle;
 

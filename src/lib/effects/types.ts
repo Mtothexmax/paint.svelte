@@ -20,6 +20,14 @@ export interface EffectParam {
 	default: number;
 	/** Optional CSS background painted on the slider track */
 	gradient?: string;
+	/**
+	 * UI kind: 'slider' (default) renders a FilterSlider bound to
+	 * `settings[key]`; 'color' renders a foreground/background color-picker
+	 * row instead, storing the chosen color in `settings[key]` as packed
+	 * 0xRRGGBB; 'checkbox' renders a checkbox storing 1/0 in `settings[key]`.
+	 * min/max/step are ignored for 'color' and 'checkbox'.
+	 */
+	kind?: 'slider' | 'color' | 'checkbox';
 }
 
 export type EffectSettings = Record<string, number>;

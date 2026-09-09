@@ -24,6 +24,7 @@
 	} from '../../services/layersService';
 	import { layerThumbnails } from '../../state/layerThumbnails';
 	import { openMenu } from '../../state/contextMenu';
+	import { layerEffectsPanelOpen, toggleLayerEffectsPanel } from '../../state/ui';
 	import { convertTextToRaster } from '../../services/textService';
 	import {
 		removeLayerEffect,
@@ -361,9 +362,17 @@
 								}}
 							>{row.visible ? '👁' : '🚫'}</button>
 							<span class="layer-name">{row.name}</span>
-							{#if row.effectCount > 0}
-								<span class="layer-fx" title={`${row.effectCount} layer effect${row.effectCount > 1 ? 's' : ''}`}>fx</span>
-							{/if}
+							<button
+								class="layer-fx"
+								class:on={$layerEffectsPanelOpen}
+								class:hasFx={row.effectCount > 0}
+								title="Toggle the layer-effects panel"
+								onclick={(e) => {
+									e.stopPropagation();
+									selectLayer(row.id);
+									toggleLayerEffectsPanel();
+								}}
+							>fx{#if row.effectCount > 0}<span class="layer-fx-n">{row.effectCount}</span>{/if}</button>
 						</div>
 						<div class="layer-line">
 							{#if row.blendMode !== 'normal' || hoveredId === row.id}

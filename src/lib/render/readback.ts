@@ -32,3 +32,18 @@ export function sampleSurfacePixels(
 		return [data[i], data[i + 1], data[i + 2], data[i + 3]];
 	});
 }
+
+/** Raw RGBA bytes of a whole surface (row-major, 4 bytes per pixel). Used by
+ * UI that needs full-pixel access (e.g. the Levels histogram). */
+export interface SurfaceBytes {
+	pixels: Uint8ClampedArray;
+	width: number;
+	height: number;
+}
+
+export function extractSurfaceBytes(renderer: EditorRenderer, surfaceId: SurfaceId): SurfaceBytes {
+	const sprite = new Sprite(renderer.surfaces.getTexture(surfaceId));
+	const extracted = renderer.app.renderer.extract.pixels({ target: sprite, resolution: 1 });
+	sprite.destroy();
+	return { pixels: extracted.pixels, width: extracted.width, height: extracted.height };
+}

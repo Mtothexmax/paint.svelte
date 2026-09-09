@@ -15,6 +15,7 @@ const ADD_NOISE_FRAGMENT = `
 	uniform float uAmount;
 	uniform float uMonochrome;
 	uniform float uSeed;
+	uniform float uLinkAlpha;
 
 	float hash(vec2 p)
 	{
@@ -26,6 +27,9 @@ const ADD_NOISE_FRAGMENT = `
 		vec2 px = vTextureCoord * uInputSize.xy;
 		float n = hash(px) - 0.5;
 		vec4 c = texture(uTexture, vTextureCoord);
+		// When linked, the noise is bound to the layer's alpha mask instead
+		// of being applied everywhere (strength follows opacity).
+		float m = uLinkAlpha > 0.5 ? clamp(c.a, 0.0, 1.0) : 1.0;
 		float gray = dot(c.rgb, vec3(0.299, 0.587, 0.114));
 		vec3 noise = mix(
 			vec3(n) * vec3(hash(px + 1.7), hash(px + 3.1), hash(px + 5.3)),
@@ -34,7 +38,7 @@ const ADD_NOISE_FRAGMENT = `
 		);
 		vec3 outColor = c.rgb + noise * uAmount * (1.0 + 0.5 * (1.0 - uMonochrome));
 		outColor += (gray - c.rgb + noise * uAmount) * uMonochrome;
-		finalColor = vec4(max(outColor, 0.0), c.a);
+		finalColor = vec4(mix(c.rgb, max(outColor, 0.0), m), c.a);
 	}
 `;
 
@@ -65,6 +69,15 @@ const definition: EffectDefinition = {
 			max: 1000,
 			step: 1,
 			default: 123
+		},
+		{
+			key: 'linkAlpha',
+			label: 'Link to alpha',
+			min: 0,
+			max: 1,
+			step: 1,
+			default: 1,
+			kind: 'checkbox'
 		}
 	],
 	filter: (settings: EffectSettings) =>
@@ -73,7 +86,8 @@ const definition: EffectDefinition = {
 			{
 				uAmount: { value: settings.amount * 0.01, type: 'f32' },
 				uMonochrome: { value: settings.monochrome / 100, type: 'f32' },
-				uSeed: { value: settings.seed, type: 'f32' }
+				uSeed: { value: settings.seed, type: 'f32' },
+				uLinkAlpha: { value: settings.linkAlpha ? 1 : 0, type: 'f32' }
 			},
 			0
 		),

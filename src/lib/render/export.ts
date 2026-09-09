@@ -25,13 +25,14 @@ function downloadBlob(blob: Blob, filename: string): void {
 
 /**
  * Renders the document's layers at 100% into a temporary render target and
- * downloads the result as a PNG.
+ * downloads the result as a PNG. Layers with enabled live effects are
+ * composited through their effect chain (same texture the canvas shows).
  */
 export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): Promise<void> {
 	const container = new Container();
 	for (const layer of doc.layers) {
 		if (!layer.visible) continue;
-		const tex = renderer.surfaces.getTexture(layer.surfaceId);
+		const tex = renderer.exportTextureFor(layer) ?? renderer.surfaces.getTexture(layer.surfaceId);
 		const sprite = new Sprite(tex);
 		sprite.alpha = layer.opacity;
 		sprite.blendMode = SPRITE_BLENDS[layer.blendMode] ?? 'normal';

@@ -55,7 +55,6 @@
 		'Merge Down': '⇩',
 		'Brightness…': '☀️',
 		'Contrast…': '◑',
-		'Sharpen…': '✨',
 		'Blurs': '💧'
 	};
 

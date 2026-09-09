@@ -5,6 +5,8 @@
 	import { onMount } from 'svelte';
 	import MovableDialog from '../common/MovableDialog.svelte';
 	import FilterSlider from '../common/FilterSlider.svelte';
+	import EffectColorRow from '../common/EffectColorRow.svelte';
+	import EffectCheckbox from '../common/EffectCheckbox.svelte';
 	import { getEditorRenderer } from '../../render/EditorRenderer';
 	import { applyEffect, effectById } from '../../effects';
 	import type { EffectSettings } from '../../effects';
@@ -69,16 +71,26 @@
 {#if def}
 	<MovableDialog title={def.label} onClose={cancel} width={380}>
 		{#each def.params as param (param.key)}
-			<FilterSlider
-				label={param.label}
-				min={param.min}
-				max={param.max}
-				step={param.step ?? 1}
-				default={param.default}
-				bind:value={settings[param.key]}
-				oninput={preview}
-				gradient={param.gradient}
-			/>
+			{#if param.kind === 'color'}
+				<EffectColorRow
+					label={param.label}
+					bind:value={settings[param.key]}
+					oninput={preview}
+				/>
+			{:else if param.kind === 'checkbox'}
+				<EffectCheckbox label={param.label} bind:value={settings[param.key]} oninput={preview} />
+			{:else}
+				<FilterSlider
+					label={param.label}
+					min={param.min}
+					max={param.max}
+					step={param.step ?? 1}
+					default={param.default}
+					bind:value={settings[param.key]}
+					oninput={preview}
+					gradient={param.gradient}
+				/>
+			{/if}
 		{/each}
 		<label class="radio">
 			<input type="checkbox" bind:checked={previewOn} onchange={togglePreview} />

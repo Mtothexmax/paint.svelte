@@ -9,7 +9,7 @@ const SHADOW_FRAGMENT = `
 	out vec4 finalColor;
 
 	uniform sampler2D uTexture;
-	uniform vec4 uInputSize;
+	uniform highp vec4 uInputSize;
 	uniform float uOffsetX;
 	uniform float uOffsetY;
 	uniform float uBlur;
@@ -29,10 +29,10 @@ const SHADOW_FRAGMENT = `
 
 		for (int x = -10; x <= 10; x++)
 		{
-			if (float(abs(x)) > r) continue;
+			if (abs(float(x)) > r) continue;
 			for (int y = -10; y <= 10; y++)
 			{
-				if (float(abs(y)) > r) continue;
+				if (abs(float(y)) > r) continue;
 				vec2 off = vec2(float(x), float(y)) * px;
 				blurredA += texture(uTexture, samplePos + off).a;
 				count += 1.0;

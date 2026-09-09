@@ -32,6 +32,7 @@ import {
 } from '../../state/ui';
 import { cloneHardness, cloneOpacity, cloneSize } from '../../state/clone';
 import { recolorHardness, recolorOpacity, recolorSize } from '../../state/recolor';
+import { eyedropperCopyHex } from '../../state/eyedropper';
 import { applyFill } from '../../services/fillService';
 import { applyWandSelection } from '../../services/wandService';
 import { deselect } from '../../services/selectionService';
@@ -300,6 +301,14 @@ export function handlePointerDown(e: PointerEvent, a: PointerDownApi): void {
 		} else {
 			foregroundColor.set(sampled);
 			showNotice(`Foreground ${rgbaToHex(sampled)}`);
+		}
+		if (get(eyedropperCopyHex)) {
+			const hex = rgbaToHex(sampled);
+			if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+				navigator.clipboard
+					.writeText(hex)
+					.catch(() => showNotice('Could not copy to clipboard.', 'error'));
+			}
 		}
 		return;
 	}

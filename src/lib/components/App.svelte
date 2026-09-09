@@ -20,7 +20,8 @@
 	import DialogHost from './dialogs/DialogHost.svelte';
 	import ContextMenu from './common/ContextMenu.svelte';
 	import ColorPickerPanel from './shell/ColorPickerPanel.svelte';
-	import { colorPicker } from '../state/ui';
+	import EffectPanel from './panels/EffectPanel.svelte';
+	import { colorPicker, layerEffectsPanelOpen } from '../state/ui';
 
 	let hasDocs = $derived($documents.docs.length > 0);
 	let colorOpen = $derived($colorPicker !== null);
@@ -54,10 +55,15 @@
 			<div class="toolbar-col"><Toolbar /></div>
 		{/if}
 
-		<div class="relative min-h-0 min-w-0 flex-1">
-			<EditorCanvas />
-			{#if !hasDocs && !colorOpen}
-				<div class="absolute inset-0 z-10"><StartScreen /></div>
+		<div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+			<div class="relative min-h-0 flex-1">
+				<EditorCanvas />
+				{#if !hasDocs && !colorOpen}
+					<div class="absolute inset-0 z-10"><StartScreen /></div>
+				{/if}
+			</div>
+			{#if hasDocs && !colorOpen && $layerEffectsPanelOpen}
+				<EffectPanel />
 			{/if}
 		</div>
 

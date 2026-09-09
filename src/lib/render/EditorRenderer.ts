@@ -6,7 +6,7 @@ import { Application, Sprite, type Texture } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry, RegistryEvents } from '../core/document/registry';
 import type { Point } from '../core/geometry';
-import type { SurfaceId } from '../core/layers/Layer';
+import type { SurfaceId, Layer } from '../core/layers/Layer';
 import { DocScene } from './DocScene';
 import { SurfaceStore } from './SurfaceStore';
 import { affinePoint } from './affine';
@@ -158,6 +158,16 @@ export class EditorRenderer {
 	 * adding, removing, toggling or editing layer effects. */
 	refreshLayerEffects(layerId: string): void {
 		this.activeScene?.refreshLayerEffects(layerId);
+	}
+
+	/**
+	 * Texture to composite for a layer when exporting (PNG) or similar: the
+	 * live effect-rendered texture when the layer has enabled effects,
+	 * otherwise the raw surface texture. Borrowed — must NOT be destroyed.
+	 * Null when there is no active scene (caller falls back to the surface).
+	 */
+	exportTextureFor(layer: Layer): Texture | null {
+		return this.activeScene?.exportTextureFor(layer) ?? null;
 	}
 
 	setActiveLayerPreview(texture: Texture | null, fallback: Texture | null = null): void {

@@ -90,7 +90,7 @@ export function documentAspect(): number {
  * built-ins it uses, e.g.:
  *
  *   in vec2 vTextureCoord;
- *   uniform vec4 uInputSize;
+ *   uniform highp vec4 uInputSize; // MUST match vertex precision (highp) or link fails
  *   uniform sampler2D uTexture;
  *   out vec4 finalColor;
  */

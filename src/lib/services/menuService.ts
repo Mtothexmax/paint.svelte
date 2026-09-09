@@ -105,8 +105,7 @@ export const MENUS: MenuDef[] = [
 				entries: effects.map(
 					(e) => ({ type: 'command' as const, commandId: `effects.${e.id}` })
 				)
-			})),
-			{ type: 'disabled', label: 'Sharpen…' }
+			}))
 		]
 	}
 ];

@@ -1,0 +1,52 @@
+/* ---- effect color row (foreground/background picker buttons) ----
+   Single horizontal row: label + stored-color rectangle + both buttons.
+   Wraps onto two lines in narrow hosts (effect dialogs). */
+.fcol {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 4px 8px;
+	min-width: 0;
+}
+.fcol-label {
+	flex: 0 0 auto;
+	font-size: 11px;
+	color: var(--text-dim);
+	white-space: nowrap;
+}
+/* rectangle showing the currently stored/chosen color */
+.fcol-stored {
+	flex: 0 0 auto;
+	width: 64px;
+	height: 20px;
+	border-radius: 4px;
+	border: 1px solid var(--border);
+	background-image: repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+	background-size: 8px 8px;
+}
+.fcol-btn {
+	flex: 0 1 auto;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 5px 8px;
+	font-size: 12px;
+	color: var(--text);
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	cursor: pointer;
+	min-width: 0;
+	white-space: nowrap;
+}
+.fcol-btn:hover {
+	border-color: var(--accent);
+}
+/* rectangle inside each button showing the live fg/bg color */
+.fcol-swatch {
+	flex: 0 0 auto;
+	width: 22px;
+	height: 16px;
+	border-radius: 3px;
+	border: 1px solid rgba(255, 255, 255, 0.35);
+}

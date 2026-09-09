@@ -1,0 +1,259 @@
+/* ---- docked layer-effects panel (bottom strip, above the status bar) ---- */
+.fx-panel {
+	position: relative;
+	height: 152px;
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: column;
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+}
+.fx-head {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 8px;
+	border-bottom: 1px solid var(--border);
+	background: var(--bg-elev);
+	/* the whole bar is the drag area for resizing the panel height */
+	cursor: ns-resize;
+	user-select: none;
+	touch-action: none;
+}
+.fx-title {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-dim);
+}
+.fx-layer {
+	font-size: 11px;
+	color: var(--text-dim);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* corner resize grip (visual affordance — the whole bar drags) */
+.fx-grip {
+	flex: 0 0 auto;
+	padding: 1px 5px;
+	font-size: 12px;
+	line-height: 1;
+	color: var(--text-dim);
+	user-select: none;
+	pointer-events: none;
+	border-radius: 4px;
+}
+.fx-close {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	border: none;
+	outline: none;
+	border-radius: 4px;
+	background: transparent;
+	cursor: pointer;
+}
+.fx-close:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+.fx-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	align-items: stretch;
+}
+
+/* ---- left toolbar ---- */
+.fx-tools {
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px;
+	border-right: 1px solid var(--border);
+}
+.fx-add {
+	position: relative;
+}
+.fx-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	border: none;
+	outline: none;
+	border-radius: 5px;
+	background: transparent;
+	cursor: pointer;
+}
+.fx-btn:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.08);
+}
+.fx-btn:active:not(:disabled) {
+	background: rgba(255, 255, 255, 0.12);
+}
+.fx-btn:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+.fx-ic {
+	width: 18px;
+	height: 18px;
+	filter: invert(0.88);
+	pointer-events: none;
+}
+
+/* add-effect flyout (opens UPWARD from the bottom dock) */
+.fx-add-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 70;
+	background: transparent;
+}
+    .fx-add-menu {
+        position: absolute;
+        left: 0;
+        bottom: calc(100% + 12px);
+        z-index: 80;
+        width: min(90vw, 800px);
+        max-height: 80vh;
+        overflow-y: auto;
+        padding: 8px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 8px;
+    }
+    .fx-add-head {
+        grid-column: 1 / -1;
+        padding: 5px 8px 2px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-dim);
+    }
+    .fx-add-sep {
+        height: 1px;
+        margin: 4px 0;
+        background: var(--border);
+        grid-column: 1 / -1;
+    }
+    .fx-add-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        width: 100%;
+        padding: 6px 8px;
+        font-size: 12px;
+        color: var(--text);
+        background: transparent;
+        border: none;
+        border-radius: 4px;
+        text-align: left;
+        cursor: pointer;
+    }
+    .fx-add-item:hover {
+        background: var(--accent);
+        color: #fff;
+    }
+.fx-add-ic {
+	flex: 0 0 auto;
+	width: 16px;
+	text-align: center;
+	font-size: 12px;
+	line-height: 1;
+}
+
+/* ---- effect checkbox list ---- */
+.fx-list {
+	flex: 0 0 210px;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 5px;
+	border-right: 1px solid var(--border);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.fx-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 6px;
+	border-radius: 4px;
+	font-size: 12px;
+	color: var(--text);
+	cursor: pointer;
+	user-select: none;
+	white-space: nowrap;
+}
+.fx-item:hover {
+	background: rgba(255, 255, 255, 0.06);
+}
+.fx-item.on {
+	background: var(--accent-soft);
+	box-shadow: inset 0 0 0 1px var(--accent);
+}
+.fx-item.dragging {
+	opacity: 0.4;
+}
+.fx-item.drop-before {
+	box-shadow: inset 0 2px 0 var(--accent);
+}
+.fx-item.drop-after {
+	box-shadow: inset 0 -2px 0 var(--accent);
+}
+.fx-item.on.drop-before {
+	box-shadow:
+		inset 0 0 0 1px var(--accent),
+		inset 0 2px 0 var(--accent);
+}
+.fx-item.on.drop-after {
+	box-shadow:
+		inset 0 0 0 1px var(--accent),
+		inset 0 -2px 0 var(--accent);
+}
+.fx-item input[type='checkbox'] {
+	accent-color: var(--accent);
+	cursor: pointer;
+	flex: 0 0 auto;
+}
+.fx-item-ic {
+	flex: 0 0 auto;
+	width: 14px;
+	text-align: center;
+	font-size: 12px;
+	line-height: 1;
+}
+.fx-item-name {
+	flex: 1 1 auto;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.fx-empty {
+	font-size: 12px;
+	color: #6b6b6b;
+	padding: 4px 6px;
+}
+
+/* ---- selected-effect properties ---- */
+.fx-props {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-y: auto;
+	padding: 6px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}

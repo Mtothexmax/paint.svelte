@@ -67,6 +67,69 @@ export function toggleLayerEffect(layerId: string, index: number): boolean {
 	return true;
 }
 
+/**
+ * Moves a layer effect within the chain. `to` is the insertion index in the
+ * array AFTER removal (0 = top). No-op when from === to. Returns true on
+ * success.
+ */
+export function reorderLayerEffect(layerId: string, from: number, to: number): boolean {
+	const r = getDocAndLayer(layerId);
+	if (!r) return false;
+	const { doc, layer } = r;
+	if (!layer.effects || from < 0 || from >= layer.effects.length) return false;
+
+	const clampedTo = Math.max(0, Math.min(to, layer.effects.length - 1));
+	if (from === clampedTo) return true;
+	const [moved] = layer.effects.splice(from, 1);
+	layer.effects.splice(clampedTo, 0, moved);
+
+	getEditorRenderer().refreshLayerEffects(layerId);
+	doc.setDirty(true);
+	documentRegistry.notifyChange(doc);
+	return true;
+}
+
+/** In-memory clipboard holding a copied effect chain (deep-cloned). */
+let copiedEffects: LayerEffect[] | null = null;
+
+/**
+ * Copies the full effect chain of the given layer into the in-memory
+ * clipboard. Returns true on success (or when the layer has no effects, so
+ * pasting a chain can be hidden — callers check `hasCopiedEffects`).
+ */
+export function copyLayerEffects(layerId: string): boolean {
+	const r = getDocAndLayer(layerId);
+	if (!r) return false;
+	copiedEffects = r.layer.effects
+		? r.layer.effects.map((e) => ({ id: e.id, settings: { ...e.settings }, enabled: e.enabled }))
+		: null;
+	return true;
+}
+
+/** True when a copied effect chain is available for pasting. */
+export function hasCopiedEffects(): boolean {
+	return copiedEffects !== null;
+}
+
+/**
+ * Replaces the target layer's effect chain with the copied one (deep-cloned).
+ * Returns true on success, false when nothing was copied.
+ */
+export function pasteLayerEffects(layerId: string): boolean {
+	if (!copiedEffects) return false;
+	const r = getDocAndLayer(layerId);
+	if (!r) return false;
+	const { doc, layer } = r;
+
+	const chain = copiedEffects.map((e) => ({ id: e.id, settings: { ...e.settings }, enabled: e.enabled }));
+	layer.effects = chain.length ? chain : undefined;
+
+	getEditorRenderer().refreshLayerEffects(layerId);
+	doc.setDirty(true);
+	documentRegistry.notifyChange(doc);
+	return true;
+}
+
 /** Updates the settings of a layer effect. Returns true on success. */
 export function updateLayerEffectSettings(layerId: string, index: number, settings: EffectSettings): boolean {
 	const r = getDocAndLayer(layerId);

@@ -87,14 +87,44 @@ img.layer-thumb {
 	color: var(--text);
 }
 .layer-fx {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	font: inherit;
 	font-size: 9px;
 	font-weight: 700;
+	line-height: 14px;
+	padding: 0 4px;
+	border: none;
+	border-radius: 3px;
+	flex-shrink: 0;
+	cursor: pointer;
+	/* gray while the layer has no effects */
+	color: var(--text-dim);
+	background: rgba(255, 255, 255, 0.06);
+}
+.layer-fx:hover {
+	background: rgba(255, 255, 255, 0.12);
+	color: var(--text);
+}
+/* blueish once the layer has at least one effect */
+.layer-fx.hasFx {
 	color: var(--accent);
 	background: var(--accent-soft);
-	padding: 0 4px;
-	border-radius: 3px;
-	line-height: 14px;
-	flex-shrink: 0;
+}
+.layer-fx.hasFx:hover {
+	color: var(--accent);
+}
+/* ring while the layer-effects panel is open: gray without effects,
+   blueish once the layer has at least one effect */
+.layer-fx.on {
+	box-shadow: inset 0 0 0 1px var(--text-dim);
+}
+.layer-fx.hasFx.on {
+	box-shadow: inset 0 0 0 1px var(--accent);
+}
+.layer-fx-n {
+	font-weight: 700;
 }
 /* Second row line (blend-mode dropdown): keep its height even while the
    dropdown is hidden (Normal + not hovered) so rows don't collapse. */
@@ -102,13 +132,15 @@ img.layer-thumb {
 	min-height: 16px;
 }
 .layer-blend {
+	transform: translateY(-5px);
 	max-width: 92px;
-	padding: 1px 2px;
+	padding: -5px;
 	background: var(--bg);
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: 3px;
 	color: var(--text-dim);
-	font-size: 11px;
+	font-size: 10px;
+
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

@@ -27,6 +27,17 @@ export function resetColors(): void {
 export type ColorTarget = 'fg' | 'bg';
 export const colorPicker = writable<{ target: ColorTarget } | null>(null);
 
+/** Docked layer-effects panel: closed by default, openable via the per-layer
+ * "fx" badge in the Layers panel and closable via its ✕ button. */
+export const layerEffectsPanelOpen = writable<boolean>(false);
+
+export function toggleLayerEffectsPanel(): void {
+	layerEffectsPanelOpen.update((v) => !v);
+}
+export function closeLayerEffectsPanel(): void {
+	layerEffectsPanelOpen.set(false);
+}
+
 export function openColorPicker(target: ColorTarget): void {
 	colorPicker.set({ target });
 }

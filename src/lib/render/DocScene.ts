@@ -162,6 +162,16 @@ this.root.addChild(this.checker);
 		return built;
 	}
 
+	/**
+	 * Texture to composite for a layer when exporting (PNG) or printing: the
+	 * live effect-rendered texture when the layer has enabled effects
+	 * (built on demand), otherwise the raw base surface. Borrowed — the
+	 * caller must NOT destroy it (the scene owns the cache).
+	 */
+	exportTextureFor(layer: Layer): Texture {
+		return this.layerEffectTexture(layer) ?? this.surfaces.getTexture(layer.surfaceId);
+	}
+
 	/** Renders a base surface through a chain of layer effects off-screen.
 	 * Returns a new RenderTexture owned by this DocScene (not the SurfaceStore).
 	 * The caller must dispose it when no longer needed. */

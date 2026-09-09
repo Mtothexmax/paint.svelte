@@ -74,6 +74,7 @@
 	} from '../../state/gradients';
 	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
 	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
+	import { eyedropperCopyHex } from '../../state/eyedropper';
 	import { commands } from '../../services/commandRegistry';
 	import { selectionActive, activeLayerIsText } from '../../state/documents';
 	import { convertTextToRaster } from '../../services/textService';
@@ -126,6 +127,8 @@
 	const isClone = $derived($activeToolId === 'clone-stamp');
 
 	const isRecolor = $derived($activeToolId === 'recolor');
+
+	const isEyedropper = $derived($activeToolId === 'eyedropper');
 
 	const isMovePixels = $derived($activeToolId === 'move-pixels');
 	const isMoveSelection = $derived($activeToolId === 'move-selection');
@@ -684,6 +687,17 @@
 		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$recolorHardness} />
 		<span class="tooloptions-placeholder" title="Paints the foreground colour, destination alpha is preserved">
 			Alpha is preserved.
+		</span>
+	{:else if isEyedropper}
+		<label class="radio" title="Also copy the sampled colour to the system clipboard as a hex string">
+			<input
+				type="checkbox"
+				bind:checked={$eyedropperCopyHex}
+			/>
+			Copy color to clipboard as hex
+		</label>
+		<span class="tooloptions-placeholder" title="Left click samples the foreground slot, right click the background slot">
+			Left click → foreground, right click → background.
 		</span>
 	{:else if isMovePixels}
 		<span class="aa-label">Transform:</span>

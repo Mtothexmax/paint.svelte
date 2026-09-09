@@ -8,6 +8,7 @@
 	import RasterizeConfirmDialog from './RasterizeConfirmDialog.svelte';
 	import ImageSizeDialog from './ImageSizeDialog.svelte';
 	import CurvesDialog from './CurvesDialog.svelte';
+	import LevelsDialog from './LevelsDialog.svelte';
 </script>
 
 {#if $dialog.kind === 'newImage'}
@@ -22,4 +23,6 @@
 	<ImageSizeDialog />
 {:else if $dialog.kind === 'curves'}
 	<CurvesDialog />
+{:else if $dialog.kind === 'levels'}
+	<LevelsDialog />
 {/if}

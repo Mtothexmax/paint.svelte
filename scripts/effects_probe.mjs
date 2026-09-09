@@ -60,7 +60,11 @@ async function main() {
 		'addNoise', 'median', 'reduceNoise',
 		'glow', 'redEyeRemoval', 'sharpen', 'softenPortrait',
 		'clouds', 'flames', 'juliaFractal', 'mandelbrotFractal', 'turbulence',
-		'edgeDetect', 'emboss', 'outline', 'relief'
+		'edgeDetect', 'emboss', 'outline', 'relief',
+		'bevel', 'feather', 'shadow',
+		'autoLevel', 'blackAndWhite', 'brightCont', 'curves', 'exposure',
+		'highlightsShadows', 'hueSat', 'invertAlpha', 'levels', 'posterize',
+		'sepia', 'threshold'
 	];
 	const missing = EXPECTED.filter((id) => !discovery.effects.some((e) => e.id === id));
 	if (missing.length) throw new Error('registry missing: ' + missing.join(','));
@@ -88,11 +92,41 @@ async function main() {
 	log('[2] created doc:', docName);
 
 	// --- Step 3: open every effect dialog (forces shader compile) ----------
-	async function openEffect(menuLabel, effectLabel, hasParams) {
-		await page.evaluate(() =>
-			[...document.querySelectorAll('.menubar-btn')].find((b) => b.textContent.trim() === 'Effects')?.click()
+	async function openEffect(menuLabel, effectLabel, hasParams, direct) {
+		// Adjustments lives in its own top-level menu; everything else nests in
+		// submenus under Effects.
+		await page.evaluate((topMenu) =>
+			[...document.querySelectorAll('.menubar-btn')].find((b) => b.textContent.trim() === topMenu)?.click(),
+			direct ? 'Adjustments' : 'Effects'
 		);
 		await sleep(250);
+		if (direct) {
+			const itemText = hasParams ? effectLabel + '…' : effectLabel;
+			const clicked = await page.evaluate(
+				(lbl) => {
+					const b = [...document.querySelectorAll('.menu-panel .menu-item .menu-text')]
+						.find((s) => (s.textContent || '').trim() === lbl)?.closest('.menu-item');
+					if (!b) return false;
+					b.click();
+					return true;
+				},
+				itemText
+			);
+			if (!clicked) throw new Error('adjustment menu item not found: ' + itemText);
+			await page.waitForSelector('.m-dialog', { timeout: 8000 });
+			await sleep(900);
+			const title = await page.evaluate(() => {
+				const d = document.querySelector('.m-dialog');
+				return d ? (d.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+			});
+			await page.evaluate(() => {
+				const btn = document.querySelector('.m-dialog .btn-secondary');
+				if (btn) btn.click();
+				else document.querySelector('.m-dialog')?.remove();
+			});
+			await sleep(250);
+			return title;
+		}
 		const subOpen = await page.evaluate((lbl) => {
 			const b = [...document.querySelectorAll('.menu-item .menu-text')]
 				.find((s) => s.textContent.trim() === lbl)?.closest('.sub-holder');
@@ -131,7 +165,8 @@ async function main() {
 
 	for (const e of discovery.effects) {
 		const beforeErr = errors.length;
-		const title = await openEffect(e.menu, e.label, e.hasParams);
+		const direct = e.menu === 'Adjustments';
+		const title = await openEffect(e.menu, e.label, e.hasParams, direct);
 		const newErrs = errors.slice(beforeErr);
 		log(`[3] ${e.id} (${e.menu}): dialog=${JSON.stringify(title)} shaderErrors=${newErrs.length ? JSON.stringify(newErrs) : 0}`);
 	}

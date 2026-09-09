@@ -2,7 +2,7 @@
 
 import { writable } from 'svelte/store';
 
-export type DialogKind = 'newImage' | 'effect' | 'layerEffect' | 'curves' | 'rasterizeConfirm' | 'imageSize' | null;
+export type DialogKind = 'newImage' | 'effect' | 'layerEffect' | 'curves' | 'levels' | 'rasterizeConfirm' | 'imageSize' | null;
 
 export interface DialogState {
 	kind: DialogKind;
