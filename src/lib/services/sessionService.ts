@@ -8,9 +8,11 @@
 // Reliability model
 // ----------------
 // - Serialisation (slow: GPU readbacks + PNG encode) starts IMMEDIATELY on
-//   every change and is cached; superseded runs are dropped. This means a
-//   snapshot with the latest pixels is usually ready by the time the user
-//   closes/reloads the tab, instead of only being started after a debounce.
+//   every change and is cached, so a snapshot with the latest pixels is
+//   usually ready by the time the user closes/reloads the tab. Runs are
+//   strictly serialised (one at a time, FIFO) and a completed snapshot is
+//   NEVER discarded: it publishes under the current version even if newer
+//   events arrived mid-run, so rapid event streams can't starve the write.
 // - The DB write itself is cheap and runs right after each completed
 //   serialisation (plus a pagehide flush). It uses ONE readwrite transaction
 //   (clear + puts), so a reload mid-write can never leave an empty store.
@@ -28,7 +30,7 @@ import { fitView } from '../render/Viewport';
 import type { EditorRenderer } from '../render/EditorRenderer';
 
 const DB_NAME = 'paint.svelte';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE = 'documents';
 
 const WRITE_DEBOUNCE_MS = 350;
@@ -54,14 +56,34 @@ interface SavedDoc {
 	dirty: boolean;
 }
 
-function openDb(): Promise<IDBDatabase> {
+/**
+ * Opens the database at the canonical version. The upgrade handler ALWAYS
+ * (re)creates the store so its shape matches this code exactly; if an older
+ * build created a differently-shaped store (e.g. no key generator), the
+ * upgrade re-creates it. As a belt-and-braces check the store shape is also
+ * verified after opening, and a mismatch triggers a one-store bump that
+ * forces the recreation.
+ */
+async function openDb(): Promise<IDBDatabase> {
+	const db = await openVersion(DB_VERSION);
+	if (db.objectStoreNames.contains(STORE)) {
+		const meta = db.transaction(STORE, 'readonly').objectStore(STORE);
+		if (meta.autoIncrement === true && !meta.keyPath) return db;
+	}
+	db.close();
+	await openVersion(DB_VERSION + 1);
+	return openVersion(DB_VERSION);
+}
+
+function openVersion(version: number): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const req = indexedDB.open(DB_NAME, DB_VERSION);
+		const req = indexedDB.open(DB_NAME, version);
 		req.onupgradeneeded = () => {
 			// Records are keyed by an auto-increment number so getAll() (which
 			// returns records in key order) preserves the original tab order.
-			if (req.result.objectStoreNames.contains(STORE)) req.result.deleteObjectStore(STORE);
-			req.result.createObjectStore(STORE, { autoIncrement: true });
+			const result = req.result;
+			if (result.objectStoreNames.contains(STORE)) result.deleteObjectStore(STORE);
+			result.createObjectStore(STORE, { autoIncrement: true });
 		};
 		req.onsuccess = () => resolve(req.result);
 		req.onerror = () => reject(req.error ?? new Error('Could not open the session database.'));
@@ -81,20 +103,29 @@ function txCompleted(tx: IDBTransaction): Promise<void> {
 	return new Promise((resolve, reject) => {
 		tx.oncomplete = () => resolve();
 		tx.onerror = () => reject(tx.error ?? new Error('Could not persist the session.'));
+		tx.onabort = () => reject(tx.error ?? new Error('The session write was aborted.'));
 	});
 }
 
 /** Writes the whole snapshot atomically (clear + puts in ONE transaction). */
 async function writeRecords(records: SavedDoc[]): Promise<void> {
 	const db = await openDb();
-	const tx = db.transaction(STORE, 'readwrite');
-	const store = tx.objectStore(STORE);
-	store.clear();
-	for (const record of records) {
-		store.put(record);
+	try {
+		const tx = db.transaction(STORE, 'readwrite');
+		const store = tx.objectStore(STORE);
+		store.clear();
+		for (const record of records) {
+			const req = store.put(record);
+			req.onerror = () => {
+				if (typeof console !== 'undefined') {
+					console.error(`[session] store.put failed for "${record.name}":`, req.error);
+				}
+			};
+		}
+		await txCompleted(tx);
+	} finally {
+		db.close();
 	}
-	await txCompleted(tx);
-	db.close();
 }
 
 async function serializeDoc(renderer: EditorRenderer, doc: ImageDocument): Promise<SavedDoc> {
@@ -148,21 +179,30 @@ let latestSerialized: SavedDoc[] | null = null;
 let prepareChain: Promise<void> = Promise.resolve();
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
 let restoring = false;
+let lastRunError: string | null = null;
 
 function schedulePrepare(): void {
-	const v = dirtyVersion;
 	prepareChain = prepareChain.then(async () => {
-		if (v !== dirtyVersion) return; // superseded before this run even started
+		// Runs are strictly serialised by the chain, so at most one snapshot
+		// is read back from the GPU at a time. Each run captures the registry
+		// as it exists when it starts.
 		try {
 			const renderer = hasEditorRenderer() ? getEditorRenderer() : await rendererReady;
 			const snapshot = await serializeAll(renderer);
-			if (v !== dirtyVersion) return; // superseded mid-flight — drop it
 			latestSerialized = snapshot;
-			preparedVersion = v;
+			// Completed work is NEVER thrown away: label it with the version
+			// the event stream has reached now, even if more events arrived
+			// during capture. The old behaviour dropped the run when the
+			// version changed mid-capture, so a rapid event stream superseded
+			// the in-flight read-back before it finished and a freshly opened
+			// doc never got written (the pipeline stayed at version 0).
+			preparedVersion = dirtyVersion;
 			scheduleWrite();
-		} catch {
+		} catch (err) {
 			// Serialisation can fail transiently (context loss); a later event
-			// re-triggers it. Ignored.
+			// re-triggers it. Logged so real-browser failures are visible.
+			lastRunError = `${err instanceof Error ? err.message : String(err)}`;
+			if (typeof console !== 'undefined') console.error('[session] serialisation failed:', err);
 		}
 	});
 }
@@ -189,7 +229,13 @@ function writePrepared(): Promise<void> {
 		.then(() => {
 			if (v > writtenVersion) writtenVersion = v;
 		})
-		.catch(() => undefined);
+		.catch((err) => {
+			// A write can fail transiently (quota, context); it is retried by
+			// the next scheduleWrite/persistSession. Logged + exposed so
+			// real-browser failures (e.g. Blob clone errors) are visible.
+			lastRunError = `write failed: ${err instanceof Error ? err.message : String(err)}`;
+			if (typeof console !== 'undefined') console.error('[session] write failed:', err);
+		});
 	return writeChain;
 }
 
@@ -209,18 +255,75 @@ let persistChain: Promise<void> = Promise.resolve();
 export function persistSession(): Promise<void> {
 	const run = async () => {
 		dirtyVersion++;
+		// Schedule a serialisation for THIS version explicitly: the bump above
+		// happens before scheduling, so the queued run is the freshest one (it
+		// runs after any already-queued work and captures the latest state).
+		schedulePrepare();
 		const v = dirtyVersion;
 		let guard = 0;
 		while (preparedVersion < v && guard++ < 64) {
 			await prepareChain;
 		}
 		await writePrepared();
+		console.log(`[session] persist() done (version ${writtenVersion})`);
 	};
 	persistChain = persistChain.then(run);
 	return persistChain;
 }
 
-// --- restore ---------------------------------------------------------------
+// --- dev diagnostics hook --------------------------------------------------
+//
+// Poke these from the browser console without needing console.log spam:
+//   window.__SESSION__.records()     -> what IndexedDB currently holds
+//   window.__SESSION__.state()       -> pipeline counters + last error
+//   window.__SESSION__.persistNow()  -> force a snapshot write now
+//   window.__SESSION__.createNew()   -> open a fresh doc (like File>New)
+export interface SessionDebug {
+	records: () => Promise<SavedDoc[]>;
+	state: () => {
+		dirty: number;
+		prepared: number;
+		written: number;
+		restoring: boolean;
+		docs: number;
+		writePending: boolean;
+		lastError: string | null;
+	};
+	persistNow: () => Promise<void>;
+	createNew: (req?: { width?: number; height?: number }) => Promise<boolean>;
+}
+
+function installDebugHook(): void {
+	if (typeof window === 'undefined') return;
+	const w = window as unknown as { __SESSION__?: SessionDebug };
+	if (w.__SESSION__) return;
+	w.__SESSION__ = {
+		records: async () => {
+			const db = await openDb();
+			const recs = await getAll(db);
+			db.close();
+			return recs;
+		},
+		state: () => ({
+			dirty: dirtyVersion,
+			prepared: preparedVersion,
+			written: writtenVersion,
+			restoring,
+			docs: documentRegistry.count,
+			writePending: writeTimer !== null,
+			lastError: lastRunError
+		}),
+		persistNow: () => persistSession(),
+		createNew: async (req) => {
+			const { createNewDocument } = await import('../services/fileService');
+			return createNewDocument({
+				width: req?.width ?? 800,
+				height: req?.height ?? 600,
+				background: 'transparent'
+			});
+		}
+	};
+}
 
 /** Re-opens the documents stored by the previous session (if any). */
 export async function restoreSession(): Promise<void> {
@@ -233,6 +336,7 @@ export async function restoreSession(): Promise<void> {
 		const saved = await getAll(db);
 		await writeRecords([]); // atomically empty the store; the rebuilt set is saved below
 		db.close();
+		console.log(`[session] restore: ${saved.length} saved document(s) found`);
 		if (!saved.length) return;
 
 		const renderer = await rendererReady;
@@ -242,11 +346,13 @@ export async function restoreSession(): Promise<void> {
 			if (!doc) continue;
 			documentRegistry.open(doc);
 			if (record.active) lastActive = doc.id;
+			console.log(`[session] restored "${doc.name}" (${doc.width}×${doc.height}, ${doc.layers.length} layer(s))`);
 		}
 		if (lastActive) documentRegistry.setActive(lastActive);
 		// The restore rebuilt fresh documents (new ids); re-save the live set so
 		// another reload in this session keeps working.
 		if (documentRegistry.count > 0) await persistSession();
+		console.log('[session] restore finished');
 	} finally {
 		restoring = false;
 	}
@@ -297,6 +403,7 @@ export interface SessionPersistence {
 
 /** Wires document events to the snapshot pipeline. Returns a cleanup function. */
 export function startSessionPersistence(): SessionPersistence {
+	installDebugHook();
 	const mark = () => markSessionDirty();
 	const onOpen = () => {
 		// A freshly opened tab should survive an immediate reload: start the
@@ -310,6 +417,10 @@ export function startSessionPersistence(): SessionPersistence {
 	documentRegistry.events.on(RegistryEvents.active, mark);
 
 	const onPageHide = () => {
+		// Best-effort flush. First write whatever snapshot is ALREADY freshly
+		// serialised (no new GPU readbacks — those may not survive teardown),
+		// then also try to serialise + write the very latest state.
+		writePrepared();
 		void persistSession();
 	};
 	window.addEventListener('pagehide', onPageHide);

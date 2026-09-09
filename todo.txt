@@ -1,0 +1,36 @@
+- Text-Tool: Erstellt einen eigenen, neuen Text-Layer. Der Text auf diesem Layer ist editierbar, aber es kann nur ein Layer pro Text angelegt werden.
+  - Benennung des Layer: Startet als "Text Layer: [Text-Inhalt]". Beim Rastern wird das "Text Layer: " entfernt.
+  - Zeichenschutz & Toolbar-Hinweis (anstatt nervigem Modal):
+      - Auf dem Text-Layer sind Pinsel/Bleistift zunächst deaktiviert.
+      - In der Toolbar erscheint stattdessen ein Button/Hinweis "Render Layer to Raster Layer" (anstatt blockierender Dialoge beim Werkzeugwechsel).
+      - Ein modales Dialogfenster ("Möchten Sie den Layer erst rastern?") soll erst dann erscheinen, wenn man tatsächlich mit dem aktiven Malwerkzeug auf die Leinwand klickt.
+  - Wechsel des Werkzeugs bei aktivem Text-Layer: Sanfter ohne modalen Dialog; erst beim Versuch zu zeichnen greift der Schutz/Dialog.
+  - Malverhalten / Rendering-Fixes für Pinsel & Radierer:
+      ✅ - Pinsel-Striche (Brush Strokes) auf unteren Ebenen: Sofort direkt auf der korrekten Ebene zeichnen (nicht erst nach dem Loslassen über alle Ebenen hinweg einzeichnen).
+      ✅ - Radierer-Werkzeug: Kein Verzögern ("weißes/transparentes Malen" bis zum Loslassen) mehr – der Radierer soll sofort und direkt in Echtzeit auf der Ebene wirken.
+  ✅ - Tastatursteuerung für "Move Selected Pixels" & "Move Selection":
+      ✅ - Mit Pfeiltasten (Oben, Unten, Links, Rechts): Verschiebung um exakt 1 Pixel.
+      ✅ - Mit gedrückter Strg-Taste (Ctrl) + Pfeiltasten: Verschiebung um exakt 10 Pixel.
+  ✅ - Zwischenablage / Clipboard (Strg+C / Copy):
+      ✅ - Kopierte Bildausschnitte oder das gesamte Bild müssen korrekt in die System-Zwischenablage exportiert werden, sodass sie auch von anderen externen Bildbearbeitungsprogrammen gelesen werden können.
+  ✅ - Schriftarten-Auswahl (System-Fonts-Berechtigung):
+      ✅ - Standardmäßig nur Standard-/Browserschriftarten anzeigen (kein automatisches, aufdringliches Berechtigungs-Popup beim Laden der Seite).
+      ✅ - Ganz unten in der Schriftarten-Liste einen Button "System-Schriftarten laden" einfügen.
+      ✅ - Erst beim Klick auf diesen Button wird die System-Schriftarten-API (window.queryLocalFonts()) aufgerufen und der Browser-Dialog zur Erlaubnis ausgelöst.
+  ✅ - Sitzungs-Wiederherstellung über die Cache API / IndexedDB:
+      ✅ - Zuletzt geöffnetes Bild und offene Session im Cache/IndexedDB speichern (nicht im stark größenlimitierten LocalStorage auf 5 MB beschränkt), um große Bilder und den letzten Stand beim erneuten Öffnen wiederherstellen zu können.
+  ✅ - Bild- und Leinwandgröße ändern (Dialog wie bei Paint.net):
+      ✅ - Klick auf die Bild-Dimensionen unten links öffnet einen Einstellungs-Dialog.
+      ✅ - Optionen zur Auswahl: Bildgröße (Resizing/Strecken) ODER Leinwandgröße (Canvas Size mit Platzierungsoptionen, z.B. Bild zentriert oder an Rändern ausgerichtet halten).
+  - Effekte & Adjustments: Effekte von Paint.net sowie Objekt-Effekte (wie aus Bolt Plugins Pack o.ä.) hinzufügen. Diese sollen sowohl unter "Effekte > Object" auswählbar sein als auch als Live-Ebeneneffekte (live gerendert bei Layer-Anpassung, ähnlich wie Ebeneneffekte in Photoshop).
+  - Spezifischer Effekt: "Feather" / "Feder" (aus Bolt Plugin Pack):
+      - Glättet/blurt gezielt den Alpha-Kanal (die Maske) an den Rändern, nicht die Farbwerte.
+      - Zweck: Übergang zwischen komplettem Alpha (Alpha 0) und nicht-komplettem Alpha smoathen, um z.B. ungenaue Freistellungen und störende Ränder (wie eine weiße Outline) zu entfernen.
+  - Dynamische Werkzeug-Anpassung (solange Werkzeug aktiv ist):
+      - Zauberstab (Magic Wand): Live-Aktualisierung der Auswahl bei nachträglicher Toleranz-Änderung (ohne erneutes Klicken).
+      - Fülleimer (Paint Bucket): Live-Aktualisierung der ähnlichen Farb-Toleranz sowie der Füllfarbe nach Änderung der Farbe/Parameter während das Tool aktiv ist.
+  - Ebeneneffekte für Text-Layer & Rasterisierung:
+      - Effekte wie Schatten, Outline/Border und Weichzeichnen sind auf Text-Layer anwendbar.
+      - Beim Umwandeln ("Rastern") des Text-Layers in Raster-Layer bleiben diese Effekte erhalten.
+  - Rechtsklick-Menü:
+      - Option "Render Layer Effects to Layer" (Effekte in den Layer einrechnen/rasten) zum Rechtsklick-Menü hinzufügen.
