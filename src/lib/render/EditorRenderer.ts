@@ -1,4 +1,4 @@
-// Layer: render (pixi). Owns the single Pixi Application, per-document scenes,
+﻿// Layer: render (pixi). Owns the single Pixi Application, per-document scenes,
 // surface store and view reconciliation. This is the ONLY place pixi is wired
 // to the app lifecycle.
 
@@ -11,6 +11,8 @@ import { DocScene } from './DocScene';
 import { SurfaceStore } from './SurfaceStore';
 import { affinePoint } from './affine';
 import { selectionOutlinePoints, traceSelectionOutline } from './selection';
+import { checkerTheme } from '../state/view';
+import { get } from 'svelte/store';
 
 type DocId = string;
 
@@ -48,6 +50,7 @@ export class EditorRenderer {
 			resolution: Math.max(window.devicePixelRatio || 1, 1)
 		});
 		this.app = app;
+		this.checkerDark = get(checkerTheme) === 'dark';
 		this.surfaces.attach(app);
 		this.wireRegistry();
 		// Render any documents that were already registered before init finished.
