@@ -83,7 +83,14 @@ const FEATHER_FRAGMENT = `
         if (newAlpha <= 0.0) {
             finalColor = vec4(0.0);
         } else {
-            finalColor = vec4(c.rgb, newAlpha);
+            // PixiJS textures and filter outputs use premultiplied alpha.
+            // c.rgb is already premultiplied by c.a.  When we reduce alpha we
+            // must scale RGB by the same ratio so the premultiplied invariant
+            // (rgb = straight_rgb * alpha) is preserved.  Without this, the
+            // compositor sees colour values that are too bright for the new
+            // alpha and blends them against white — giving the light-grey fringe.
+            float ratio = (c.a > 0.0) ? (newAlpha / c.a) : 0.0;
+            finalColor = vec4(c.rgb * ratio, newAlpha);
         }
     }
 `;

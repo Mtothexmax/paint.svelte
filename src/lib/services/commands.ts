@@ -18,7 +18,7 @@ import { checkerTheme } from '../state/view';
 import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
 import { copySelection, cutSelection, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
-import { invertColorsScoped } from '../render/effects';
+import { invertColorsScoped, autoLevelScoped, blackAndWhiteScoped, sepiaScoped, invertAlphaScoped } from '../render/effects';
 import { cropToSelection } from '../render/crop';
 import { effects } from '../effects';
 
@@ -270,9 +270,31 @@ export function registerBuiltinCommands(): void {
 			id: 'adjustments.invertColors',
 			label: 'Invert Colors',
 			shortcut: 'Ctrl+Shift+I',
-			run: () => {
-				invertColorsScoped(getEditorRenderer());
-			},
+			run: () => { invertColorsScoped(getEditorRenderer()); },
+			isEnabled: hasDoc
+		},
+		{
+			id: 'adjustments.autoLevel',
+			label: 'Auto-Level',
+			run: () => { autoLevelScoped(getEditorRenderer()); },
+			isEnabled: hasDoc
+		},
+		{
+			id: 'adjustments.blackAndWhite',
+			label: 'Black and White',
+			run: () => { blackAndWhiteScoped(getEditorRenderer()); },
+			isEnabled: hasDoc
+		},
+		{
+			id: 'adjustments.sepia',
+			label: 'Sepia',
+			run: () => { sepiaScoped(getEditorRenderer()); },
+			isEnabled: hasDoc
+		},
+		{
+			id: 'adjustments.invertAlpha',
+			label: 'Invert Alpha',
+			run: () => { invertAlphaScoped(getEditorRenderer()); },
 			isEnabled: hasDoc
 		}
 	]);

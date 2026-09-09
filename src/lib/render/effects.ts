@@ -9,6 +9,10 @@ import { documentRegistry } from '../core/document/registry';
 import type { SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
 import { blitMaskedInto, eraseSelectionRegion } from './selection';
+import autoLevelDef from '../effects/adjustments/autoLevel';
+import blackAndWhiteDef from '../effects/adjustments/blackAndWhite';
+import sepiaDef from '../effects/adjustments/sepia';
+import invertAlphaDef from '../effects/adjustments/invertAlpha';
 
 /**
  * Applies a separable Gaussian blur (Pixi BlurFilter) to the active layer's
@@ -106,4 +110,24 @@ export function invertColorsScoped(renderer: EditorRenderer): boolean {
 		}
 	});
 	return true;
+}
+
+/** Applies Auto-Level to the active layer instantly (no dialog). */
+export function autoLevelScoped(renderer: EditorRenderer): boolean {
+	return applyFilterSwap(renderer, 'Auto-Level', () => autoLevelDef.filter({}));
+}
+
+/** Converts the active layer to greyscale instantly (no dialog). */
+export function blackAndWhiteScoped(renderer: EditorRenderer): boolean {
+	return applyFilterSwap(renderer, 'Black and White', () => blackAndWhiteDef.filter({}));
+}
+
+/** Applies a sepia tone to the active layer instantly (no dialog). */
+export function sepiaScoped(renderer: EditorRenderer): boolean {
+	return applyFilterSwap(renderer, 'Sepia', () => sepiaDef.filter({}));
+}
+
+/** Inverts the alpha channel of the active layer instantly (no dialog). */
+export function invertAlphaScoped(renderer: EditorRenderer): boolean {
+	return applyFilterSwap(renderer, 'Invert Alpha', () => invertAlphaDef.filter({}));
 }

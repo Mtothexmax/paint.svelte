@@ -4,6 +4,15 @@
 
 import { adjustmentEffects, effectMenusWithEntries } from '../effects';
 
+/** Adjustment IDs that should run instantly (no dialog) — mapped to their
+ *  dedicated `adjustments.*` command instead of the dialog-opening `effects.*`. */
+const INSTANT_ADJUSTMENTS: Record<string, string> = {
+	autoLevel: 'adjustments.autoLevel',
+	blackAndWhite: 'adjustments.blackAndWhite',
+	sepia: 'adjustments.sepia',
+	invertAlpha: 'adjustments.invertAlpha'
+};
+
 export type MenuEntry =
 	| { type: 'command'; commandId: string }
 	| { type: 'disabled'; label: string; shortcut?: string }
@@ -83,11 +92,12 @@ export const MENUS: MenuDef[] = [
 		label: 'Adjustments',
 		enabled: true,
 		entries: [
-			// Alphabetical list of registered adjustments + the instant Invert Colors.
+			// The four simple (no-param) adjustments run instantly; everything else
+			// that still has a dialog stays as effects.*.
 			...[
 				...adjustmentEffects.map((e) => ({
 					label: e.label,
-					commandId: `effects.${e.id}`
+					commandId: INSTANT_ADJUSTMENTS[e.id] ?? `effects.${e.id}`
 				})),
 				{ label: 'Invert Colors', commandId: 'adjustments.invertColors' }
 			]
