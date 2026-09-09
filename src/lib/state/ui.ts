@@ -4,6 +4,7 @@
 import { writable, get } from 'svelte/store';
 import { clamp } from '../core/geometry';
 import type { RGBA } from '../core/color';
+import type { MoveToolMode } from '../core/toolMode';
 
 export const activeToolId = writable<string>('brush');
 
@@ -93,9 +94,16 @@ export const antiAliasMode = writable<'pixel' | 'smooth'>('smooth');
 export type SelectionMode = 'replace' | 'add' | 'subtract';
 export const selectionMode = writable<SelectionMode>('replace');
 
-/** Move-pixels distort mode (shear via the corner handles, Photoshop skew
- * style). Session-only; the engine reads it through a subscription. */
-export const moveDistort = writable<boolean>(false);
+/**
+ * Sub-mode of the "Move Selected Pixels" tool (todo3):
+ * - 'move'    — translate the floating selection (move/moveLogic.ts)
+ * - 'rotate'  — rotate / scale about the pivot (move/rotateLogic.ts, the
+ *               former "transform" option renamed to Rotate)
+ * - 'distort' — free 4-corner warp (move/distortLogic.ts, placeholder for now;
+ *               still performs the legacy shear warp)
+ * Session-only; the engine reads it through a subscription.
+ */
+export const moveToolMode = writable<MoveToolMode>('move');
 
 /** Rectangle-select sizing: normal (free), fixed aspect ratio, or fixed size. */
 export type SelectionRatio = 'normal' | 'fixedRatio' | 'fixedSize';

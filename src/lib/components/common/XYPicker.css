@@ -1,0 +1,93 @@
+/* ---- reusable XY position pad (FL Studio style) ---- */
+.xyp {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.xyp-label {
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.xyp-body {
+	display: flex;
+	gap: 10px;
+	align-items: stretch;
+}
+.xyp-pad {
+	position: relative;
+	flex: 0 0 auto;
+	width: 120px;
+	height: 120px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background:
+		linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat,
+		linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat,
+		var(--bg-elev, #1e1e1e);
+	cursor: crosshair;
+	touch-action: none;
+	user-select: none;
+}
+.xyp-dot {
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: var(--accent, #4f8cff);
+	border: 2px solid #fff;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+}
+.xyp-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	justify-content: center;
+}
+.xyp-field {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.xyp-tag {
+	width: 14px;
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.xyp-num {
+	width: 64px;
+	background: var(--bg-elev, #1e1e1e);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 12px;
+	padding: 2px 4px;
+}
+.xyp-num:focus {
+	outline: 1px solid var(--accent, #4f8cff);
+}
+.xyp-reset {
+	flex: 0 0 auto;
+	width: 24px;
+	height: 24px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	border-radius: 5px;
+	color: var(--text-dim);
+	font-size: 15px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0;
+}
+.xyp-reset:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--text);
+}
+.xyp-reset:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}

@@ -99,7 +99,7 @@ function buildMatrix(lv: ChannelLevels): [number, number, number, number, number
 
 const definition: EffectDefinition = {
 	label: 'Auto-Level',
-	icon: '🪜',
+	icon: '🎚️',
 	params: [],
 	filter: (_settings: EffectSettings) => {
 		const lv = analyzeLevels();

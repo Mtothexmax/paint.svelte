@@ -10,7 +10,7 @@
 		brushHardness,
 		brushSpacing,
 		antiAliasMode,
-		moveDistort,
+		moveToolMode,
 		selectionMode,
 		selectionRatio,
 		selectionFixedRatio,
@@ -30,6 +30,7 @@
 		type TextAlign
 	} from '../../state/text';
 	import { get } from 'svelte/store';
+	import { MOVE_TOOL_MODES, MOVE_TOOL_MODE_LABELS, type MoveToolMode } from '../../core/toolMode';
 	import { requestPolygonFinish } from '../../state/polygon';
 	import PdnSlider from '../common/PdnSlider.svelte';
 	import IconSplitButton from '../common/IconSplitButton.svelte';
@@ -132,6 +133,20 @@
 
 	const isMovePixels = $derived($activeToolId === 'move-pixels');
 	const isMoveSelection = $derived($activeToolId === 'move-selection');
+
+	// Move-Pixels sub-modes (todo3): Move / Rotate / Distort. Rotate is the old
+	// "Transform" option renamed; Distort is the new 4-dragger warp (placeholder
+	// until the corner-pin warp lands — it still shears for now).
+	const MOVE_MODE_ICONS: Record<MoveToolMode, string> = {
+		move: '⤢',
+		rotate: '⟳',
+		distort: '◩'
+	};
+	const MOVE_MODE_TITLES: Record<MoveToolMode, string> = {
+		move: 'Move the selection',
+		rotate: 'Rotate and scale about the pivot (axis gizmo follows in the next step)',
+		distort: 'Distort with four independent corner draggers (placeholder — shears for now)'
+	};
 
 	const LINE_STYLE_OPTIONS = [
 		{
@@ -702,22 +717,16 @@
 	{:else if isMovePixels}
 		<span class="aa-label">Transform:</span>
 		<div class="seg" role="group" aria-label="Transform mode">
-			<button
-				class="seg-btn"
-				class:on={!$moveDistort}
-				title="Move, scale and rotate"
-				onclick={() => moveDistort.set(false)}
-			>
-				⤢ Move
-			</button>
-			<button
-				class="seg-btn"
-				class:on={$moveDistort}
-				title="Distort (shear) via the corner handles"
-				onclick={() => moveDistort.set(true)}
-			>
-				◩ Distort
-			</button>
+			{#each MOVE_TOOL_MODES as mode (mode)}
+				<button
+					class="seg-btn"
+					class:on={$moveToolMode === mode}
+					title={MOVE_MODE_TITLES[mode]}
+					onclick={() => moveToolMode.set(mode)}
+				>
+					{MOVE_MODE_ICONS[mode]} {MOVE_TOOL_MODE_LABELS[mode]}
+				</button>
+			{/each}
 		</div>
 		{#if $selectionActive}
 			<button

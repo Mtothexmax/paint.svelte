@@ -33,7 +33,7 @@
 		brushSize,
 		foregroundColor,
 		backgroundColor,
-		moveDistort,
+		moveToolMode,
 		selectionMode,
 		selectionRatio,
 		showNotice
@@ -1102,7 +1102,7 @@ let zoomRightHeld = $state(false);
 			if (tool === 'move-pixels') {
 				if (!moveEngine) {
 					moveEngine = new MoveEngine(getEditorRenderer());
-					moveEngine.setDistortMode(get(moveDistort));
+					moveEngine.setMode(get(moveToolMode));
 				}
 				moveEngine.nudge(dx, dy);
 				syncTransformUi();
@@ -1607,9 +1607,10 @@ function onPointerDown(e: PointerEvent) {
 					if (gradientDraft) queueGradientPreview();
 				})
 			);
-			// Distort toggle → move engine (also applied when created below).
-			const unDistort = moveDistort.subscribe((v) => moveEngine?.setDistortMode(v));
-			disposers.push(unTool, unSize, unPoly, unText, unLine, unGradient, ...unGradientLive, unDistort);
+			// Move sub-mode (move / rotate / distort) → move engine (also
+			// applied when the engine is created later).
+			const unMoveMode = moveToolMode.subscribe((v) => moveEngine?.setMode(v));
+			disposers.push(unTool, unSize, unPoly, unText, unLine, unGradient, ...unGradientLive, unMoveMode);
 
 			const onEnter = () => {
 				pointerInside = true;

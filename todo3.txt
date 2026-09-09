@@ -1,0 +1,24 @@
+the move selected pixels tool has two options move and transform
+
+please move the logic of the transform and the logic for the move into two seperate files if possible and add a 3rd options which is called distort and rename the already existing transform to rotate.
+
+the rotate options should allow moving it but it should also show like blender 3 3d circles one for each axis around which one can rotate it
+
+the distort option must allow to have 4 dragger points and to move each of them individually while the image is streched/transformed/distorted so that the image matches it
+
+first step is just to do the refactoring and to create the placeholder files. then stop after that.
+
+-- step 1 DONE (refactor + placeholders, no new visuals yet) --
+src/lib/core/toolMode.ts        MoveToolMode = 'move' | 'rotate' | 'distort'
+src/lib/render/move/types.ts    TransformHandle / TransformState / TransformGesture
+src/lib/render/move/moveLogic.ts    translation (was in MoveEngine)
+src/lib/render/move/rotateLogic.ts  rotate+scale+pivot (the old "transform", renamed)
+src/lib/render/move/distortLogic.ts 4-corner warp PLACEHOLDER (+ working homography
+                                    helper, not wired yet; still shears for now)
+MoveEngine = session only (lift/float/drop/commit) and delegates to the mode files.
+ToolOptions: 3 buttons (Move / Rotate / Distort), store moveToolMode.
+-- step 2 TODO --
+rotate: draggable + 3 blender-style 3d axis rings (x/y/z) around the selection
+distort: 4 independent corner draggers + projective (homography) warp of the
+floating pixels so the image follows the 4 points (renderer: per-pixel /
+mesh warp — SurfaceStore.blitTransformed is affine only today)

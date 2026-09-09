@@ -6,7 +6,7 @@ import type { EffectDefinition } from '../types';
 // re-premultiplies on output, so the alpha row stays identity.
 const definition: EffectDefinition = {
 	label: 'Black and White',
-	icon: '🌑',
+	icon: '📰',
 	params: [],
 	filter: () => {
 		const cm = new ColorMatrixFilter();

@@ -14,8 +14,10 @@ export interface EffectParam {
 	/** An effect is "no-op" (Apply disabled) at its default value by default */
 	key: string;
 	label: string;
-	min: number;
-	max: number;
+	/** Required for 'slider' / 'angle' kinds; ignored by 'color'/'checkbox'/'xy'
+	 * (the latter uses minX/minY). Kept optional so those kinds stay terse. */
+	min?: number;
+	max?: number;
 	step?: number;
 	default: number;
 	/** Optional CSS background painted on the slider track */
@@ -24,10 +26,22 @@ export interface EffectParam {
 	 * UI kind: 'slider' (default) renders a FilterSlider bound to
 	 * `settings[key]`; 'color' renders a foreground/background color-picker
 	 * row instead, storing the chosen color in `settings[key]` as packed
-	 * 0xRRGGBB; 'checkbox' renders a checkbox storing 1/0 in `settings[key]`.
-	 * min/max/step are ignored for 'color' and 'checkbox'.
+	 * 0xRRGGBB; 'checkbox' renders a checkbox storing 1/0 in `settings[key]`;
+	 * 'xy' renders an XYPicker (FL Studio style pad) writing `settings[keyX]` /
+	 * `settings[keyY]`; 'angle' renders an AnglePicker (dial) bound to
+	 * `settings[key]`. min/max/step are ignored for 'color' and 'checkbox'.
 	 */
-	kind?: 'slider' | 'color' | 'checkbox';
+	kind?: 'slider' | 'color' | 'checkbox' | 'xy' | 'angle';
+	/** (xy only) horizontal range; defaults to -100..100 */
+	minX?: number;
+	maxX?: number;
+	/** (xy only) vertical range; defaults to -100..100 (top = maxY) */
+	minY?: number;
+	maxY?: number;
+	/** (xy only) default Y value (falls back to `default` if omitted) */
+	defaultY?: number;
+	/** (xy only) step for the Y axis (falls back to `step` if omitted) */
+	stepY?: number;
 }
 
 export type EffectSettings = Record<string, number>;

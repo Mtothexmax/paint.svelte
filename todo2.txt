@@ -1,0 +1,3 @@
+when pasting an image it is somehow sometimes weirdly placed so that hte top left of the pasted image is in the center of tha canvas. it should be placed at the top left of the canvas but even better, if pasting show a dialog like paint.net that asks expand canvas, keep canvas size or reset, but only if the dimensions are bigger than the image
+
+also make that dialog so cool like in paint.net where the options are only 3 big buttons and above it the text with already a preview in small of the image to paste

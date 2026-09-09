@@ -66,7 +66,8 @@ const definition: EffectDefinition = {
 			min: 0,
 			max: 360,
 			step: 1,
-			default: 135
+			default: 135,
+			kind: 'angle'
 		}
 	],
 	filter: (settings: EffectSettings) =>

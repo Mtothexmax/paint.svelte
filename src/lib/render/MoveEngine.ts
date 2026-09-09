@@ -7,18 +7,33 @@
 // undoable step. Escape cancels and restores the original state. Works for
 // any selection the mask can express: simple shapes, complements (donuts) and
 // combined add/subtract regions.
+//
+// Sub-modes (todo3): this class owns the SESSION (lift → float → drop/commit,
+// hit-testing, previews). The gesture maths lives in ./move, one file per
+// sub-mode:
+//   • move/moveLogic.ts    — translate (move)
+//   • move/rotateLogic.ts  — rotate / scale / pivot (formerly "transform")
+//   • move/distortLogic.ts — 4-corner warp (placeholder, see the file header)
 
 import { Rectangle, Sprite } from 'pixi.js';
 import type { Point, Rect } from '../core/geometry';
+import type { MoveToolMode } from '../core/toolMode';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
 import type { Layer, SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
 import { blitMaskedInto, boundsOfLoops, complementMaskSurface, eraseSelectionRegion } from './selection';
 import { logTransformDebug } from './transformDebug';
+// Sub-mode modules (todo3): pure gesture maths, one file per mode.
+import { beginMove, moveTo as translateTo, nudge as nudgeOffset, sameOffset, type MoveGesture } from './move/moveLogic';
+import { pivotTo, rotateTo } from './move/rotateLogic';
+import { distortTo } from './move/distortLogic';
+import { beginGesture, isScaleHandle, isTranslationHandle, type TransformGesture, type TransformHandle, type TransformState } from './move/types';
 
 export type MoveBeginResult = 'ok' | 'none';
-export type TransformHandle = 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'pivot' | 'rotate';
+/** Re-exported so the canvas / pointer layers keep their existing imports. */
+export type { TransformHandle } from './move/types';
+export type { MoveToolMode } from '../core/toolMode';
 
 export class MoveEngine {
 	private renderer: EditorRenderer;
@@ -36,15 +51,17 @@ export class MoveEngine {
 	private scaleX = 1;
 	private scaleY = 1;
 	private rotation = 0;
-	/** Shear in radians (distort mode, Photoshop skew style). */
+	/** Shear factors (distort mode — see ./move/distortLogic). */
 	private skewX = 0;
 	private skewY = 0;
-	/** When true, corner/edge handles shear instead of scaling. */
-	private distortMode = false;
+	/** Active sub-mode: 'move' | 'rotate' | 'distort' (options strip). */
+	private mode: MoveToolMode = 'move';
 
-	// drag-in-flight state
+	// drag-in-flight state. The maths lives in ./move/* — here we only keep
+	// the gesture object the active mode module needs.
 	private origin: Point | null = null; // press point of the current drag
-	private baseOffset: Point = { x: 0, y: 0 }; // offset when the drag started
+	private moveGesture: MoveGesture | null = null;
+	private transformGesture: TransformGesture | null = null;
 	private active = false;
 
 	constructor(renderer: EditorRenderer) {
@@ -70,9 +87,14 @@ export class MoveEngine {
 		};
 	}
 
-	/** Switches corner/edge handles between scale and shear (distort). */
-	setDistortMode(v: boolean): void {
-		this.distortMode = v;
+	/** Selects the sub-mode ('move' | 'rotate' | 'distort') — decides which
+	 * module in ./move handles the corner/edge grips. */
+	setMode(v: MoveToolMode): void {
+		this.mode = v;
+	}
+
+	get moveMode(): MoveToolMode {
+		return this.mode;
 	}
 
 	/** True when the current selection mask covers the given image point. A 1×1
@@ -140,7 +162,8 @@ export class MoveEngine {
 		this.rotation = 0;
 		this.skewX = 0;
 		this.skewY = 0;
-		this.baseOffset = { x: 0, y: 0 };
+		this.moveGesture = null;
+		this.transformGesture = null;
 		this.origin = null;
 		this.active = true;
 		logTransformDebug('engine.begin', { bounds, selectionBounds: sel.bounds ?? null });
@@ -159,24 +182,24 @@ export class MoveEngine {
 	beginDrag(p: Point): void {
 		if (!this.active) return;
 		this.origin = { x: Math.round(p.x), y: Math.round(p.y) };
-		this.baseOffset = { x: this.offset.x, y: this.offset.y };
+		// move logic → ./move/moveLogic
+		this.moveGesture = beginMove(p, this.offset);
 	}
 
 	/** Moves the floating preview by the drag offset (integer image px) and
 	 * shifts the ants + tint veil along. Cheap: sprite positions + outline. */
 	moveTo(p: Point): void {
-		if (!this.active || !this.doc || !this.bounds || !this.origin) return;
-		const dx = this.baseOffset.x + Math.round(p.x - this.origin.x);
-		const dy = this.baseOffset.y + Math.round(p.y - this.origin.y);
-		if (dx === this.offset.x && dy === this.offset.y) {
+		if (!this.active || !this.doc || !this.bounds || !this.moveGesture) return;
+		const next = translateTo(this.moveGesture, p);
+		if (sameOffset(next, this.offset)) {
 			this.updateLivePreview();
 			this.applyPreviewTransform();
 			return;
 		}
-		this.offset = { x: dx, y: dy };
+		this.offset = next;
 		const surfaces = this.renderer.surfaces;
 		if (!this.floatingId || !surfaces.has(this.floatingId)) return;
-		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + dx, this.bounds.y + dy);
+		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + next.x, this.bounds.y + next.y);
 		this.applyFloatingTransform();
 		this.updateLivePreview();
 		this.applyPreviewTransform();
@@ -207,13 +230,12 @@ export class MoveEngine {
 			if (this.begin() !== 'ok') return;
 		}
 		if (!this.active || !this.doc || !this.bounds) return;
-		const nx = this.offset.x + Math.round(dx);
-		const ny = this.offset.y + Math.round(dy);
-		if (nx === this.offset.x && ny === this.offset.y) return;
-		this.offset = { x: nx, y: ny };
+		const next = nudgeOffset(this.offset, dx, dy); // move logic → ./move/moveLogic
+		if (sameOffset(next, this.offset)) return;
+		this.offset = next;
 		const surfaces = this.renderer.surfaces;
 		if (!this.floatingId || !surfaces.has(this.floatingId)) return;
-		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + nx, this.bounds.y + ny);
+		this.renderer.setActiveFloating(surfaces.getTexture(this.floatingId), this.bounds.x + next.x, this.bounds.y + next.y);
 		this.applyFloatingTransform();
 		this.updateLivePreview();
 		this.applyPreviewTransform();
@@ -234,191 +256,91 @@ export class MoveEngine {
 		);
 	}
 
-	/** Starts a resize, pivot move, or rotation gesture. */
+	/** Starts a resize, pivot move, or rotation gesture. Only the gesture is
+	 * captured here — the maths lives in ./move (rotateLogic / distortLogic). */
 	beginTransform(handle: TransformHandle, p: Point): void {
 		if (!this.active || !this.bounds) return;
 		this.origin = { ...p };
-		this.baseOffset = { ...this.offset };
-		this.transformHandle = handle;
-		this.transformStart = {
-			offset: { ...this.offset },
+		// Arm the translate gesture too: a 'move' handle may be dragged through
+		// either moveTo() (startMoveDrag) or transformTo().
+		this.moveGesture = beginMove(p, this.offset);
+		this.transformGesture = beginGesture(handle, p, this.currentState());
+		logTransformDebug('engine.beginTransform', {
+			handle,
+			pointer: p,
+			mode: this.mode,
+			transformStart: this.transformGesture.start,
+			bounds: this.bounds
+		});
+	}
+
+	/** The session transform in the shape the mode modules consume. */
+	private currentState(): TransformState {
+		return {
 			pivot: { ...this.pivot },
+			offset: { ...this.offset },
 			scaleX: this.scaleX,
 			scaleY: this.scaleY,
 			rotation: this.rotation,
 			skewX: this.skewX,
 			skewY: this.skewY
 		};
-		logTransformDebug('engine.beginTransform', {
-			handle,
-			pointer: p,
-			transformStart: this.transformStart,
-			bounds: this.bounds
-		});
+	}
+
+	/** Writes a mode module's result back into the session and repaints the
+	 * floating sprite, the ants and the live layer preview. */
+	private applyState(next: TransformState): void {
+		this.pivot = { ...next.pivot };
+		this.offset = { ...next.offset };
+		this.scaleX = next.scaleX;
+		this.scaleY = next.scaleY;
+		this.rotation = next.rotation;
+		this.skewX = next.skewX;
+		this.skewY = next.skewY;
+		this.applyFloatingTransform();
+		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
+		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
+		this.updateLivePreview();
 	}
 
 	setPivot(p: Point): void {
 		if (!this.active || !this.bounds) return;
-		this.offset = this.offsetForPivot(p, this.pivot, this.offset);
-		this.pivot = { ...p };
-		this.applyFloatingTransform();
-		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
-		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
-		this.updateLivePreview();
-	}
-
-	private offsetForPivot(nextPivot: Point, previousPivot: Point, offset: Point): Point {
-		const cos = Math.cos(this.rotation);
-		const sin = Math.sin(this.rotation);
-		const transformedDelta = {
-			x: (nextPivot.x - previousPivot.x) * this.scaleX * cos - (nextPivot.y - previousPivot.y) * this.scaleY * sin,
-			y: (nextPivot.x - previousPivot.x) * this.scaleX * sin + (nextPivot.y - previousPivot.y) * this.scaleY * cos
-		};
-		return {
-			x: offset.x + previousPivot.x - nextPivot.x + transformedDelta.x,
-			y: offset.y + previousPivot.y - nextPivot.y + transformedDelta.y
-		};
-	}
-
-	private inverseTransformPoint(p: Point, state: typeof this.transformStart): Point {
-		const dx = p.x - state.pivot.x - state.offset.x;
-		const dy = p.y - state.pivot.y - state.offset.y;
-		const cos = Math.cos(state.rotation);
-		const sin = Math.sin(state.rotation);
-		return {
-			x: state.pivot.x + (dx * cos + dy * sin) / (state.scaleX || 1),
-			y: state.pivot.y + (-dx * sin + dy * cos) / (state.scaleY || 1)
-		};
+		this.applyState(pivotTo(this.currentState(), p)); // rotate logic
 	}
 
 	setTransformState(state: { pivot: Point; offset: Point; scaleX: number; scaleY: number; rotation: number; skewX?: number; skewY?: number }): void {
 		if (!this.active) return;
-		this.pivot = { ...state.pivot };
-		this.offset = { ...state.offset };
-		this.scaleX = state.scaleX;
-		this.scaleY = state.scaleY;
-		this.rotation = state.rotation;
-		this.skewX = state.skewX ?? 0;
-		this.skewY = state.skewY ?? 0;
-		this.applyFloatingTransform();
-		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
-		this.renderer.setActiveTintTransform(this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
-		this.updateLivePreview();
+		this.applyState({
+			pivot: { ...state.pivot },
+			offset: { ...state.offset },
+			scaleX: state.scaleX,
+			scaleY: state.scaleY,
+			rotation: state.rotation,
+			skewX: state.skewX ?? 0,
+			skewY: state.skewY ?? 0
+		});
 	}
 
-	private transformHandle: TransformHandle = 'move';
-	private transformStart = {
-		offset: { x: 0, y: 0 },
-		pivot: { x: 0, y: 0 },
-		scaleX: 1,
-		scaleY: 1,
-		rotation: 0,
-		skewX: 0,
-		skewY: 0
-	};
-
+	/** Continues the gesture started by beginTransform(). The active sub-mode
+	 * picks the module that turns pointer + gesture into the next transform. */
 	transformTo(p: Point, shift = false, alt = false): void {
-		if (!this.active || !this.bounds || !this.origin) return;
-		const start = this.transformStart;
+		const g = this.transformGesture;
+		if (!this.active || !this.bounds || !g) return;
 		const b = this.bounds;
-		if (this.transformHandle === 'move') {
-			this.offset = {
-				x: start.offset.x + Math.round(p.x - this.origin.x),
-				y: start.offset.y + Math.round(p.y - this.origin.y)
-			};
-		} else if (this.transformHandle === 'pivot') {
-			// The pivot marker is displayed at pivot + offset. Keep the
-			// transform offset fixed so moving this UI control does not move
-			// the selected pixels.
-			const dx = p.x - (start.pivot.x + start.offset.x);
-			const dy = p.y - (start.pivot.y + start.offset.y);
-			const cos = Math.cos(start.rotation);
-			const sin = Math.sin(start.rotation);
-			const scaledX = dx * cos + dy * sin;
-			const scaledY = -dx * sin + dy * cos;
-			this.pivot = {
-				x: start.pivot.x + scaledX / (start.scaleX || 1),
-				y: start.pivot.y + scaledY / (start.scaleY || 1)
-			};
-			this.offset = this.offsetForPivot(this.pivot, start.pivot, start.offset);
-		} else if (this.transformHandle === 'rotate') {			const center = {
-				x: this.pivot.x + this.offset.x,
-				y: this.pivot.y + this.offset.y
-			};
-			const angle = Math.atan2(p.y - center.y, p.x - center.x);
-			const startAngle = Math.atan2(this.origin.y - center.y, this.origin.x - center.x);
-			let next = start.rotation + angle - startAngle;
-			if (shift) next = Math.round((next * 180) / Math.PI / 10) * (Math.PI / 18);
-			this.rotation = next;
-		} else if (this.distortMode) {
-			// Distort mode: handles shear about the pivot instead of scaling.
-			// North/south handles shear X with the pointer's horizontal travel
-			// (sign flips so dragging right always slants right); east/west
-			// handles shear Y with the vertical travel. Corners do both.
-			const h = this.transformHandle;
-			const dx = p.x - this.origin.x;
-			const dy = p.y - this.origin.y;
-			const clampSkew = (v: number) => Math.max(-1, Math.min(1, v));
-			if (h.includes('n') || h.includes('s')) {
-				const s = h.includes('n') ? -1 : 1;
-				this.skewX = clampSkew(start.skewX + (dx / (b.height || 1)) * s);
-			}
-			if (h.includes('e') || h.includes('w')) {
-				const s = h.includes('e') ? 1 : -1;
-				this.skewY = clampSkew(start.skewY + (dy / (b.width || 1)) * s);
-			}
+		let next: TransformState;
+		if (isTranslationHandle(g.handle)) {
+			// move logic (./move/moveLogic) — translate; the rotate and distort
+			// modes must still be able to move the selection.
+			next = { ...g.start, offset: translateTo({ origin: g.origin, baseOffset: g.start.offset }, p) };
+		} else if (this.mode === 'distort' && isScaleHandle(g.handle)) {
+			next = distortTo(g, p, b); // distort logic (placeholder → 4-corner warp)
 		} else {
-			const anchorX = this.transformHandle.includes('w') ? b.x + b.width : this.transformHandle.includes('e') ? b.x : b.x + b.width / 2;
-			const anchorY = this.transformHandle.includes('n') ? b.y + b.height : this.transformHandle.includes('s') ? b.y : b.y + b.height / 2;
-			const localPointer = this.inverseTransformPoint(p, start);
-			const movingX = this.transformHandle.includes('w') ? b.x : this.transformHandle.includes('e') ? b.x + b.width : anchorX;
-			const movingY = this.transformHandle.includes('n') ? b.y : this.transformHandle.includes('s') ? b.y + b.height : anchorY;
-			let sx = this.transformHandle.includes('w') || this.transformHandle.includes('e')
-				? start.scaleX + ((localPointer.x - movingX) / (movingX - anchorX)) * start.scaleX
-				: start.scaleX;
-			let sy = this.transformHandle.includes('n') || this.transformHandle.includes('s')
-				? start.scaleY + ((localPointer.y - movingY) / (movingY - anchorY)) * start.scaleY
-				: start.scaleY;
-			if (shift) {
-				const magnitude = Math.max(Math.abs(sx), Math.abs(sy));
-				if (this.transformHandle === 'n' || this.transformHandle === 's') sx = Math.sign(sx || 1) * Math.abs(sy);
-				else if (this.transformHandle === 'e' || this.transformHandle === 'w') sy = Math.sign(sy || 1) * Math.abs(sx);
-				else {
-					sx = Math.sign(sx || 1) * magnitude;
-					sy = Math.sign(sy || 1) * magnitude;
-				}
-			}
-			this.scaleX = Math.abs(sx) < 0.001 ? (sx < 0 ? -0.001 : 0.001) : sx;
-			this.scaleY = Math.abs(sy) < 0.001 ? (sy < 0 ? -0.001 : 0.001) : sy;
-			if (alt) {
-				this.offset = { ...start.offset };
-			} else {
-				const cos = Math.cos(start.rotation);
-				const sin = Math.sin(start.rotation);
-				const fixedX = (anchorX - start.pivot.x) * (start.scaleX - this.scaleX);
-				const fixedY = (anchorY - start.pivot.y) * (start.scaleY - this.scaleY);
-				this.offset = {
-					x: start.offset.x + fixedX * cos - fixedY * sin,
-					y: start.offset.y + fixedX * sin + fixedY * cos
-				};
-			}
+			next = rotateTo(g, p, b, { shift, alt }); // rotate logic (pivot / rotate / scale)
 		}
-		this.applyFloatingTransform();
-		this.renderer.previewTransformedSelectionOutline(this.pivot, this.offset, this.scaleX, this.scaleY, this.rotation, this.skewX, this.skewY);
-		this.renderer.setActiveTintTransform(
-			this.pivot.x,
-			this.pivot.y,
-			this.offset.x,
-			this.offset.y,
-			this.scaleX,
-			this.scaleY,
-			this.rotation,
-			this.skewX,
-			this.skewY
-		);
-		this.updateLivePreview();
+		this.applyState(next);
 		logTransformDebug('engine.transformTo', {
-			handle: this.transformHandle,
+			handle: g.handle,
+			mode: this.mode,
 			pointer: p,
 			shift,
 			alt,
@@ -672,7 +594,8 @@ export class MoveEngine {
 		this.floatingId = null;
 		this.bounds = null;
 		this.origin = null;
-		this.baseOffset = { x: 0, y: 0 };
+		this.moveGesture = null;
+		this.transformGesture = null;
 		this.offset = { x: 0, y: 0 };
 		this.pivot = { x: 0, y: 0 };
 		this.scaleX = 1;

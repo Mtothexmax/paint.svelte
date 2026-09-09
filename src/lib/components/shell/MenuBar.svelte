@@ -6,7 +6,7 @@
 	import { MENUS } from '../../services/menuService';
 	import { commands } from '../../services/commandRegistry';
 	import { lastApplied } from '../../state/repeat';
-	import { effects } from '../../effects';
+	import { effects, adjustmentEffects } from '../../effects';
 	import type { MenuEntry } from '../../services/menuService';
 	import BrightnessContrastSvg from '@material-symbols/svg-400/rounded/contrast.svg?raw';
 
@@ -38,11 +38,17 @@
 		'image.canvasSize': '⬜',
 		'adjustments.hueSat': '🌈',
 		'adjustments.invertColors': '🔁',
-		...Object.fromEntries(effects.map((e) => [`effects.${e.id}`, e.icon ?? '✨']))
+		...Object.fromEntries(effects.map((e) => [`effects.${e.id}`, e.icon ?? '✨'])),
+		// The instant (no-param) adjustments run via `adjustments.*` commands
+		// rather than `effects.*`, so they need their own icon mapping.
+		...Object.fromEntries(
+			adjustmentEffects.map((e) => [`adjustments.${e.id}`, e.icon ?? '✨'])
+		)
 	};
 	/** Raw inline SVG markup per command (rendered via {@html}, exact color). */
 	const COMMAND_SVG_ICONS: Record<string, string> = {
-		'adjustments.brightCont': BrightnessContrastSvg
+		'adjustments.brightCont': BrightnessContrastSvg,
+		'effects.brightCont': BrightnessContrastSvg
 	};
 	const LABEL_ICONS: Record<string, string> = {
 		'Cut': '✂️',
@@ -55,7 +61,13 @@
 		'Merge Down': '⇩',
 		'Brightness…': '☀️',
 		'Contrast…': '◑',
-		'Blurs': '💧'
+		'Blurs': '💧',
+		'Photo': '🖼️',
+		'Render': '☁️',
+		'Stylize': '🟨',
+		'Noise': '✨',
+		'Object': '🔘',
+		'Distort': '⚪️'
 	};
 
 	let bar: HTMLDivElement;

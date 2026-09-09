@@ -78,7 +78,12 @@ export class EditorRenderer {
 
 	private addDoc(doc: ImageDocument): void {
 		if (this.scenes.has(doc.id)) return;
-		this.scenes.set(doc.id, new DocScene(doc, this.surfaces, this.checkerDark));
+		try {
+			this.scenes.set(doc.id, new DocScene(doc, this.surfaces, this.checkerDark));
+		} catch (err) {
+			if (typeof console !== 'undefined')
+				console.error(`[EditorRenderer] could not build scene for doc "${doc.name}":`, err);
+		}
 	}
 
 	/** Applies the transparency-checkerboard theme to all open documents

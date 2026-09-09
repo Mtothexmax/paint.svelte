@@ -4,7 +4,7 @@ import type { EffectDefinition } from '../types';
 // Classic sepia toning (Paint.NET's Sepia is a fixed, one-shot matrix).
 const definition: EffectDefinition = {
 	label: 'Sepia',
-	icon: '🟤',
+	icon: '📜',
 	params: [],
 	filter: () => {
 		const cm = new ColorMatrixFilter();

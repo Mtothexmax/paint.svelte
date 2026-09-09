@@ -1,0 +1,84 @@
+/* ---- reusable angle dial ---- */
+.ang {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.ang-label {
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.ang-body {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ang-svg {
+	flex: 0 0 auto;
+	width: 72px;
+	height: 72px;
+	touch-action: none;
+	user-select: none;
+	cursor: pointer;
+}
+.ang-ring {
+	fill: var(--bg-elev, #1e1e1e);
+	stroke: var(--border);
+	stroke-width: 2;
+}
+.ang-line {
+	stroke: var(--accent, #4f8cff);
+	stroke-width: 3;
+	stroke-linecap: round;
+}
+.ang-handle {
+	fill: var(--accent, #4f8cff);
+	stroke: #fff;
+	stroke-width: 2;
+}
+.ang-side {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.ang-num {
+	width: 56px;
+	background: var(--bg-elev, #1e1e1e);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	font-size: 12px;
+	padding: 2px 4px;
+}
+.ang-num:focus {
+	outline: 1px solid var(--accent, #4f8cff);
+}
+.ang-reset {
+	flex: 0 0 auto;
+	width: 24px;
+	height: 24px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	border-radius: 5px;
+	color: var(--text-dim);
+	font-size: 15px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0;
+}
+.ang-reset:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--text);
+}
+.ang-reset:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+.ang-val {
+	font-size: 12px;
+	color: var(--text-dim);
+	min-width: 36px;
+}

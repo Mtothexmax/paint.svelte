@@ -337,8 +337,8 @@
 					{:else}
 						<FilterSlider
 							label={param.label}
-							min={param.min}
-							max={param.max}
+							min={param.min ?? 0}
+							max={param.max ?? 100}
 							step={param.step ?? 1}
 							default={param.default}
 							bind:value={selectedEff.settings[param.key]}

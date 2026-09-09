@@ -26,7 +26,7 @@ import {
 	brushSize,
 	brushSpacing,
 	foregroundColor,
-	moveDistort,
+	moveToolMode,
 	selectionMode,
 	showNotice
 } from '../../state/ui';
@@ -199,7 +199,7 @@ export function handlePointerDown(e: PointerEvent, a: PointerDownApi): void {
 		let moveEngine = a.moveEngine();
 		if (!moveEngine) {
 			moveEngine = new MoveEngine(getEditorRenderer());
-			moveEngine.setDistortMode(get(moveDistort));
+			moveEngine.setMode(get(moveToolMode));
 			a.setMoveEngine(moveEngine);
 		}
 		// Refresh the handle geometry before hit-testing. The engine is

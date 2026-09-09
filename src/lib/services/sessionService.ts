@@ -23,7 +23,7 @@
 
 import { documentRegistry, RegistryEvents } from '../core/document/registry';
 import { ImageDocument } from '../core/document/ImageDocument';
-import { createRasterLayer, createTextLayer, type TextContent } from '../core/layers/Layer';
+import { createRasterLayer, createTextLayer, type SurfaceId, type TextContent } from '../core/layers/Layer';
 import { hasEditorRenderer, getEditorRenderer, rendererReady } from '../render/EditorRenderer';
 import { surfaceToPngBlob } from '../render/export';
 import { fitView } from '../render/Viewport';
@@ -328,6 +328,13 @@ function installDebugHook(): void {
 /** Re-opens the documents stored by the previous session (if any). */
 export async function restoreSession(): Promise<void> {
 	if (typeof indexedDB === 'undefined') return;
+	// Documents already in the registry means a prior restore (or an HMR
+	// remount of the canvas component) already populated them; re-running
+	// would duplicate them and can hit a renderer/surface-store mismatch.
+	if (documentRegistry.count > 0) {
+		restoring = false;
+		return;
+	}
 	restoring = true;
 	preparedVersion = dirtyVersion; // existing cached snapshots belong to the old session
 	writtenVersion = dirtyVersion;
@@ -366,9 +373,19 @@ async function buildDoc(renderer: EditorRenderer, record: SavedDoc): Promise<Ima
 	try {
 		const restoredLayers = [];
 		for (const layer of record.layers) {
-			const bitmap = await createImageBitmap(layer.png);
-			const surfaceId = renderer.surfaces.createFromBitmap(bitmap);
-			bitmap.close();
+			let surfaceId: SurfaceId;
+			try {
+				const bitmap = await createImageBitmap(layer.png);
+				surfaceId = renderer.surfaces.createFromBitmap(bitmap);
+				bitmap.close();
+			} catch (err) {
+				// A corrupt/unsupported layer blob should not sink the whole
+				// document — fall back to a transparent surface so the doc
+				// still opens.
+				if (typeof console !== 'undefined')
+					console.error('[session] failed to restore a layer bitmap; using empty surface:', err);
+				surfaceId = renderer.surfaces.create(record.width, record.height);
+			}
 			if (layer.kind === 'text' && layer.text) {
 				restoredLayers.push(createTextLayer(surfaceId, layer.name, layer.text));
 			} else {

@@ -137,7 +137,7 @@ this.root.addChild(this.checker);
 		}
 		this.clearLayerEffectTextures();
 		this.layerSprites = this.doc.layers.map((layer: Layer) => {
-			const texture = this.layerEffectTexture(layer) ?? surfaces.getTexture(layer.surfaceId);
+			const texture = this.resolveLayerTexture(layer);
 			const sprite = new Sprite(texture);
 			sprite.alpha = layer.opacity;
 			sprite.visible = layer.visible;
@@ -157,9 +157,36 @@ this.root.addChild(this.checker);
 		if (!effs.length) return null;
 		const cached = this.layerEffectTextures.get(layer.id);
 		if (cached) return cached;
-		const built = this.renderEffectChain(layer.surfaceId, effs);
-		if (built) this.layerEffectTextures.set(layer.id, built);
-		return built;
+		try {
+			const built = this.renderEffectChain(layer.surfaceId, effs);
+			if (built) this.layerEffectTextures.set(layer.id, built);
+			return built;
+		} catch (err) {
+			if (typeof console !== 'undefined')
+				console.error('[DocScene] layer-effect chain failed; showing base surface:', err);
+			return null;
+		}
+	}
+
+	/**
+	 * Resolves the texture a layer sprite should display: the cached
+	 * effect-rendered texture when the layer has enabled effects, otherwise the
+	 * raw base surface. If the base surface is missing (corrupt/legacy session
+	 * data, or a renderer/store mismatch after a hot reload), a transparent
+	 * placeholder is created and assigned so the editor still loads instead of
+	 * throwing an "Unknown surface" error that would blank the whole app.
+	 */
+	private resolveLayerTexture(layer: Layer): Texture {
+		const eff = this.layerEffectTexture(layer);
+		if (eff) return eff;
+		if (this.surfaces.has(layer.surfaceId)) return this.surfaces.getTexture(layer.surfaceId);
+		if (typeof console !== 'undefined')
+			console.error(
+				`[DocScene] layer "${layer.name}" references unknown surface ${layer.surfaceId}; using placeholder.`
+			);
+		const placeholder = this.surfaces.create(this.doc.width, this.doc.height);
+		layer.surfaceId = placeholder;
+		return this.surfaces.getTexture(placeholder);
 	}
 
 	/**

@@ -10,7 +10,7 @@ import type { EffectDefinition } from '../types';
 // which is the expected Paint.NET behaviour.)
 const definition: EffectDefinition = {
 	label: 'Invert Alpha',
-	icon: '🫧',
+	icon: '🏁',
 	params: [],
 	filter: () => {
 		const cm = new ColorMatrixFilter();

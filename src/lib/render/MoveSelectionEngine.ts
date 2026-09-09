@@ -40,7 +40,7 @@ export class MoveSelectionEngine {
 	private scaleX = 1;
 	private scaleY = 1;
 	private rotation = 0;
-	private transformHandle: import('./MoveEngine').TransformHandle = 'move';
+	private transformHandle: import('./move/types').TransformHandle = 'move';
 	private transformStart = { pivot: { x: 0, y: 0 }, offset: { x: 0, y: 0 }, scaleX: 1, scaleY: 1, rotation: 0 };
 
 	constructor(renderer: EditorRenderer) {
@@ -128,7 +128,7 @@ export class MoveSelectionEngine {
 		});
 	}
 
-	beginTransform(handle: import('./MoveEngine').TransformHandle, p: Point): void {
+	beginTransform(handle: import('./move/types').TransformHandle, p: Point): void {
 		if (!this.active) return;
 		this.origin = { ...p };
 		this.transformHandle = handle;
