@@ -1,62 +1,14 @@
 // Layer: render (pixi). GPU effects applied to the active layer, recorded as a
-// reversible surface swap in the doc history (no readbacks).
+// reversible surface swap in the doc history (no readbacks). The generic swap
+// pipeline lives in the effects module so both legacy adjustments and the
+// auto-registered effect system share one implementation.
 
-import { BlurFilter, ColorMatrixFilter, RenderTexture, Sprite, Texture, type Filter } from 'pixi.js';
+import { BlurFilter, ColorMatrixFilter, RenderTexture, Sprite, Texture } from 'pixi.js';
+import { applyFilterSwap } from '../effects/apply';
 import { documentRegistry } from '../core/document/registry';
 import type { SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
 import { blitMaskedInto, eraseSelectionRegion } from './selection';
-
-/** Applies an arbitrary filter off-screen and swaps the layer surface (undoable). */
-function applyFilterSwap(
-	renderer: EditorRenderer,
-	label: string,
-	makeFilter: () => Filter
-): boolean {
-	const doc = documentRegistry.active;
-	const layer = doc?.activeLayer;
-	if (!doc || !layer) return false;
-
-	const surfaces = renderer.surfaces;
-	const src = surfaces.getTexture(layer.surfaceId);
-	const target = RenderTexture.create({ width: doc.width, height: doc.height, resolution: 1 });
-
-	const sprite = new Sprite(src);
-	const filter = makeFilter();
-	sprite.filters = [filter];
-	renderer.app.renderer.render({ container: sprite, target, clear: true });
-	sprite.destroy();
-	filter.destroy();
-
-	const before = layer.surfaceId;
-	const after = surfaces.adopt(target);
-	layer.surfaceId = after;
-	renderer.rebuildActiveLayers();
-	doc.setDirty(true);
-	documentRegistry.notifyChange(doc);
-
-	doc.history.push({
-		label,
-		memoryBytes: doc.width * doc.height * 4 * 2,
-		undo: () => {
-			if (layer.surfaceId === after) {
-				layer.surfaceId = before;
-				renderer.rebuildActiveLayers();
-			}
-		},
-		redo: () => {
-			if (layer.surfaceId === before) {
-				layer.surfaceId = after;
-				renderer.rebuildActiveLayers();
-			}
-		},
-		dispose: () => {
-			if (layer.surfaceId === after) surfaces.dispose(before);
-			else surfaces.dispose(after);
-		}
-	});
-	return true;
-}
 
 /**
  * Applies a separable Gaussian blur (Pixi BlurFilter) to the active layer's
@@ -66,31 +18,6 @@ function applyFilterSwap(
 export function gaussianBlurActiveLayer(renderer: EditorRenderer, strength: number): boolean {
 	if (!(strength > 0)) return false;
 	return applyFilterSwap(renderer, 'Gaussian Blur', () => new BlurFilter({ strength, resolution: 1 }));
-}
-
-export interface HslSettings {
-	/** hue rotation in degrees (-180..180) */
-	hue: number;
-	/** saturation offset: 0 = unchanged, -100 = greyscale, +100 = double */
-	sat: number;
-	/** lightness offset: 0 = unchanged, -100 = black, +100 = double */
-	light: number;
-}
-
-/**
- * Hue / Saturation / Lightness adjustment via a composed ColorMatrixFilter.
- * Saturation and lightness are offsets: 0 = unchanged, mapped to factor 1.0.
- */
-export function hueSaturationActiveLayer(renderer: EditorRenderer, s: HslSettings): boolean {
-	const sat = Math.max(0, (100 + s.sat) / 100);
-	const light = Math.max(0, (100 + s.light) / 100);
-	return applyFilterSwap(renderer, 'Hue/Saturation', () => {
-		const cm = new ColorMatrixFilter();
-		cm.saturate(sat, true);
-		cm.hue(s.hue, true);
-		cm.brightness(light, true);
-		return cm;
-	});
 }
 
 /** Inverts the colours of the active layer (photographic negative). */
@@ -106,131 +33,6 @@ export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
 		];
 		return cm;
 	});
-}
-
-export interface BrightContSettings {
-	/** brightness offset: 0 = unchanged, -100 = black, +100 = double */
-	brightness: number;
-	/** contrast offset: 0 = unchanged, -100 = flat grey, +100 = max */
-	contrast: number;
-}
-
-/**
- * Brightness / Contrast adjustment using Paint.NET's intensity-based
- * algorithm (from Pinta). At contrast = +100 every pixel becomes either
- * pure black or pure white; at -100 everything collapses to mid-grey.
- * Brightness is applied first, then contrast shifts each channel
- * relative to the pixel's intensity.
- */
-export function brightnessContrastActiveLayer(renderer: EditorRenderer, s: BrightContSettings): boolean {
-	const doc = documentRegistry.active;
-	const layer = doc?.activeLayer;
-	if (!doc || !layer) return false;
-	if (s.brightness === 0 && s.contrast === 0) return false;
-
-	const surfaces = renderer.surfaces;
-	const beforeId = layer.surfaceId;
-	const w = doc.width;
-	const h = doc.height;
-
-	const brightness = s.brightness;
-	const contrast = s.contrast;
-	const multiply = contrast < 0 ? contrast + 100 : contrast > 0 ? 100 : 1;
-	const divide = contrast < 0 ? 100 : contrast > 0 ? 100 - contrast : 1;
-
-	// Read source pixels (Pixi v8 extract.pixels returns premultiplied alpha)
-	const srcSprite = new Sprite(surfaces.getTexture(beforeId));
-	const px = renderer.app.renderer.extract.pixels({ target: srcSprite, resolution: 1 });
-	srcSprite.destroy();
-	const src = px.pixels;
-
-	// Build unpremultiplied output buffer, apply contrast algorithm in
-	// straight-alpha space so that the luminance intensity is correct.
-	const out = new Uint8ClampedArray(w * h * 4);
-
-	for (let i = 0; i < src.length; i += 4) {
-		const a = src[i + 3];
-		if (a === 0) continue; // leave out[i..+3] as 0
-
-		// Unpremultiply source
-		let r: number, g: number, b: number;
-		if (a < 255) {
-			const inv = 255 / a;
-			r = Math.min(255, Math.round(src[i] * inv));
-			g = Math.min(255, Math.round(src[i + 1] * inv));
-			b = Math.min(255, Math.round(src[i + 2] * inv));
-		} else {
-			r = src[i]; g = src[i + 1]; b = src[i + 2];
-		}
-
-		// Pinta contrast algorithm (operates on straight-alpha values)
-		if (divide === 0) {
-			// Maximum contrast: threshold → pure black or white
-			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
-			const val = (intensity + brightness < 128) ? 0 : 255;
-			r = val; g = val; b = val;
-		} else if (divide === 100) {
-			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
-			const shift = Math.round((intensity - 127) * multiply / divide + 127 - intensity + brightness);
-			r = clampByte(r + shift);
-			g = clampByte(g + shift);
-			b = clampByte(b + shift);
-		} else {
-			const intensity = Math.round(r * 0.299 + g * 0.587 + b * 0.114);
-			const shift = Math.round((intensity - 127 + brightness) * multiply / divide + 127 - intensity);
-			r = clampByte(r + shift);
-			g = clampByte(g + shift);
-			b = clampByte(b + shift);
-		}
-
-		out[i] = r; out[i + 1] = g; out[i + 2] = b; out[i + 3] = a;
-	}
-
-	const afterId = surfaces.create(w, h);
-	const canvas = document.createElement('canvas');
-	canvas.width = w;
-	canvas.height = h;
-	const ctx = canvas.getContext('2d')!;
-	const imgData = ctx.createImageData(w, h);
-	imgData.data.set(out);
-	ctx.putImageData(imgData, 0, 0);
-	const uploadTex = Texture.from(canvas);
-	const uploadSprite = new Sprite(uploadTex);
-	renderer.app.renderer.render({ container: uploadSprite, target: surfaces.getTexture(afterId), clear: true });
-	uploadSprite.destroy();
-	uploadTex.destroy(true);
-	canvas.remove();
-
-	layer.surfaceId = afterId;
-	renderer.rebuildActiveLayers();
-	doc.setDirty(true);
-	documentRegistry.notifyChange(doc);
-
-	doc.history.push({
-		label: 'Brightness / Contrast',
-		memoryBytes: w * h * 4 * 2,
-		undo: () => {
-			if (layer.surfaceId === afterId) {
-				layer.surfaceId = beforeId;
-				renderer.rebuildActiveLayers();
-			}
-		},
-		redo: () => {
-			if (layer.surfaceId === beforeId) {
-				layer.surfaceId = afterId;
-				renderer.rebuildActiveLayers();
-			}
-		},
-		dispose: () => {
-			if (layer.surfaceId === afterId) surfaces.dispose(beforeId);
-			else surfaces.dispose(afterId);
-		}
-	});
-	return true;
-}
-
-function clampByte(v: number): number {
-	return v < 0 ? 0 : v > 255 ? 255 : v;
 }
 
 /** Renders an inverted (negative) copy of surface `srcId` into a NEW owned

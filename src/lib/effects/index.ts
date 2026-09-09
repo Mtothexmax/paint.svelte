@@ -1,0 +1,19 @@
+// Layer: effects. Public facade for the auto-registered effect system.
+
+export {
+	effects,
+	effectById,
+	effectMenus,
+	effectMenusWithEntries,
+	adjustmentEffects,
+	ADJUSTMENTS_MENU
+} from './registry';
+export { applyEffect, applyFilterSwap } from './apply';
+export { makeGlFilter, ADJUST_GLSL, type GlUniform } from './shaders';
+export type {
+	EffectContext,
+	EffectDefinition,
+	EffectParam,
+	EffectSettings,
+	ResolvedEffect
+} from './types';

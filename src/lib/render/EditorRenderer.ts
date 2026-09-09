@@ -154,6 +154,12 @@ export class EditorRenderer {
 		if (this.activeScene) this.activeScene.resync(this.surfaces);
 	}
 
+	/** Re-renders the live layer effects for a specific layer id. Call after
+	 * adding, removing, toggling or editing layer effects. */
+	refreshLayerEffects(layerId: string): void {
+		this.activeScene?.refreshLayerEffects(layerId);
+	}
+
 	setActiveLayerPreview(texture: Texture | null, fallback: Texture | null = null): void {
 		this.activeScene?.setActiveLayerPreview(texture, fallback);
 	}
@@ -369,7 +375,13 @@ export class EditorRenderer {
 		return traceSelectionOutline(extracted.pixels, width, height);
 	}
 
-	/** Temporary live filter preview on the active layer (effect dialogs). */
+	/**
+	 * Temporary effect preview on the active layer (effect + adjustment
+	 * dialogs). The filter is rendered off-screen at document resolution — the
+	 * same pass the apply path uses — and the result is swapped onto the layer
+	 * sprite, so the preview is pixel-identical to what Apply produces and does
+	 * not shift with zoom/pan. `null` removes the preview.
+	 */
 	setActiveLayerFilterPreview(filter: import('pixi.js').Filter | null): void {
 		this.activeScene?.setActiveLayerFilter(filter);
 	}

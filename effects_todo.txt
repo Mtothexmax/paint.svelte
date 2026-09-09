@@ -1,0 +1,68 @@
+Effects
+├── Blurs ✅
+│   ├── Frosted Glass ✅
+│   ├── Gaussian Blur ✅
+│   ├── Motion Blur ✅
+│   ├── Radial Blur ✅
+│   ├── Rotary Blur ✅
+│   ├── Smart Blur ✅
+│   ├── Surface Blur ✅
+│   ├── Unfocus ✅
+│   └── Zoom Blur ✅
+├── Distort ✅
+│   ├── Bulge ✅
+│   ├── Crystalize ✅
+│   ├── Frosted Glass ✅
+│   ├── Pixelate ✅
+│   ├── Polar Inversion ✅
+│   ├── Smudge ✅
+│   ├── Tile Reflection ✅
+│   ├── Twist ✅
+│   └── Warp ✅
+├── Noise ✅
+│   ├── Add Noise ✅
+│   ├── Median ✅
+│   └── Reduce Noise ✅
+├── Object ✅
+│   ├── Bevel ✅
+│   ├── Drop Shadow ✅
+│   ├── Feather ✅
+│   └── Outline ✅
+├── Photo ✅
+│   ├── Glow ✅
+│   ├── Red Eye Removal ✅
+│   ├── Sharpen ✅
+│   └── Soften Portrait ✅
+├── Render ✅
+│   ├── Clouds ✅
+│   ├── Flames ✅
+│   ├── Julia Fractal ✅
+│   ├── Mandelbrot Fractal ✅
+│   └── Turbulence ✅
+└── Stylize ✅
+    ├── Edge Detect ✅
+    ├── Emboss ✅
+    ├── Outline ✅
+    └── Relief ✅
+
+Adjustments ✅
+├── Auto-Level ✅
+├── Black and White ✅
+├── Brightness / Contrast ✅
+├── Curves ✅
+├── Exposure ✅
+├── Highlights / Shadows ✅
+├── Hue / Saturation ✅
+├── Invert Alpha ✅
+├── Invert Colors ✅
+├── Levels ✅
+├── Posterize ✅
+├── Sepia Tone ✅
+└── Threshold ✅
+
+Layer Effects (live, non-destructive) ✅
+├── Add / Remove / Toggle per layer ✅
+├── Edit via dialog with live preview ✅
+├── Render Effects to Layer (bake) ✅
+├── Persist on text → raster conversion ✅
+└── fx badge in Layers panel ✅

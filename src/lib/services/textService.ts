@@ -142,10 +142,13 @@ export function convertTextToRaster(id: string): void {
 	const renderer = getEditorRenderer();
 	const text = layer.text ? { ...layer.text, color: { ...layer.text.color } } : undefined;
 	const beforeName = layer.name;
+	const beforeEffects = layer.effects ? [...layer.effects.map((e) => ({ ...e, settings: { ...e.settings } }))] : undefined;
 
 	layer.kind = 'raster';
 	layer.text = undefined;
 	layer.name = layer.name.replace(/^Text Layer:\s*/, '');
+	// Preserve live layer effects across the conversion.
+	if (beforeEffects) layer.effects = beforeEffects;
 	renderer.rebuildActiveLayers();
 	doc.setDirty(true);
 	documentRegistry.notifyChange(doc);
@@ -156,6 +159,7 @@ export function convertTextToRaster(id: string): void {
 			layer.kind = 'text';
 			layer.name = beforeName;
 			if (text) layer.text = text;
+			layer.effects = beforeEffects;
 			renderer.rebuildActiveLayers();
 			documentRegistry.notifyChange(doc);
 		},
@@ -163,6 +167,7 @@ export function convertTextToRaster(id: string): void {
 			layer.kind = 'raster';
 			layer.text = undefined;
 			layer.name = beforeName.replace(/^Text Layer:\s*/, '');
+			layer.effects = beforeEffects;
 			renderer.rebuildActiveLayers();
 			documentRegistry.notifyChange(doc);
 		},

@@ -6,6 +6,7 @@
 	import { MENUS } from '../../services/menuService';
 	import { commands } from '../../services/commandRegistry';
 	import { lastApplied } from '../../state/repeat';
+	import { effects } from '../../effects';
 	import type { MenuEntry } from '../../services/menuService';
 	import BrightnessContrastSvg from '@material-symbols/svg-400/rounded/contrast.svg?raw';
 
@@ -37,7 +38,7 @@
 		'image.canvasSize': '⬜',
 		'adjustments.hueSat': '🌈',
 		'adjustments.invertColors': '🔁',
-		'effects.blur': '💧'
+		...Object.fromEntries(effects.map((e) => [`effects.${e.id}`, e.icon ?? '✨']))
 	};
 	/** Raw inline SVG markup per command (rendered via {@html}, exact color). */
 	const COMMAND_SVG_ICONS: Record<string, string> = {
@@ -54,14 +55,17 @@
 		'Merge Down': '⇩',
 		'Brightness…': '☀️',
 		'Contrast…': '◑',
-		'Sharpen…': '✨'
+		'Sharpen…': '✨',
+		'Blurs': '💧'
 	};
 
 	let bar: HTMLDivElement;
 	let openMenu = $state<string | null>(null);
+	let openSub = $state<string | null>(null);
 
 	function toggle(label: string, enabled: boolean) {
 		if (!enabled) return;
+		openSub = null;
 		openMenu = openMenu === label ? null : label;
 	}
 
@@ -70,6 +74,7 @@
 			commands.run(entry.commandId);
 		}
 		openMenu = null;
+		openSub = null;
 	}
 
 	function iconOf(entry: MenuEntry): string {
@@ -129,7 +134,8 @@
 			document.removeEventListener('mousedown', onGlobalMouseDown);
 			document.removeEventListener('keydown', onGlobalKeyDown);
 		};
-	});
+});
+
 </script>
 
 	<div bind:this={bar} class="flex h-full items-stretch px-1 select-none">
@@ -161,6 +167,52 @@
 					{#each menu.entries as entry, i (i)}
 						{#if entry.type === 'separator'}
 							<div class="menu-separator"></div>
+						{:else if entry.type === 'submenu'}
+							{@const subKey = menu.label + '/' + entry.label}
+							<div
+								class="sub-holder"
+								role="group"
+								onpointerenter={() => (openSub = subKey)}
+								onpointerleave={() => (openSub = null)}
+							>
+								<button
+									class="menu-item"
+									class:open={openSub === subKey}
+									onclick={() => (openSub = openSub === subKey ? null : subKey)}
+								>
+									<span class="menu-ic">{LABEL_ICONS[entry.label] ?? ''}</span>
+									<span class="menu-text">{entry.label}</span>
+									<span class="menu-chevron">▸</span>
+								</button>
+								{#if openSub === subKey}
+									<div class="menu-panel sub-panel">
+										{#each entry.entries as sub, j (j)}
+											{#if sub.type === 'separator'}
+												<div class="menu-separator"></div>
+											{:else}
+												{@const subInfo = labelOf(sub)}
+												<button
+													class="menu-item"
+													class:disabled={subInfo.disabled}
+													disabled={subInfo.disabled}
+													onclick={() => activate(sub)}
+												>
+													{#if subInfo.checkable}<span class="menu-check">{subInfo.checked ? '✓' : ''}</span>{/if}
+													<span class="menu-ic">
+														{#if isSvgIcon(sub)}
+															<span class="menu-svg">{@html iconOf(sub)}</span>
+														{:else}
+															{subInfo.icon || ''}
+														{/if}
+													</span>
+													<span class="menu-text">{subInfo.text}</span>
+													{#if subInfo.shortcut}<span class="menu-shortcut">{subInfo.shortcut}</span>{/if}
+												</button>
+											{/if}
+										{/each}
+									</div>
+								{/if}
+							</div>
 						{:else}
 							{@const info = labelOf(entry)}
 							<button

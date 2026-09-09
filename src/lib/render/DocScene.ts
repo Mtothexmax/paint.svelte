@@ -1,11 +1,13 @@
 // Layer: render (pixi). One scene graph per open document.
 
-import { Container, Graphics, RenderTexture, Sprite, Texture, TilingSprite, type Filter } from 'pixi.js';
+import { Container, Filter, Graphics, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { Point } from '../core/geometry';
-import type { Layer } from '../core/layers/Layer';
+import type { Layer, LayerEffect, SurfaceId } from '../core/layers/Layer';
 import { checkerTexture } from './checkerboard';
 import { SPRITE_BLENDS, type SurfaceStore } from './SurfaceStore';
+import { effectById } from '../effects';
+import type { EffectSettings } from '../effects';
 
 const SQUARE = 8; // checker square in screen px
 const BASE = SQUARE * 2; // texture side in image px (2 squares)
@@ -94,9 +96,16 @@ export class DocScene {
 	/** Mask texture that clips the live stroke preview, and its mask sprite. */
 	private strokeClipTexture: Texture | null = null;
 	private strokeClipSprite: Sprite | null = null;
+	/** Owns all doc surfaces — used to grab the active selection's mask texture. */
+	private surfaces: SurfaceStore;
+	/** Cached effect-rendered textures per layer id. The base surface is rendered
+	 * through the layer's enabled effects off-screen; the sprite shows this cache
+	 * instead of the raw surface so effects are live and non-destructive. */
+	private layerEffectTextures = new Map<string, RenderTexture>();
 
 	constructor(doc: ImageDocument, surfaces: SurfaceStore, darkChecker = false) {
 		this.doc = doc;
+		this.surfaces = surfaces;
 		this.checker = new TilingSprite({
 			texture: checkerTexture(SQUARE, darkChecker ? 'dark' : 'bright'),
 			width: doc.width,
@@ -126,8 +135,9 @@ this.root.addChild(this.checker);
 			this.root.removeChild(sprite);
 			sprite.destroy();
 		}
+		this.clearLayerEffectTextures();
 		this.layerSprites = this.doc.layers.map((layer: Layer) => {
-			const texture = surfaces.getTexture(layer.surfaceId);
+			const texture = this.layerEffectTexture(layer) ?? surfaces.getTexture(layer.surfaceId);
 			const sprite = new Sprite(texture);
 			sprite.alpha = layer.opacity;
 			sprite.visible = layer.visible;
@@ -135,8 +145,110 @@ this.root.addChild(this.checker);
 			this.root.addChild(sprite);
 			return sprite;
 		});
+		this.restorePreview();
 		this.setStrokeOverlayPosition(); // stroke preview composites at its layer
 		this.raiseTop(); // selection indicator + ants stay above everything
+	}
+
+	/** Returns the effect-rendered texture for a layer (building it on first call
+	 * after a rebuild), or null when the layer has no enabled effects. */
+	private layerEffectTexture(layer: Layer): RenderTexture | null {
+		const effs = layer.effects?.filter((e) => e.enabled) ?? [];
+		if (!effs.length) return null;
+		const cached = this.layerEffectTextures.get(layer.id);
+		if (cached) return cached;
+		const built = this.renderEffectChain(layer.surfaceId, effs);
+		if (built) this.layerEffectTextures.set(layer.id, built);
+		return built;
+	}
+
+	/** Renders a base surface through a chain of layer effects off-screen.
+	 * Returns a new RenderTexture owned by this DocScene (not the SurfaceStore).
+	 * The caller must dispose it when no longer needed. */
+	private renderEffectChain(baseId: SurfaceId, effects: LayerEffect[]): RenderTexture | null {
+		const w = this.doc.width;
+		const h = this.doc.height;
+		const baseTex = this.surfaces.getTexture(baseId);
+
+		// Ping-pong between two temp textures so we can chain filters.
+		let ping = RenderTexture.create({ width: w, height: h, resolution: 1 });
+		let pong = RenderTexture.create({ width: w, height: h, resolution: 1 });
+		let src: Texture = baseTex;
+		const filtersToDestroy: Filter[] = [];
+
+		for (const eff of effects) {
+			const def = effectById(eff.id);
+			if (!def) continue;
+			const filter = def.filter(eff.settings);
+			filtersToDestroy.push(filter);
+			const sprite = new Sprite(src);
+			sprite.filters = [filter];
+			this.surfaces.renderInto(ping, sprite, true);
+			sprite.destroy();
+			src = ping;
+			// swap
+			const t = ping;
+			ping = pong;
+			pong = t;
+		}
+
+		for (const f of filtersToDestroy) f.destroy();
+		// If no effects actually ran, src is still baseTex — clean up temps.
+		if (src === baseTex) {
+			ping.destroy(true);
+			pong.destroy(true);
+			return null;
+		}
+		// `src` now points to the last written texture (either ping or pong).
+		// The OTHER one is the unused intermediate — dispose it.
+		const unused = src === ping ? pong : ping;
+		unused.destroy(true);
+		return src as RenderTexture;
+	}
+
+	/** Disposes all cached layer-effect textures. Called before rebuildLayers. */
+	private clearLayerEffectTextures(): void {
+		for (const tex of this.layerEffectTextures.values()) tex.destroy(true);
+		this.layerEffectTextures.clear();
+	}
+
+	/** Re-renders effects for a single layer. Call after adding/removing/
+	 * toggling/editing layer effects. Safe to call when the layer has no effects. */
+	refreshLayerEffects(layerId: string): void {
+		const idx = this.doc.layers.findIndex((l) => l.id === layerId);
+		if (idx < 0) return;
+		const layer = this.doc.layers[idx];
+		const sprite = this.layerSprites[idx];
+		if (!sprite) return;
+
+		// Dispose old cache for this layer.
+		const old = this.layerEffectTextures.get(layerId);
+		if (old) {
+			old.destroy(true);
+			this.layerEffectTextures.delete(layerId);
+		}
+
+		const tex = this.layerEffectTexture(layer) ?? this.surfaces.getTexture(layer.surfaceId);
+		sprite.texture = tex;
+		this.applySampling();
+	}
+
+	/** Puts an in-flight effect preview back onto the freshly built active-layer
+	 * sprite. The preview is only still valid when it was rendered from the
+	 * layer's CURRENT surface — otherwise it is dropped. */
+	private restorePreview(): void {
+		if (!this.previewTexture) return;
+		const [sprite, layer] = this.previewTarget();
+		const sizeMatches = this.previewWidth === this.doc.width && this.previewHeight === this.doc.height;
+		if (sprite && layer && sizeMatches && layer.surfaceId === this.previewSurfaceId) {
+			sprite.texture = this.previewTexture;
+			this.applySampling();
+			return;
+		}
+		this.previewTexture = null;
+		this.previewLayerId = null;
+		this.previewSurfaceId = null;
+		this.destroyPreviewTargets();
 	}
 
 	/** Re-inserts the live stroke overlay directly ABOVE the ACTIVE layer sprite
@@ -225,22 +337,144 @@ this.root.addChild(this.checker);
 		return !!this.strokeOverlay?.visible;
 	}
 
-	// Live filter preview on the ACTIVE layer sprite (used by effect dialogs).
-	private previewFilter: Filter | null = null;
+	// Live effect preview on the ACTIVE layer sprite (used by effect dialogs
+	// and the legacy adjustment dialogs).
+	//
+	// The preview is rendered OFF-SCREEN into a doc-sized surface (exactly the
+	// way the apply path renders it) and the result is swapped onto the layer
+	// sprite. It deliberately does NOT attach the filter to the sprite: Pixi
+	// clips a live filter's bounds to the current viewport, and the shader's
+	// `vTextureCoord` is normalised over that CLIPPED region — so a live
+	// filter (a) made procedural effects like Clouds/Flames re-generate their
+	// pattern from the visible window (pattern shifting with every zoom/pan,
+	// never matching the applied result) and (b) sampled the doc-sized
+	// selection mask / original pixels in the wrong place, so the effect was
+	// not actually scoped to the selection.
+	private previewFiltered: RenderTexture | null = null;
+	private previewComposed: RenderTexture | null = null;
+	private previewWidth = 0;
+	private previewHeight = 0;
+	/** The preview texture currently swapped onto the active layer sprite. */
+	private previewTexture: RenderTexture | null = null;
+	/** Layer the preview was rendered for (survives an active-layer switch). */
+	private previewLayerId: string | null = null;
+	/** Layer surface the preview was rendered from (invalidated by a swap). */
+	private previewSurfaceId: SurfaceId | null = null;
 
-	/** Applies/removes a temporary filter preview on the active layer. */
-	setActiveLayerFilter(filter: Filter | null): void {
-		if (this.previewFilter) {
-			this.previewFilter.destroy();
-			this.previewFilter = null;
-		}
+	private activeLayerSprite(): Sprite | null {
 		const idx = this.doc.layers.findIndex((l) => l.id === this.doc.activeLayerId);
-		const sprite = idx >= 0 ? this.layerSprites[idx] : null;
-		if (sprite) sprite.filters = null;
-		if (filter && sprite) {
-			this.previewFilter = filter;
-			sprite.filters = [filter];
+		return idx >= 0 ? (this.layerSprites[idx] ?? null) : null;
+	}
+
+	/** Sprite + layer the current preview is attached to, or [null, null]. */
+	private previewTarget(): [Sprite | null, Layer | null] {
+		if (!this.previewLayerId) return [null, null];
+		const idx = this.doc.layers.findIndex((l) => l.id === this.previewLayerId);
+		if (idx < 0) return [null, null];
+		return [this.layerSprites[idx] ?? null, this.doc.layers[idx] ?? null];
+	}
+
+	/** (Re)creates the pooled doc-sized preview surfaces. */
+	private ensurePreviewTargets(w: number, h: number): void {
+		if (this.previewFiltered && this.previewComposed && this.previewWidth === w && this.previewHeight === h)
+			return;
+		this.destroyPreviewTargets();
+		this.previewFiltered = RenderTexture.create({ width: w, height: h, resolution: 1 });
+		this.previewComposed = RenderTexture.create({ width: w, height: h, resolution: 1 });
+		this.previewWidth = w;
+		this.previewHeight = h;
+	}
+
+	private destroyPreviewTargets(): void {
+		this.previewFiltered?.destroy(true);
+		this.previewComposed?.destroy(true);
+		this.previewFiltered = null;
+		this.previewComposed = null;
+		this.previewWidth = 0;
+		this.previewHeight = 0;
+	}
+
+	/**
+	 * Applies (or removes) a temporary effect preview on the active layer.
+	 *
+	 * The layer itself is never modified — only the texture its sprite shows —
+	 * so nothing is recorded in history and Cancel is free. When a selection is
+	 * active the filtered result is clipped to it and the untouched layer shows
+	 * through everywhere else, mirroring the apply path.
+	 *
+	 * `filter` is consumed (destroyed) by this call.
+	 */
+	setActiveLayerFilter(filter: Filter | null): void {
+		this.clearActiveLayerFilter();
+		if (!filter) return;
+
+		const layer = this.doc.activeLayer;
+		const sprite = this.activeLayerSprite();
+		if (!layer || !sprite || !this.surfaces.has(layer.surfaceId)) {
+			filter.destroy();
+			return;
 		}
+
+		const surfaces = this.surfaces;
+		const w = this.doc.width;
+		const h = this.doc.height;
+		this.ensurePreviewTargets(w, h);
+		const filtered = this.previewFiltered!;
+		const original = surfaces.getTexture(layer.surfaceId);
+		this.previewLayerId = layer.id;
+		this.previewSurfaceId = layer.surfaceId;
+
+		// 1) the effect, rendered at document resolution — identical to
+		//    applyFilterSwap's off-screen pass.
+		const source = new Sprite(original);
+		source.filters = [filter];
+		surfaces.renderInto(filtered, source, true);
+		source.destroy();
+		filter.destroy();
+
+		// 2) scope it to the selection (the mask is doc-sized, so it lines up
+		//    with the filtered result 1:1).
+		const sel = this.doc.selection;
+		const mask =
+			sel.active && sel.maskId && surfaces.has(sel.maskId) ? surfaces.getTexture(sel.maskId) : null;
+		if (!mask) {
+			this.previewTexture = filtered;
+			sprite.texture = filtered;
+		} else {
+			const composed = this.previewComposed!;
+			// a) the untouched layer …
+			const base = new Container();
+			base.addChild(new Sprite(original));
+			surfaces.renderInto(composed, base, true);
+			base.destroy({ children: true });
+			// b) … with the filtered result painted on top, clipped to the mask
+			// (same construction as render/blitMaskedInto).
+			const holder = new Container();
+			const maskSprite = new Sprite(mask);
+			holder.addChild(new Sprite(filtered));
+			holder.addChild(maskSprite);
+			holder.mask = maskSprite;
+			surfaces.renderInto(composed, holder, false);
+			holder.destroy({ children: true });
+			this.previewTexture = composed;
+			sprite.texture = composed;
+		}
+		this.applySampling();
+	}
+
+	/** Restores the layer's own texture on its sprite and frees the pooled
+	 * preview surfaces. Safe to call when no preview is active. */
+	clearActiveLayerFilter(): void {
+		if (this.previewTexture) {
+			const [sprite, layer] = this.previewTarget();
+			this.previewTexture = null;
+			if (sprite && layer && this.surfaces.has(layer.surfaceId))
+				sprite.texture = this.surfaces.getTexture(layer.surfaceId);
+		}
+		this.previewLayerId = null;
+		this.previewSurfaceId = null;
+		this.destroyPreviewTargets();
+		this.applySampling();
 	}
 
 	/** Applies the document view transform to the scene. Called on attach and on
@@ -519,6 +753,8 @@ this.root.addChild(this.checker);
 
 	/** Frees GPU resources (textures are owned by the SurfaceStore). */
 	dispose(): void {
+		this.destroyPreviewTargets();
+		this.clearLayerEffectTextures();
 		this.root.destroy({ children: true });
 		if (this.strokeBuffer) {
 			this.strokeBuffer.destroy(true);

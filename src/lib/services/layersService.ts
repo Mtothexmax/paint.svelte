@@ -370,6 +370,8 @@ export interface LayerRow {
 	active: boolean;
 	index: number;
 	isText: boolean;
+	/** Active layer effect count (for the fx badge). */
+	effectCount: number;
 }
 
 export function layerRows(doc: import('../core/document/ImageDocument').ImageDocument): LayerRow[] {
@@ -384,6 +386,7 @@ export function layerRows(doc: import('../core/document/ImageDocument').ImageDoc
 			blendMode: isLayerBlendMode(l.blendMode) ? l.blendMode : 'normal',
 			active: l.id === doc.activeLayerId,
 			index: arr.length - 1 - i,
-			isText: l.kind === 'text'
+			isText: l.kind === 'text',
+			effectCount: l.effects?.filter((e) => e.enabled).length ?? 0
 		}));
 }

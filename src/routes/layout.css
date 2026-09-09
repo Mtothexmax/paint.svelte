@@ -154,6 +154,24 @@ body {
 	color: #888;
 	font-size: 11px;
 }
+.menu-chevron {
+	color: #888;
+	font-size: 11px;
+	margin-left: auto;
+	padding-left: 14px;
+}
+.sub-holder {
+	position: relative;
+}
+.sub-holder > .menu-item.open {
+	background: var(--accent);
+	color: #fff;
+}
+.sub-panel {
+	left: 100%;
+	top: -4px;
+	z-index: 61;
+}
 .menu-separator {
 	height: 1px;
 	margin: 4px 6px;
@@ -422,17 +440,24 @@ background-size: 6px 6px;
 	color: #fca5a5;
 }
 .status-dim {
-	background: none;
-	border: none;
-	padding: 0;
-	color: inherit;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 22px;
+	padding: 0 8px;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #bdbdbd;
 	font: inherit;
+	font-weight: 600;
 	cursor: pointer;
-	border-radius: 3px;
+	user-select: none;
 }
 .status-dim:hover {
-	text-decoration: underline;
-	color: #e8e8e8;
+	background: rgba(255, 255, 255, 0.08);
+	border-color: var(--border);
+	color: #eee;
 }
 
 /* ---- Paint.NET-style brush preview ring (canvas cursor) ---- */

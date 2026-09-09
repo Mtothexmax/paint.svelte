@@ -8,6 +8,16 @@ export type LayerId = string;
 /** Opaque handle to GPU-resident pixels. Only the render layer may resolve it. */
 export type SurfaceId = string;
 
+/** One live layer effect (non-destructive until baked). */
+export interface LayerEffect {
+	/** Effect definition id (e.g. 'outline'). */
+	id: string;
+	/** Settings object matching the effect's params. */
+	settings: Record<string, number>;
+	/** Enabled state — toggled without removing the effect. */
+	enabled: boolean;
+}
+
 export interface Layer {
 	id: LayerId;
 	/** Extensible union — 'text' layers carry editable text (raster cache). */
@@ -19,6 +29,8 @@ export interface Layer {
 	surfaceId: SurfaceId;
 	/** Present on text layers: the editable content (surfaceId caches it). */
 	text?: TextContent;
+	/** Live layer effects — rendered on top of the base surface every frame. */
+	effects?: LayerEffect[];
 }
 
 /** Editable text content of a text layer (image px, straight RGBA bytes). */

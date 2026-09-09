@@ -2,11 +2,24 @@
 
 import { writable } from 'svelte/store';
 
-export type DialogKind = 'newImage' | 'blur' | 'hueSat' | 'brightCont' | 'rasterizeConfirm' | 'imageSize' | null;
+export type DialogKind = 'newImage' | 'effect' | 'layerEffect' | 'curves' | 'rasterizeConfirm' | 'imageSize' | null;
 
 export interface DialogState {
 	kind: DialogKind;
 	payload?: unknown;
+}
+
+/** Payload for the generic 'effect' dialog: which registered effect to run. */
+export interface EffectDialogPayload {
+	effectId: string;
+}
+
+/** Payload for the layer-effect dialog: adding or editing a live layer effect. */
+export interface LayerEffectDialogPayload {
+	layerId: string;
+	effectId: string;
+	/** When present we are editing an existing effect at this index. */
+	effectIndex?: number;
 }
 
 /** Payload for the 'rasterizeConfirm' dialog: invoked when the user confirms. */

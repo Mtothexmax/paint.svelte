@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Layer: components. Bottom-right zoom bar (Paint.NET style): Fit to Window,
-	// 1:1 (100%), step zoom and a logarithmic zoom slider. Double-clicking the
-	// zoom value resets to 100% and re-centres the document.
+	// 1:1 (100%), step zoom, a logarithmic zoom slider and a zoom % readout that
+	// on click zooms to 100% and re-centres the document.
 	import './ZoomBar.css';
 	import { getEditorRenderer, hasEditorRenderer } from '../../render/EditorRenderer';
 	import { zoomTo, fitView } from '../../render/Viewport';
@@ -71,7 +71,7 @@
 	function onSliderKey(e: KeyboardEvent): void {
 		e.stopPropagation();
 	}
-	function onDblClick(): void {
+	function onClick(): void {
 		centerAt(100);
 	}
 </script>
@@ -91,15 +91,15 @@
 		title="Double-click to reset to 100%"
 		oninput={onSliderInput}
 		onpointerdown={(e) => (e.currentTarget as HTMLElement)?.blur()}
-		ondblclick={onDblClick}
+		ondblclick={onClick}
 		onkeydown={onSliderKey}
 	/>
 	<button type="button" class="zb-btn" title="Zoom In (Ctrl+=)" disabled={!hasDoc} onclick={() => applyZoom(zoomPct * 1.2)}>+</button>
 	<button
 		type="button"
 		class="zb-btn zb-pct"
-		title="Double-click to reset to 100% and centre"
+		title="Zoom to 100% and centre"
 		disabled={!hasDoc}
-		ondblclick={onDblClick}
+		onclick={onClick}
 	>{zoomPct}%</button>
 </div>

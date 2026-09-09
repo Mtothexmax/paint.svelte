@@ -20,6 +20,7 @@ import { deleteSelection, deselect, invertSelection, selectAll } from './selecti
 import { copySelection, cutSelection, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
 import { invertColorsScoped } from '../render/effects';
 import { cropToSelection } from '../render/crop';
+import { effects } from '../effects';
 
 function setStatusZoom(view: ViewState): void {
 	statusBar.update((s) => ({ ...s, zoomPct: Math.round(view.zoom * 100) }));
@@ -245,30 +246,25 @@ export function registerBuiltinCommands(): void {
 		}
 	]);
 
-	commands.registerMany([
-		{
-			id: 'effects.blur',
-			label: 'Gaussian Blur…',
-			run: () => openDialog('blur'),
+	// The Effects menu is generated from the effect registry: every file under
+	// src/lib/effects/<menu>/ becomes an `effects.<id>` command automatically.
+	// Adjustments also live in the registry but surface in their own top-level
+	// menu (see menuService.ts). Effects with a `dialog` override open a custom
+	// dialog instead of the generic slider sheet.
+	commands.registerMany(
+		effects.map((effect) => ({
+			id: `effects.${effect.id}`,
+			label: effect.params.length ? `${effect.label}…` : effect.label,
+			run: () =>
+				openDialog(
+					(effect.dialog ?? 'effect') as NonNullable<import('./dialogService').DialogKind>,
+					effect.dialog ? undefined : { effectId: effect.id }
+				),
 			isEnabled: hasDoc
-		}
-	]);
+		}))
+	);
 
-	commands.registerMany([
-		{
-				id: 'adjustments.hueSat',
-				label: 'Hue / Saturation…',
-				run: () => openDialog('hueSat'),
-				isEnabled: hasDoc
-			},
-			{
-				id: 'adjustments.brightCont',
-				label: 'Brightness / Contrast…',
-				run: () => openDialog('brightCont'),
-				isEnabled: hasDoc
-			}
-	]);
-
+	// Instant-apply adjustment that Paint.NET exposes without a dialog.
 	commands.registerMany([
 		{
 			id: 'adjustments.invertColors',

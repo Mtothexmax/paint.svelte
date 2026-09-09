@@ -2,10 +2,13 @@
 // (labels/shortcuts/enabled come from the CommandRegistry); disabled groups are
 // placeholders for future slices.
 
+import { adjustmentEffects, effectMenusWithEntries } from '../effects';
+
 export type MenuEntry =
 	| { type: 'command'; commandId: string }
 	| { type: 'disabled'; label: string; shortcut?: string }
-	| { type: 'separator' };
+	| { type: 'separator' }
+	| { type: 'submenu'; label: string; entries: MenuEntry[] };
 
 export interface MenuDef {
 	label: string;
@@ -80,16 +83,29 @@ export const MENUS: MenuDef[] = [
 		label: 'Adjustments',
 		enabled: true,
 		entries: [
-			{ type: 'command', commandId: 'adjustments.hueSat' },
-				{ type: 'command', commandId: 'adjustments.brightCont' },
-				{ type: 'command', commandId: 'adjustments.invertColors' }
+			// Alphabetical list of registered adjustments + the instant Invert Colors.
+			...[
+				...adjustmentEffects.map((e) => ({
+					label: e.label,
+					commandId: `effects.${e.id}`
+				})),
+				{ label: 'Invert Colors', commandId: 'adjustments.invertColors' }
+			]
+				.sort((a, b) => a.label.localeCompare(b.label))
+				.map((e) => ({ type: 'command' as const, commandId: e.commandId }))
 		]
 	},
 	{
 		label: 'Effects',
 		enabled: true,
 		entries: [
-			{ type: 'command', commandId: 'effects.blur' },
+			...effectMenusWithEntries.map(({ label, effects }) => ({
+				type: 'submenu' as const,
+				label,
+				entries: effects.map(
+					(e) => ({ type: 'command' as const, commandId: `effects.${e.id}` })
+				)
+			})),
 			{ type: 'disabled', label: 'Sharpen…' }
 		]
 	}

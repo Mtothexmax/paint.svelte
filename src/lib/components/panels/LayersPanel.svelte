@@ -25,12 +25,21 @@
 	import { layerThumbnails } from '../../state/layerThumbnails';
 	import { openMenu } from '../../state/contextMenu';
 	import { convertTextToRaster } from '../../services/textService';
+	import {
+		removeLayerEffect,
+		toggleLayerEffect,
+		bakeLayerEffects
+	} from '../../services/layerEffectsService';
+	import { openDialog } from '../../services/dialogService';
+	import { effectMenusWithEntries } from '../../effects';
 
 	let rows = $state<LayerRow[]>([]);
 	let opacityVal = $state(100);
 	let prevActiveId: string | null = null;
 	let lastCommittedOpacity = 100;
 	let unsubHist: (() => void) | null = null;
+	/** Row currently hovered — reveals the blend-mode dropdown when its mode is Normal. */
+	let hoveredId: string | null = $state(null);
 
 	function refresh() {
 		const doc = documentRegistry.active;
@@ -138,15 +147,80 @@
 		dropBelow = false;
 	}
 
-	/** Right-click menu per row — text layers offer raster conversion. */
+	/** Right-click menu per row — text layers offer raster conversion;
+	 * all layers offer live effects (add / toggle / remove / bake). */
 	function onRowContextMenu(e: MouseEvent, row: LayerRow): void {
 		e.preventDefault();
 		e.stopPropagation();
-		if (!row.isText) return;
 		selectLayer(row.id);
-		openMenu(e.clientX, e.clientY, [
-			{ type: 'action', label: 'Convert to Raster Layer', action: () => convertTextToRaster(row.id) }
-		]);
+
+		const items: import('../../state/contextMenu').ContextItem[] = [];
+
+		// --- Add Effect list ---
+		const objectMenu = effectMenusWithEntries.find((m) => m.label.toLowerCase() === 'object');
+		if (objectMenu && objectMenu.effects.length) {
+			items.push({ type: 'separator' });
+			items.push({ type: 'action', label: '─ Add Layer Effect ─', disabled: true, action: () => {} });
+			for (const eff of objectMenu.effects) {
+				items.push({
+					type: 'action',
+					label: `   ${eff.label}`,
+					action: () =>
+						openDialog('layerEffect', {
+							layerId: row.id,
+							effectId: eff.id
+						})
+				});
+			}
+		}
+
+		// --- Existing effects ---
+		const doc = documentRegistry.active;
+		const layer = doc?.layers.find((l) => l.id === row.id);
+		const effects = layer?.effects;
+		if (effects?.length) {
+			items.push({ type: 'separator' });
+			for (let i = 0; i < effects.length; i++) {
+				const eff = effects[i];
+				items.push({
+					type: 'action',
+					label: `${eff.enabled ? '☑' : '☐'} ${eff.id}`,
+					action: () => toggleLayerEffect(row.id, i)
+				});
+				items.push({
+					type: 'action',
+					label: `   Edit ${eff.id}…`,
+					action: () =>
+						openDialog('layerEffect', {
+							layerId: row.id,
+							effectId: eff.id,
+							effectIndex: i
+						})
+				});
+				items.push({
+					type: 'action',
+					label: `   Remove ${eff.id}`,
+					action: () => removeLayerEffect(row.id, i)
+				});
+			}
+			items.push({ type: 'separator' });
+			items.push({
+				type: 'action',
+				label: 'Render Effects to Layer',
+				action: () => bakeLayerEffects(row.id)
+			});
+		}
+
+		if (row.isText) {
+			if (items.length) items.push({ type: 'separator' });
+			items.push({
+				type: 'action',
+				label: 'Convert to Raster Layer',
+				action: () => convertTextToRaster(row.id)
+			});
+		}
+
+		if (items.length) openMenu(e.clientX, e.clientY, items);
 	}
 
 	// --- drop onto the empty list area = move to the very bottom ------------
@@ -263,6 +337,8 @@
 					ondragover={(e) => onRowDragOver(e, row.id)}
 					ondrop={(e) => onRowDrop(e, row.id)}
 					ondragend={onRowDragEnd}
+					onpointerenter={() => (hoveredId = row.id)}
+					onpointerleave={() => (hoveredId = null)}
 				>
 {#if $layerThumbnails[row.id]}
 					<img
@@ -285,20 +361,25 @@
 								}}
 							>{row.visible ? '👁' : '🚫'}</button>
 							<span class="layer-name">{row.name}</span>
+							{#if row.effectCount > 0}
+								<span class="layer-fx" title={`${row.effectCount} layer effect${row.effectCount > 1 ? 's' : ''}`}>fx</span>
+							{/if}
 						</div>
 						<div class="layer-line">
-							<select
-								class="layer-blend"
-								value={row.blendMode}
-								title="Blend mode"
-								onclick={(e) => e.stopPropagation()}
-								onpointerdown={(e) => e.stopPropagation()}
-								onchange={(e) => setLayerBlendMode(row.id, (e.currentTarget as HTMLSelectElement).value)}
-							>
-								{#each BLEND_MODE_OPTIONS as b (b.id)}
-									<option value={b.id}>{b.label}</option>
-								{/each}
-							</select>
+							{#if row.blendMode !== 'normal' || hoveredId === row.id}
+								<select
+									class="layer-blend"
+									value={row.blendMode}
+									title="Blend mode"
+									onclick={(e) => e.stopPropagation()}
+									onpointerdown={(e) => e.stopPropagation()}
+									onchange={(e) => setLayerBlendMode(row.id, (e.currentTarget as HTMLSelectElement).value)}
+								>
+									{#each BLEND_MODE_OPTIONS as b (b.id)}
+										<option value={b.id}>{b.label}</option>
+									{/each}
+								</select>
+							{/if}
 						</div>
 					</div>
 				</div>
