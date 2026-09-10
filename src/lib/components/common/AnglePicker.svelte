@@ -139,6 +139,5 @@
 				onclick={reset}
 			>↺</button>
 		</div>
-		<span class="ang-val">{Math.round(value)}°</span>
 	</div>
 </div>

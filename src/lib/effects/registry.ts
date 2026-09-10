@@ -24,14 +24,32 @@ function isEffectDefinition(value: unknown): value is EffectDefinition {
 	);
 }
 
-// Infra files (types.ts, registry.ts, index.ts, apply.ts, shaders.ts) have no
-// default EffectDefinition export, so they are filtered out automatically.
-const modules = import.meta.glob<{ default?: unknown }>('./**/*.ts', { eager: true });
+// Only the effect FOLDERS are globbed. Infra files (types.ts, registry.ts,
+// index.ts, apply.ts, shaders.ts) are deliberately excluded: `index.ts` is a
+// barrel that re-exports this very module, so an eager `./**/*.ts` glob pulled
+// it back in and created an import cycle. In dev (unbundled ESM) that cycle is
+// harmless, but in the production bundle the barrel's namespace object is
+// still uninitialised when this map is built — the entry is `undefined` and
+// `mod.default` threw "Cannot read properties of undefined" on GitHub Pages.
+const modules = import.meta.glob<{ default?: unknown }>(
+	[
+		'./adjustments/*.ts',
+		'./blurs/*.ts',
+		'./distort/*.ts',
+		'./noise/*.ts',
+		'./object/*.ts',
+		'./photo/*.ts',
+		'./render/*.ts',
+		'./stylize/*.ts'
+	],
+	{ eager: true }
+);
 
 const all: ResolvedEffect[] = [];
 
 for (const [path, mod] of Object.entries(modules)) {
-	const entry = mod.default;
+	// Defensive: a module namespace can still be undefined mid-cycle.
+	const entry = mod?.default;
 	if (!isEffectDefinition(entry)) continue;
 
 	const clean = path.replace(/^\.\//, '').replace(/\.ts$/, '');

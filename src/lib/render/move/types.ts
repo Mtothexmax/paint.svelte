@@ -13,8 +13,24 @@ import type { MoveToolMode } from '../../core/toolMode';
 
 export type { MoveToolMode };
 
-/** Draggable control points of the transform overlay. */
-export type TransformHandle = 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'pivot' | 'rotate';
+/** Draggable control points of the transform overlay. `ringX/Y/Z` are the
+ * Blender-style 3D rotation rings of the rotate sub-mode. */
+export type TransformHandle = 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'pivot' | 'rotate' | 'ringX' | 'ringY' | 'ringZ';
+
+/** The three 3D rotation rings. */
+export const RING_HANDLES: readonly TransformHandle[] = ['ringX', 'ringY', 'ringZ'];
+
+export function isRingHandle(h: TransformHandle): boolean {
+	return RING_HANDLES.includes(h);
+}
+
+/** Which 3D axis a ring handle rotates about. */
+export function ringAxis(h: TransformHandle): 'x' | 'y' | 'z' | null {
+	if (h === 'ringX') return 'x';
+	if (h === 'ringY') return 'y';
+	if (h === 'ringZ') return 'z';
+	return null;
+}
 
 /** Corner + edge handles (the eight scale/shear grips). */
 export const SCALE_HANDLES: readonly TransformHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];

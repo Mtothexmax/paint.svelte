@@ -2,9 +2,9 @@
 // This is the only place (besides EditorRenderer / export) that touches pixi
 // render targets in this slice.
 
-import { Container, Graphics, RenderTexture, Sprite, Texture, type Application } from 'pixi.js';
+import { Container, Graphics, Mesh, PerspectivePlaneGeometry, RenderTexture, Sprite, Texture, type Application } from 'pixi.js';
 import { newId } from '../core/id';
-import { type Rect } from '../core/geometry';
+import { type Point, type Rect } from '../core/geometry';
 import type { SurfaceId } from '../core/layers/Layer';
 
 export type BlendName = 'normal' | 'erase' | 'none';
@@ -150,6 +150,45 @@ export class SurfaceStore {
 		holder.addChild(sprite);
 		this.render(holder, this.getTexture(destId), false);
 		holder.destroy({ children: true });
+	}
+
+	/**
+	 * Draws a surface warped by a four-corner pin (projective map): the source
+	 * rectangle is stretched so its corners land exactly on `corners`
+	 * (absolute image px, clockwise from the top-left). Used by the Move tool's
+	 * Distort / 3D-Rotate sub-modes for the floating pixels and the mask.
+	 *
+	 * `corners` are given in the DESTINATION's image space; the mesh is placed
+	 * at the origin, so the source's own placement must already be part of the
+	 * corner coordinates.
+	 */
+	blitPerspective(srcId: SurfaceId, destId: SurfaceId, corners: [Point, Point, Point, Point], blend: BlendName = 'normal'): void {
+		const texture = this.getTexture(srcId);
+		const dest = this.getTexture(destId);
+		const geometry = new PerspectivePlaneGeometry({
+			width: texture.width,
+			height: texture.height,
+			verticesX: 24,
+			verticesY: 24
+		});
+		geometry.setCorners(
+			corners[0].x,
+			corners[0].y,
+			corners[1].x,
+			corners[1].y,
+			corners[2].x,
+			corners[2].y,
+			corners[3].x,
+			corners[3].y
+		);
+		const mesh = new Mesh({ texture, geometry });
+		mesh.blendMode = blend;
+		const holder = new Container();
+		holder.addChild(mesh);
+		this.render(holder, dest, false);
+		// The mesh is destroyed with the holder; its geometry is not a child.
+		holder.destroy({ children: true });
+		geometry.destroy();
 	}
 
 	/** Draws a surface with an affine transform around an image-space pivot. */

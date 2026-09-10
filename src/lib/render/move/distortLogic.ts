@@ -115,6 +115,31 @@ export function applyHomography(h: Homography, p: Point): Point {
 }
 
 /**
+ * Inverse of a homography — maps a warped (destination) point back into the
+ * source space. Used to hit-test the floating selection while it is warped.
+ * Returns null when the map collapses (degenerate quad).
+ */
+export function invertHomography(h: Homography): Homography | null {
+	const [a, b, c, d, e, f, g, i, j] = h.h;
+	const det = a * (e * j - f * i) - b * (d * j - f * g) + c * (d * i - e * g);
+	if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+	const inv = 1 / det;
+	return {
+		h: [
+			(e * j - f * i) * inv,
+			(c * i - b * j) * inv,
+			(b * f - c * e) * inv,
+			(f * g - d * j) * inv,
+			(a * j - c * g) * inv,
+			(c * d - a * f) * inv,
+			(d * i - e * g) * inv,
+			(b * g - a * i) * inv,
+			(a * e - b * d) * inv
+		]
+	};
+}
+
+/**
  * Legacy distort gesture: corner/edge handles shear about the pivot
  * (Photoshop skew style) instead of scaling. Kept so the shipped Distort
  * option keeps working until the 4-dragger warp replaces it.
@@ -143,4 +168,39 @@ export function distortTo(g: TransformGesture, p: Point, b: Rect): TransformStat
 /** True when the transform carries a non-identity shear (used by drop()). */
 export function hasShear(s: TransformState): boolean {
 	return s.skewX !== 0 || s.skewY !== 0;
+}
+
+/** Corner order used everywhere the quad is consumed as a list (clockwise
+ * from the top-left): nw → ne → se → sw. */
+export function quadPoints(q: DistortQuad): [Point, Point, Point, Point] {
+	return [q.nw, q.ne, q.se, q.sw];
+}
+
+export function quadFromPoints(points: [Point, Point, Point, Point]): DistortQuad {
+	return { nw: { ...points[0] }, ne: { ...points[1] }, se: { ...points[2] }, sw: { ...points[3] } };
+}
+
+/** Shifts all four corners (the quad is stored in final image space). */
+export function translateQuad(q: DistortQuad, dx: number, dy: number): DistortQuad {
+	return {
+		nw: { x: q.nw.x + dx, y: q.nw.y + dy },
+		ne: { x: q.ne.x + dx, y: q.ne.y + dy },
+		se: { x: q.se.x + dx, y: q.se.y + dy },
+		sw: { x: q.sw.x + dx, y: q.sw.y + dy }
+	};
+}
+
+/** Corner key from a transform handle ('nw' | 'ne' | 'se' | 'sw'); null for
+ * the edge handles, which the distort sub-mode does not expose. */
+export function cornerFromHandle(handle: string): DistortCorner | null {
+	return handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw' ? handle : null;
+}
+
+/**
+ * Homography that maps the selection rectangle onto the dragged quad — the
+ * corner-pin warp the distort sub-mode applies to the floating pixels, the
+ * mask and the marching ants.
+ */
+export function homographyForQuad(bounds: Rect, quad: DistortQuad): Homography | null {
+	return computeHomography(quadFromBounds(bounds), quad);
 }

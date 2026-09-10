@@ -77,8 +77,3 @@
 	opacity: 0.35;
 	cursor: not-allowed;
 }
-.ang-val {
-	font-size: 12px;
-	color: var(--text-dim);
-	min-width: 36px;
-}

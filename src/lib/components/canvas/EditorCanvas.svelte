@@ -15,6 +15,7 @@
 	import { MoveEngine } from '../../render/MoveEngine';
 	import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
 	import type { TransformHandle } from '../../render/MoveEngine';
+	import { AXIS_COLORS, pickRing } from '../../render/move/gizmo3d';
 	import { logTransformDebug } from '../../render/transformDebug';
 	import rotateClockwiseCursor from '../../assets/rotate-clockwise.svg';
 	import rotateCounterclockwiseCursor from '../../assets/rotate-counterclockwise.svg';
@@ -256,6 +257,13 @@ let zoomRightHeld = $state(false);
 		const doc = documentRegistry.active;
 		if (get(activeToolId) !== 'move-pixels' && get(activeToolId) !== 'move-selection') return [];
 		if (!doc || (!transformUi && !handleBounds)) return [];
+		// Rotate sub-mode: the affine grips are replaced by the 3D rings
+		// (drawn as SVG below). Distort sub-mode: only the four corners.
+		if (get(activeToolId) === 'move-pixels') {
+			const mode = get(moveToolMode);
+			if (mode === 'rotate') return [];
+			if (mode === 'distort') return distortCornerPoints();
+		}
 		if (transformUi) {
 			return transformPoints;
 		}
@@ -270,6 +278,52 @@ let zoomRightHeld = $state(false);
 			['pivot', bounds.x + bounds.width / 2, bounds.y + bounds.height / 2]
 		];
 		return points.map(([handle, x, y]) => ({ handle, sx: doc.view.panX + x * zoom, sy: doc.view.panY + y * zoom }));
+	}
+
+	// --- Rotate sub-mode: Blender-style 3D axis rings (SVG overlay) --------
+	const rotateRingPaths = $derived.by(() => {
+		transformRevision;
+		if (get(activeToolId) !== 'move-pixels' || get(moveToolMode) !== 'rotate') return [];
+		const view = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
+		return (moveEngine?.rotateRings ?? []).map((ring) => {
+			const d = ring.points
+				.map((p, i) => {
+					const s = imageToScreen(view, p.x, p.y);
+					return `${i === 0 ? 'M' : 'L'}${s.x.toFixed(1)},${s.y.toFixed(1)}`;
+				})
+				.join(' ');
+			return { axis: ring.axis, d: `${d} Z` };
+		});
+	});
+
+	function ringHandleAt(img: Point): TransformHandle | null {
+		if (get(activeToolId) !== 'move-pixels' || get(moveToolMode) !== 'rotate') return null;
+		const rings = moveEngine?.rotateRings ?? [];
+		const doc = documentRegistry.active;
+		if (!rings.length || !doc) return null;
+		const threshold = 10 / Math.max(doc.view.zoom, 0.01);
+		const hit = pickRing(rings, img, threshold);
+		if (!hit) return null;
+		return hit.axis === 'x' ? 'ringX' : hit.axis === 'y' ? 'ringY' : 'ringZ';
+	}
+
+	// --- Distort sub-mode: four independently draggable corners ------------
+	function distortCornerPoints(): Array<{ handle: TransformHandle; sx: number; sy: number }> {
+		transformRevision;
+		const corners = moveEngine?.warpCorners;
+		const doc = documentRegistry.active;
+		if (!corners || !doc) return [];
+		const view = doc.view;
+		const order: Array<[TransformHandle, number]> = [
+			['nw', 0],
+			['ne', 1],
+			['se', 2],
+			['sw', 3]
+		];
+		return order.map(([handle, index]) => {
+			const s = imageToScreen(view, corners[index].x, corners[index].y);
+			return { handle, sx: s.x, sy: s.y };
+		});
 	}
 
 	// move-selection-tool state (drag the SELECTION border, not the pixels)
@@ -1280,6 +1334,28 @@ let zoomRightHeld = $state(false);
 
 	function transformHandleAt(img: Point): TransformHandle | null {
 		const activeTool = get(activeToolId);
+		// The projective sub-modes have their own hit-testing: rings (rotate)
+		// and the four corner draggers (distort). Everything inside the
+		// selection is a plain translation, handled by pointerDown.
+		if (activeTool === 'move-pixels') {
+			const mode = get(moveToolMode);
+			if (mode === 'rotate') return ringHandleAt(img);
+			if (mode === 'distort') {
+				const doc = documentRegistry.active;
+				const corners = moveEngine?.warpCorners;
+				if (!doc || !corners) return null;
+				const threshold = 10 / Math.max(doc.view.zoom, 0.01);
+				const order: Array<[TransformHandle, number]> = [
+					['nw', 0],
+					['ne', 1],
+					['se', 2],
+					['sw', 3]
+				];
+				for (const [handle, index] of order)
+					if (Math.hypot(img.x - corners[index].x, img.y - corners[index].y) <= threshold) return handle;
+				return null;
+			}
+		}
 		const t = activeTool === 'move-selection'
 			? moveSelEngine?.transformState ?? transformUi
 			: moveEngine?.transformState ?? transformUi;
@@ -1761,4 +1837,18 @@ function onPointerDown(e: PointerEvent) {
 			style="left:{point.sx - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; top:{point.sy - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; width:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px; height:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px;"
 		></div>
 	{/each}
+	<!-- Rotate sub-mode: Blender-style 3D rotation rings (one per axis) -->
+	{#if rotateRingPaths.length}
+		<svg class="pointer-events-none absolute inset-0 z-20 h-full w-full">
+			{#each rotateRingPaths as ring (ring.axis)}
+				<path
+					d={ring.d}
+					fill="none"
+					stroke={AXIS_COLORS[ring.axis]}
+					stroke-width="2"
+					stroke-opacity="0.95"
+				/>
+			{/each}
+		</svg>
+	{/if}
 </div>

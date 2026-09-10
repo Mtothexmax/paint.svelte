@@ -258,6 +258,13 @@ export class EditorRenderer {
 		this.activeScene?.setFloatingTexture(texture, x, y);
 	}
 
+	/** Warps the floating content onto four image-space corners (clockwise from
+	 * the top-left) — the Distort / 3D-Rotate sub-modes. `null` restores the
+	 * plain affine sprite. */
+	setActiveFloatingQuad(corners: [Point, Point, Point, Point] | null): void {
+		this.activeScene?.setFloatingQuad(corners);
+	}
+
 	setActiveFloatingTransform(
 		pivotX: number,
 		pivotY: number,
@@ -345,6 +352,27 @@ export class EditorRenderer {
 		if (!loops) return;
 		const state = { pivot, offset, scaleX, scaleY, rotation, skewX, skewY };
 		const transformed = loops.map((loop) => loop.map((p) => affinePoint(state, p)));
+		this.activeScene.showSelectionOutline(transformed, true);
+		if (this.usesGeometryTint(doc.selection)) this.activeScene.setSelectionTintFromLoops(transformed);
+	}
+
+	/** Live ants preview warped by a homography — used while the Distort /
+	 * 3D-Rotate sub-modes drag the floating selection. */
+	previewWarpedSelectionOutline(h: { h: ArrayLike<number> } | null): void {
+		const doc = documentRegistry.active;
+		if (!doc || !this.activeScene) return;
+		if (!h) {
+			this.refreshActiveSelection();
+			return;
+		}
+		const loops = this.selectionOutlineLoops(doc);
+		if (!loops) return;
+		const warp = (p: Point): Point => {
+			const m = h.h;
+			const w = m[6] * p.x + m[7] * p.y + m[8] || 1;
+			return { x: (m[0] * p.x + m[1] * p.y + m[2]) / w, y: (m[3] * p.x + m[4] * p.y + m[5]) / w };
+		};
+		const transformed = loops.map((loop) => loop.map(warp));
 		this.activeScene.showSelectionOutline(transformed, true);
 		if (this.usesGeometryTint(doc.selection)) this.activeScene.setSelectionTintFromLoops(transformed);
 	}

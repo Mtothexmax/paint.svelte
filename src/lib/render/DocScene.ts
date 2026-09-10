@@ -1,6 +1,6 @@
 // Layer: render (pixi). One scene graph per open document.
 
-import { Container, Filter, Graphics, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js';
+import { Container, Filter, Graphics, Mesh, PerspectivePlaneGeometry, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { Point } from '../core/geometry';
 import type { Layer, LayerEffect, SurfaceId } from '../core/layers/Layer';
@@ -88,6 +88,15 @@ export class DocScene {
 	 * between the blue tint and the ants outline while the Move tool drags the
 	 * selected pixels around. */
 	private floating: Sprite | null = null;
+	/** Projective (4-corner) variant of the floating preview: used by the
+	 * Distort and 3D-Rotate sub-modes, where an affine sprite transform cannot
+	 * express the warp. Mutually exclusive with `floating` — when the mesh is
+	 * shown the sprite is hidden. */
+	private floatingMesh: Mesh | null = null;
+	private floatingMeshGeometry: PerspectivePlaneGeometry | null = null;
+	/** Latest floating texture + warp quad (the mesh is rebuilt from these). */
+	private floatingTexture: Texture | null = null;
+	private floatingQuad: [Point, Point, Point, Point] | null = null;
 	/** Outline currently displayed (image-space loops); re-stroked on zoom. */
 	private outlineLoops: Point[][] | null = null;
 	private outlineDashed = true;
@@ -715,6 +724,9 @@ this.root.addChild(this.checker);
 	 */
 	setFloatingTexture(texture: Texture | null, x = 0, y = 0): void {
 		if (!texture) {
+			this.floatingTexture = null;
+			this.floatingQuad = null;
+			this.syncFloatingMesh();
 			if (this.floating) {
 				this.top.removeChild(this.floating);
 				this.floating.destroy();
@@ -729,6 +741,60 @@ this.root.addChild(this.checker);
 		}
 		this.floating.texture = texture;
 		this.floating.position.set(x, y);
+		this.floatingTexture = texture;
+		this.syncFloatingMesh();
+	}
+
+	/**
+	 * Shows the floating content warped onto four image-space corners (Move
+	 * tool Distort / 3D-Rotate sub-modes) instead of the affine sprite.
+	 * `null` restores the sprite. Corners are absolute image px, clockwise
+	 * from the top-left.
+	 */
+	setFloatingQuad(corners: [Point, Point, Point, Point] | null): void {
+		this.floatingQuad = corners ? ([{ ...corners[0] }, { ...corners[1] }, { ...corners[2] }, { ...corners[3] }] as [Point, Point, Point, Point]) : null;
+		this.syncFloatingMesh();
+	}
+
+	/** Creates / updates / removes the warped floating mesh to match
+	 * `floatingQuad` + `floatingTexture`. */
+	private syncFloatingMesh(): void {
+		const texture = this.floatingTexture;
+		if (!this.floatingQuad || !texture) {
+			if (this.floatingMesh) {
+				this.top.removeChild(this.floatingMesh);
+				this.floatingMesh.destroy();
+				this.floatingMesh = null;
+			}
+			if (this.floatingMeshGeometry) {
+				this.floatingMeshGeometry.destroy();
+				this.floatingMeshGeometry = null;
+			}
+			if (this.floating) this.floating.visible = true;
+			return;
+		}
+		if (!this.floatingMesh || this.floatingMesh.texture !== texture) {
+			if (this.floatingMesh) {
+				this.top.removeChild(this.floatingMesh);
+				this.floatingMesh.destroy();
+			}
+			if (this.floatingMeshGeometry) this.floatingMeshGeometry.destroy();
+			this.floatingMeshGeometry = new PerspectivePlaneGeometry({
+				width: texture.width,
+				height: texture.height,
+				verticesX: 24,
+				verticesY: 24
+			});
+			const mesh = new Mesh({ texture, geometry: this.floatingMeshGeometry });
+			const index = this.floating ? this.top.getChildIndex(this.floating) : this.top.getChildIndex(this.ants);
+			this.top.addChildAt(mesh, index);
+			this.floatingMesh = mesh;
+			this.raiseTop();
+		}
+		const q = this.floatingQuad;
+		this.floatingMeshGeometry!.setCorners(q[0].x, q[0].y, q[1].x, q[1].y, q[2].x, q[2].y, q[3].x, q[3].y);
+		this.floatingMesh!.position.set(0, 0);
+		if (this.floating) this.floating.visible = false;
 	}
 
 	/** Applies the current floating-selection transform in image space. */
@@ -792,6 +858,11 @@ this.root.addChild(this.checker);
 	dispose(): void {
 		this.destroyPreviewTargets();
 		this.clearLayerEffectTextures();
+		if (this.floatingMeshGeometry) {
+			this.floatingMeshGeometry.destroy();
+			this.floatingMeshGeometry = null;
+		}
+		this.floatingMesh = null;
 		this.root.destroy({ children: true });
 		if (this.strokeBuffer) {
 			this.strokeBuffer.destroy(true);

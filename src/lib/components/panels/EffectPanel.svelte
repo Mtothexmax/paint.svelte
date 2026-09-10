@@ -13,6 +13,9 @@
 	import FilterSlider from '../common/FilterSlider.svelte';
 	import EffectColorRow from '../common/EffectColorRow.svelte';
 	import EffectCheckbox from '../common/EffectCheckbox.svelte';
+	import XYPicker from '../common/XYPicker.svelte';
+	import AnglePicker from '../common/AnglePicker.svelte';
+	import XyParam from '../common/XyParam.svelte';
 
 	import AddIcon from '@material-symbols/svg-400/rounded/add.svg';
 	import RemoveIcon from '@material-symbols/svg-400/rounded/remove.svg';
@@ -331,6 +334,19 @@
 						<EffectCheckbox
 							label={param.label}
 							bind:value={selectedEff.settings[param.key]}
+							oninput={pushSettings}
+							onCommit={commitSettings}
+						/>
+					{:else if param.kind === 'xy'}
+						<XyParam {param} settings={selectedEff.settings} onChange={pushSettings} />
+					{:else if param.kind === 'angle'}
+						<AnglePicker
+							bind:value={selectedEff.settings[param.key]}
+							min={param.min ?? 0}
+							max={param.max ?? 360}
+							step={param.step ?? 1}
+							default={param.default}
+							label={param.label}
 							oninput={pushSettings}
 							onCommit={commitSettings}
 						/>
