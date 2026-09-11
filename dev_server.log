@@ -1445,3 +1445,16 @@ https://svelte.dev/e/a11y_no_static_element_interactions
 [2m5:50:48 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mPixiJS Warning:  [BindGroup] a 'textureSource' was destroyed while still bound to a shader. Remove it from the shader before destroying it.
 [2m5:50:48 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mPixiJS Warning:  [BindGroup] a 'textureSource' was destroyed while still bound to a shader. Remove it from the shader before destroying it.
 [2m5:50:48 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mPixiJS Warning:  [BindGroup] a 'textureSource' was destroyed while still bound to a shader. Remove it from the shader before destroying it.
+[2m5:51:18 PM[22m [36m[1m[vite][22m[39m [32mvite.config.ts changed, restarting server...[39m
+[2m5:51:18 PM[22m [36m[1m[vite][22m[39m server restarted.
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/paint.svelte[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m5:51:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mbuild/index.html[22m
+[2m5:51:24 PM[22m [36m[1m[vite][22m[39m [32mvite.config.ts changed, restarting server...[39m
+[2m5:51:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mdocs/index.html[22m
+[2m5:51:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mbuild/index.html[22m
+[2m5:51:24 PM[22m [36m[1m[vite][22m[39m server restarted.
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
