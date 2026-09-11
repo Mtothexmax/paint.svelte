@@ -9,8 +9,13 @@
 	import { MAX_DIMENSION, MAX_PIXELS, formatBytes, surfaceBytes, validateSize } from '../../core/limits';
 	import { deviceMaxTextureSize } from '../../services/device';
 	import { dialog, closeDialog, type ImageSizeDialogPayload } from '../../services/dialogService';
+	import MovableDialog from '../common/MovableDialog.svelte';
 	import { getEditorRenderer } from '../../render/EditorRenderer';
 	import { resizeCanvas, resizeImage, type ResizeAnchor } from '../../render/resize';
+	// The width/height lock. Imported `?raw` and inlined with {@html} so the
+	// shipped black SVGs can be tinted (same convention as MenuBar's .menu-svg).
+	import LockIcon from '@material-symbols/svg-400/rounded/lock.svg?raw';
+	import LockOpenIcon from '@material-symbols/svg-400/rounded/lock_open.svg?raw';
 
 	const payload = $dialog.payload as ImageSizeDialogPayload | undefined;
 
@@ -32,6 +37,8 @@
 	const validation = $derived(
 		validateSize(Math.round(width || 0), Math.round(height || 0), device ?? undefined)
 	);
+
+	let widthEl = $state<HTMLInputElement | null>(null);
 
 	function clampInt(v: number): number {
 		const n = Math.round(Number(v));
@@ -58,6 +65,17 @@
 		scalePct = p;
 		width = Math.max(1, Math.round((origW * p) / 100));
 		height = Math.max(1, Math.round((origH * p) / 100));
+	}
+
+	/** Toggle the width/height lock. Switching it ON re-syncs the two values
+	 * straight away — otherwise you could lock the ratio, hit OK and still get a
+	 * distorted image, which is the one thing the lock promises not to do. The
+	 * field edited last wins, exactly as if you had just typed in it. */
+	function toggleConstrain() {
+		constrain = !constrain;
+		if (!constrain) return;
+		if (lastEdit === 'h') updateFromHeight();
+		else updateFromWidth();
 	}
 
 	function updatePercent() {
@@ -98,21 +116,20 @@
 
 	onMount(() => {
 		window.addEventListener('keydown', onGlobalKey, true);
+		// Opened to type numbers — put the caret there straight away.
+		queueMicrotask(() => {
+			widthEl?.focus();
+			widthEl?.select();
+		});
 		return () => window.removeEventListener('keydown', onGlobalKey, true);
 	});
 </script>
 
-<div class="dialog-backdrop" onclick={() => closeDialog()}>
-	<div
-		class="dialog"
-		onclick={(e) => e.stopPropagation()}
-		role="dialog"
-		aria-modal="true"
-		aria-label={mode === 'resize' ? 'Resize Image' : 'Canvas Size'}
-	>
-		<h2 class="dialog-title">{mode === 'resize' ? 'Resize Image' : 'Canvas Size'}</h2>
-
-		<div class="space-y-3 p-4">
+<!-- Non-modal on purpose (MovableDialog, like the Selection Size dialog): no
+     dimming backdrop, so the canvas stays visible and interactive, with an X
+     button and drag-by-title. -->
+<MovableDialog title={mode === 'resize' ? 'Resize Image' : 'Canvas Size'} onClose={closeDialog}>
+	<div class="space-y-3">
 			<div class="seg" role="group" aria-label="Resize mode">
 				<button class="seg-btn" class:on={mode === 'resize'} onclick={() => (mode = 'resize')} type="button">
 					Resize image
@@ -122,17 +139,33 @@
 				</button>
 			</div>
 
-			<div class="grid grid-cols-2 gap-3">
+			<div class="dims">
 				<label class="field">
 					<span class="field-label">Width (px)</span>
 					<input
 						type="number"
 						min="1"
 						max={MAX_DIMENSION}
+						bind:this={widthEl}
 						bind:value={width}
 						onchange={updateFromWidth}
 					/>
 				</label>
+				<!-- The width/height ratio lock. Sits between the two fields it
+				     relates, rather than beside the dialog as a labelled
+				     checkbox; the words survive as the tooltip / accessible
+				     name. -->
+				<button
+					type="button"
+					class="lock-btn"
+					class:on={constrain}
+					aria-pressed={constrain}
+					aria-label="Constrain proportions"
+					title="Constrain proportions: {constrain ? 'on' : 'off'}"
+					onclick={toggleConstrain}
+				>
+					<span class="lock-ic" aria-hidden="true">{@html constrain ? LockIcon : LockOpenIcon}</span>
+				</button>
 				<label class="field">
 					<span class="field-label">Height (px)</span>
 					<input
@@ -145,13 +178,12 @@
 				</label>
 			</div>
 
-			<div class="grid grid-cols-2 gap-3">
+			<!-- Same template as the Width/Height row, so the Scale field lines up
+			     with the Width field instead of drifting wider. -->
+			<div class="dims">
 				<label class="field">
 					<span class="field-label">Scale (%)</span>
 					<input type="number" min="1" max="1000" bind:value={scalePct} onchange={updateFromPercent} />
-				</label>
-				<label class="radio mt-2 items-start" style="align-items:center;">
-					<input type="checkbox" bind:checked={constrain} /> Constrain proportions
 				</label>
 			</div>
 
@@ -192,16 +224,62 @@
 			{#if !validation.ok}
 				<div class="error-box">{validation.error}</div>
 			{/if}
-		</div>
-
-		<div class="dialog-footer">
-			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
-			<button class="btn-primary" disabled={!validation.ok} onclick={apply}>OK</button>
-		</div>
 	</div>
-</div>
+
+	{#snippet actions()}
+		<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+		<button class="btn-primary" disabled={!validation.ok} onclick={apply}>OK</button>
+	{/snippet}
+</MovableDialog>
 
 <style>
+	/* Width | lock | Height. The middle column is a fixed 32px — the lock's own
+	   width — rather than `auto`, so the Scale row can reuse the same template
+	   and still line its single field up with the Width field exactly. */
+	.dims {
+		display: grid;
+		grid-template-columns: 1fr 32px 1fr;
+		gap: 12px;
+		align-items: end;
+	}
+	.lock-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		/* Matches `.field input[type='number']` (6px padding + 13px text + border)
+		   so the toggle sits flush with the two inputs it joins. */
+		height: 30px;
+		padding: 0;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text-dim);
+		cursor: pointer;
+	}
+	.lock-btn:hover {
+		border-color: var(--accent);
+		color: var(--text);
+	}
+	.lock-btn.on {
+		background: var(--accent-soft);
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.lock-ic {
+		display: inline-flex;
+		width: 16px;
+		height: 16px;
+	}
+	/* `:global` because the <svg> comes from {@html} — Svelte's scoping class is
+	   never added to raw-injected markup, so a plain descendant selector would
+	   be reported as unused and silently never match. */
+	.lock-ic :global(svg) {
+		width: 16px;
+		height: 16px;
+		fill: currentColor;
+	}
+
 	.anchor-grid {
 		display: grid;
 		grid-template-columns: repeat(3, 34px);

@@ -5,8 +5,12 @@
 // Pixi v8 `extract.pixels` returns premultiplied-alpha bytes, so the "over"
 // compositing happens in premultiplied space and the result is unpremultiplied
 // once at the end (same convention as `effects.ts`).
+//
+// Only a 1×1 `frame` is read back per layer. That matters because this runs on
+// every pointer move for the eyedropper's live RGB/A readout: extracting whole
+// doc-sized buffers would be megabytes of GPU→CPU traffic per frame.
 
-import { Sprite } from 'pixi.js';
+import { Rectangle, Sprite } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { RGBA } from '../core/color';
 import type { EditorRenderer } from './EditorRenderer';
@@ -26,6 +30,7 @@ export function sampleCompositeColorAt(
 	const py = Math.floor(y);
 	if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) return null;
 	if (!renderer.app) return null;
+	const frame = new Rectangle(px, py, 1, 1);
 
 	// premultiplied accumulator, 0..1
 	let outR = 0;
@@ -39,19 +44,18 @@ export function sampleCompositeColorAt(
 		const sprite = new Sprite(renderer.surfaces.getTexture(layer.surfaceId));
 		let extracted;
 		try {
-			extracted = renderer.app.renderer.extract.pixels({ target: sprite, resolution: 1 });
+			extracted = renderer.app.renderer.extract.pixels({ target: sprite, frame, resolution: 1 });
 		} finally {
 			sprite.destroy();
 		}
-		if (!extracted || extracted.width !== doc.width || extracted.height !== doc.height) continue;
+		if (!extracted || extracted.width !== 1 || extracted.height !== 1) continue;
 		const d = extracted.pixels;
-		const i = (py * extracted.width + px) * 4;
 		const layerOpacity = Math.max(0, Math.min(1, layer.opacity));
-		const sa = (d[i + 3] / 255) * layerOpacity;
+		const sa = (d[3] / 255) * layerOpacity;
 		if (sa <= 0) continue;
-		const sr = (d[i] / 255) * layerOpacity;
-		const sg = (d[i + 1] / 255) * layerOpacity;
-		const sb = (d[i + 2] / 255) * layerOpacity;
+		const sr = (d[0] / 255) * layerOpacity;
+		const sg = (d[1] / 255) * layerOpacity;
+		const sb = (d[2] / 255) * layerOpacity;
 		outR = sr + outR * (1 - sa);
 		outG = sg + outG * (1 - sa);
 		outB = sb + outB * (1 - sa);

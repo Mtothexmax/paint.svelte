@@ -1,0 +1,1849 @@
+
+> paint.svelte@0.0.1 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: c:\dev\paint.svelte
+Getting Svelte diagnostics...
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\TabBar.svelte[39m:27:4
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m			<span class="fltab-name">{doc.name}{doc.dirty ? '*' : ''}</span>
+			[35m<span
+				class="fltab-close"
+				role="button"
+				aria-label="Close {doc.name}"
+				tabindex="-1"
+				onclick={(e) => {
+					e.stopPropagation();
+					closeDocument(doc.id);
+				}}
+			>×</span>[36m
+		</button>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:74:2
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m>
+	[35m<span class="isp-icon" onclick={cycle}>{current?.icon ?? ''}</span>[36m
+	{#if titleInButton}<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>{/if}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:74:2
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m>
+	[35m<span class="isp-icon" onclick={cycle}>{current?.icon ?? ''}</span>[36m
+	{#if titleInButton}<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>{/if}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:75:21
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m	<span class="isp-icon" onclick={cycle}>{current?.icon ?? ''}</span>
+	{#if titleInButton}[35m<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>[36m{/if}
+	<span class="isp-arrow" onclick={toggleMenu}>▾</span>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:75:21
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m	<span class="isp-icon" onclick={cycle}>{current?.icon ?? ''}</span>
+	{#if titleInButton}[35m<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>[36m{/if}
+	<span class="isp-arrow" onclick={toggleMenu}>▾</span>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:76:2
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m	{#if titleInButton}<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>{/if}
+	[35m<span class="isp-arrow" onclick={toggleMenu}>▾</span>[36m
+</button>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:76:2
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m	{#if titleInButton}<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>{/if}
+	[35m<span class="isp-arrow" onclick={toggleMenu}>▾</span>[36m
+</button>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:362:3
+[33mWarn[39m: `<div>` with a dragover or drop handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m	{#if rows.length > 0}
+		[35m<div
+			class="layer-list"
+			class:drop-below={dropBelow}
+			ondragover={onListDragOver}
+			ondrop={onListDrop}
+		>
+			{#each rows as row (row.id)}
+				<div
+					class="layer-row"
+					class:on={row.active}
+					class:dim={!row.visible}
+					class:dragging={draggedId === row.id}
+					class:drop-before={dropTarget?.id === row.id && dropTarget.before}
+					class:drop-after={dropTarget?.id === row.id && !dropTarget.before}
+					draggable="true"
+					onclick={() => selectLayer(row.id)}
+					oncontextmenu={(e) => onRowContextMenu(e, row)}
+					ondragstart={(e) => onRowDragStart(e, row.id)}
+					ondragover={(e) => onRowDragOver(e, row.id)}
+					ondrop={(e) => onRowDrop(e, row.id)}
+					ondragend={onRowDragEnd}
+					onpointerenter={() => (hoveredId = row.id)}
+					onpointerleave={() => (hoveredId = null)}
+				>
+<input
+						type="checkbox"
+						class="layer-vis"
+						checked={row.visible}
+						title={row.visible ? 'Hide layer' : 'Show layer'}
+						onclick={(e) => e.stopPropagation()}
+						onchange={() => setLayerVisibility(row.id, !row.visible)}
+					/>
+{#if $layerThumbnails[row.id]}
+					<img
+						class="layer-thumb"
+						src={$layerThumbnails[row.id]}
+						alt=""
+						 draggable="false"
+					/>
+					{:else}
+						<div class="layer-thumb" aria-hidden="true"></div>
+					{/if}
+					<div class="layer-main">
+						<div class="layer-line">
+							{#if editingId === row.id}
+								<!-- size=1 keeps the <input>'s intrinsic width at one
+								character, so even a browser that ignores the
+								flex-basis: 0 in .layer-rename cannot widen the row. -->
+								<input
+									class="layer-rename"
+									size="1"
+									bind:this={editInput}
+									bind:value={editingName}
+									onkeydown={(e) => onRenameKey(row, e)}
+									onblur={() => commitRename(row)}
+									onclick={(e) => e.stopPropagation()}
+								/>
+							{:else}
+								<span
+									class="layer-name"
+									class:renameable={!row.isText}
+									title={row.isText ? 'Text layers cannot be renamed' : 'Click to rename'}
+									onclick={(e) => startRename(row, e)}
+								>{row.name}</span>
+							{/if}
+						</div>
+						<div class="layer-line">
+							{#if row.blendMode !== 'normal' || hoveredId === row.id}
+								<select
+									class="layer-blend"
+									value={row.blendMode}
+									title="Blend mode"
+									onclick={(e) => e.stopPropagation()}
+									onpointerdown={(e) => e.stopPropagation()}
+									onchange={(e) => setLayerBlendMode(row.id, (e.currentTarget as HTMLSelectElement).value)}
+								>
+									{#each BLEND_MODE_OPTIONS as b (b.id)}
+										<option value={b.id}>{b.label}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+					</div>
+					<!-- Pinned to the row's far right, independent of the name /
+					blend lines above. Hidden while the row is not hovered UNLESS
+					the layer actually has effects. -->
+					<button
+						class="layer-fx"
+						class:on={$layerEffectsPanelOpen}
+						class:hasFx={row.effectCount > 0}
+						title="Toggle the layer-effects panel"
+						onclick={(e) => {
+							e.stopPropagation();
+							selectLayer(row.id);
+							toggleLayerEffectsPanel();
+						}}
+					>fx{#if row.effectCount > 0}<span class="layer-fx-n">{row.effectCount}</span>{/if}</button>
+				</div>
+			{/each}
+		</div>[36m
+	{:else}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:369:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m			{#each rows as row (row.id)}
+				[35m<div
+					class="layer-row"
+					class:on={row.active}
+					class:dim={!row.visible}
+					class:dragging={draggedId === row.id}
+					class:drop-before={dropTarget?.id === row.id && dropTarget.before}
+					class:drop-after={dropTarget?.id === row.id && !dropTarget.before}
+					draggable="true"
+					onclick={() => selectLayer(row.id)}
+					oncontextmenu={(e) => onRowContextMenu(e, row)}
+					ondragstart={(e) => onRowDragStart(e, row.id)}
+					ondragover={(e) => onRowDragOver(e, row.id)}
+					ondrop={(e) => onRowDrop(e, row.id)}
+					ondragend={onRowDragEnd}
+					onpointerenter={() => (hoveredId = row.id)}
+					onpointerleave={() => (hoveredId = null)}
+				>
+<input
+						type="checkbox"
+						class="layer-vis"
+						checked={row.visible}
+						title={row.visible ? 'Hide layer' : 'Show layer'}
+						onclick={(e) => e.stopPropagation()}
+						onchange={() => setLayerVisibility(row.id, !row.visible)}
+					/>
+{#if $layerThumbnails[row.id]}
+					<img
+						class="layer-thumb"
+						src={$layerThumbnails[row.id]}
+						alt=""
+						 draggable="false"
+					/>
+					{:else}
+						<div class="layer-thumb" aria-hidden="true"></div>
+					{/if}
+					<div class="layer-main">
+						<div class="layer-line">
+							{#if editingId === row.id}
+								<!-- size=1 keeps the <input>'s intrinsic width at one
+								character, so even a browser that ignores the
+								flex-basis: 0 in .layer-rename cannot widen the row. -->
+								<input
+									class="layer-rename"
+									size="1"
+									bind:this={editInput}
+									bind:value={editingName}
+									onkeydown={(e) => onRenameKey(row, e)}
+									onblur={() => commitRename(row)}
+									onclick={(e) => e.stopPropagation()}
+								/>
+							{:else}
+								<span
+									class="layer-name"
+									class:renameable={!row.isText}
+									title={row.isText ? 'Text layers cannot be renamed' : 'Click to rename'}
+									onclick={(e) => startRename(row, e)}
+								>{row.name}</span>
+							{/if}
+						</div>
+						<div class="layer-line">
+							{#if row.blendMode !== 'normal' || hoveredId === row.id}
+								<select
+									class="layer-blend"
+									value={row.blendMode}
+									title="Blend mode"
+									onclick={(e) => e.stopPropagation()}
+									onpointerdown={(e) => e.stopPropagation()}
+									onchange={(e) => setLayerBlendMode(row.id, (e.currentTarget as HTMLSelectElement).value)}
+								>
+									{#each BLEND_MODE_OPTIONS as b (b.id)}
+										<option value={b.id}>{b.label}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+					</div>
+					<!-- Pinned to the row's far right, independent of the name /
+					blend lines above. Hidden while the row is not hovered UNLESS
+					the layer actually has effects. -->
+					<button
+						class="layer-fx"
+						class:on={$layerEffectsPanelOpen}
+						class:hasFx={row.effectCount > 0}
+						title="Toggle the layer-effects panel"
+						onclick={(e) => {
+							e.stopPropagation();
+							selectLayer(row.id);
+							toggleLayerEffectsPanel();
+						}}
+					>fx{#if row.effectCount > 0}<span class="layer-fx-n">{row.effectCount}</span>{/if}</button>
+				</div>[36m
+			{/each}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:369:5
+[33mWarn[39m: `<div>` with a click, contextmenu, dragstart, dragover, drop, dragend, pointerenter or pointerleave handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m			{#each rows as row (row.id)}
+				[35m<div
+					class="layer-row"
+					class:on={row.active}
+					class:dim={!row.visible}
+					class:dragging={draggedId === row.id}
+					class:drop-before={dropTarget?.id === row.id && dropTarget.before}
+					class:drop-after={dropTarget?.id === row.id && !dropTarget.before}
+					draggable="true"
+					onclick={() => selectLayer(row.id)}
+					oncontextmenu={(e) => onRowContextMenu(e, row)}
+					ondragstart={(e) => onRowDragStart(e, row.id)}
+					ondragover={(e) => onRowDragOver(e, row.id)}
+					ondrop={(e) => onRowDrop(e, row.id)}
+					ondragend={onRowDragEnd}
+					onpointerenter={() => (hoveredId = row.id)}
+					onpointerleave={() => (hoveredId = null)}
+				>
+<input
+						type="checkbox"
+						class="layer-vis"
+						checked={row.visible}
+						title={row.visible ? 'Hide layer' : 'Show layer'}
+						onclick={(e) => e.stopPropagation()}
+						onchange={() => setLayerVisibility(row.id, !row.visible)}
+					/>
+{#if $layerThumbnails[row.id]}
+					<img
+						class="layer-thumb"
+						src={$layerThumbnails[row.id]}
+						alt=""
+						 draggable="false"
+					/>
+					{:else}
+						<div class="layer-thumb" aria-hidden="true"></div>
+					{/if}
+					<div class="layer-main">
+						<div class="layer-line">
+							{#if editingId === row.id}
+								<!-- size=1 keeps the <input>'s intrinsic width at one
+								character, so even a browser that ignores the
+								flex-basis: 0 in .layer-rename cannot widen the row. -->
+								<input
+									class="layer-rename"
+									size="1"
+									bind:this={editInput}
+									bind:value={editingName}
+									onkeydown={(e) => onRenameKey(row, e)}
+									onblur={() => commitRename(row)}
+									onclick={(e) => e.stopPropagation()}
+								/>
+							{:else}
+								<span
+									class="layer-name"
+									class:renameable={!row.isText}
+									title={row.isText ? 'Text layers cannot be renamed' : 'Click to rename'}
+									onclick={(e) => startRename(row, e)}
+								>{row.name}</span>
+							{/if}
+						</div>
+						<div class="layer-line">
+							{#if row.blendMode !== 'normal' || hoveredId === row.id}
+								<select
+									class="layer-blend"
+									value={row.blendMode}
+									title="Blend mode"
+									onclick={(e) => e.stopPropagation()}
+									onpointerdown={(e) => e.stopPropagation()}
+									onchange={(e) => setLayerBlendMode(row.id, (e.currentTarget as HTMLSelectElement).value)}
+								>
+									{#each BLEND_MODE_OPTIONS as b (b.id)}
+										<option value={b.id}>{b.label}</option>
+									{/each}
+								</select>
+							{/if}
+						</div>
+					</div>
+					<!-- Pinned to the row's far right, independent of the name /
+					blend lines above. Hidden while the row is not hovered UNLESS
+					the layer actually has effects. -->
+					<button
+						class="layer-fx"
+						class:on={$layerEffectsPanelOpen}
+						class:hasFx={row.effectCount > 0}
+						title="Toggle the layer-effects panel"
+						onclick={(e) => {
+							e.stopPropagation();
+							selectLayer(row.id);
+							toggleLayerEffectsPanel();
+						}}
+					>fx{#if row.effectCount > 0}<span class="layer-fx-n">{row.effectCount}</span>{/if}</button>
+				</div>[36m
+			{/each}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:420:9
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m							{:else}
+								[35m<span
+									class="layer-name"
+									class:renameable={!row.isText}
+									title={row.isText ? 'Text layers cannot be renamed' : 'Click to rename'}
+									onclick={(e) => startRename(row, e)}
+								>{row.name}</span>[36m
+							{/if}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:420:9
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m							{:else}
+								[35m<span
+									class="layer-name"
+									class:renameable={!row.isText}
+									title={row.isText ? 'Text layers cannot be renamed' : 'Click to rename'}
+									onclick={(e) => startRename(row, e)}
+								>{row.name}</span>[36m
+							{/if}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:1935:3
+[33mWarn[39m: `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m		{@const td = textDraft}
+		[35m<div
+			class="text-nub absolute z-40"
+			style="left:{td.sx - 5}px; top:{td.sy - 5}px;"
+			title="Drag to move the text"
+			onpointerdown={onTextNubDown}
+		></div>[36m
+		<textarea[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:1980:4
+[33mWarn[39m: `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m		{#each [lq0, lq1, lq2, lq3] as q, i (i)}
+			[35m<div
+				class="line-nub absolute z-40"
+				class:line-ctrl={i === 1 || i === 2}
+				style="left:{q.x - 7}px; top:{q.y - 7}px;"
+				title={i === 0 ? 'Start point' : i === 3 ? 'End point' : 'Control point'}
+				onpointerdown={(e) => onLineNubDown(e, i as 0 | 1 | 2 | 3)}
+			></div>[36m
+		{/each}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:1995:4
+[33mWarn[39m: `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m		{#each [gq0, gq1] as q, i (i)}
+			[35m<div
+				class="line-nub absolute z-40"
+				style="left:{q.x - 7}px; top:{q.y - 7}px;"
+				title={i === 0 ? 'Gradient start (foreground)' : 'Gradient end (background)'}
+				onpointerdown={(e) => onGradientNubDown(e, i as 0 | 1)}
+			></div>[36m
+		{/each}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:109:5
+[33mWarn[39m: `host` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+[36m
+let [35mhost: HTMLDivElement[36m;
+let canvasEl: HTMLCanvasElement;[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:72:1
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m
+[35m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	<div class="dialog" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="New image">
+		<h2 class="dialog-title">New Image</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
+				</label>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input type="number" min="1" max={MAX_DIMENSION} bind:value={height} />
+				</label>
+			</div>
+
+			<div>
+				<span class="field-label">Presets</span>
+				<div class="mt-1 flex flex-wrap gap-1.5">
+					{#each presets as p (p.label)}
+						<button class="preset-chip" onclick={() => applyPreset(p.w, p.h)}>{p.label}</button>
+					{/each}
+				</div>
+			</div>
+
+			<div>
+				<span class="field-label">Background</span>
+				<div class="mt-1 flex items-center gap-4">
+					<label class="radio"><input type="radio" bind:group={background} value="transparent" /> Transparent</label>
+					<label class="radio"><input type="radio" bind:group={background} value="white" /> White</label>
+					<label class="radio">
+						<input type="radio" bind:group={background} value="custom" /> Custom
+						{#if background === 'custom'}
+							<input type="color" bind:value={customColor} class="ml-2 h-6 w-8 align-middle" />
+						{/if}
+					</label>
+				</div>
+			</div>
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				~{formatBytes(bytes)} per layer &middot; background: <span style="color:#e0e0e0;">{selectedBg}</span>
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => void fromClipboard()} title="Create a document from an image on the clipboard">
+				📋 From Clipboard…
+			</button>
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={create}>Create</button>
+		</div>
+	</div>
+</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:72:1
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m
+[35m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	<div class="dialog" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="New image">
+		<h2 class="dialog-title">New Image</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
+				</label>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input type="number" min="1" max={MAX_DIMENSION} bind:value={height} />
+				</label>
+			</div>
+
+			<div>
+				<span class="field-label">Presets</span>
+				<div class="mt-1 flex flex-wrap gap-1.5">
+					{#each presets as p (p.label)}
+						<button class="preset-chip" onclick={() => applyPreset(p.w, p.h)}>{p.label}</button>
+					{/each}
+				</div>
+			</div>
+
+			<div>
+				<span class="field-label">Background</span>
+				<div class="mt-1 flex items-center gap-4">
+					<label class="radio"><input type="radio" bind:group={background} value="transparent" /> Transparent</label>
+					<label class="radio"><input type="radio" bind:group={background} value="white" /> White</label>
+					<label class="radio">
+						<input type="radio" bind:group={background} value="custom" /> Custom
+						{#if background === 'custom'}
+							<input type="color" bind:value={customColor} class="ml-2 h-6 w-8 align-middle" />
+						{/if}
+					</label>
+				</div>
+			</div>
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				~{formatBytes(bytes)} per layer &middot; background: <span style="color:#e0e0e0;">{selectedBg}</span>
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => void fromClipboard()} title="Create a document from an image on the clipboard">
+				📋 From Clipboard…
+			</button>
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={create}>Create</button>
+		</div>
+	</div>
+</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:73:2
+[33mWarn[39m: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+[36m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	[35m<div class="dialog" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="New image">
+		<h2 class="dialog-title">New Image</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
+				</label>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input type="number" min="1" max={MAX_DIMENSION} bind:value={height} />
+				</label>
+			</div>
+
+			<div>
+				<span class="field-label">Presets</span>
+				<div class="mt-1 flex flex-wrap gap-1.5">
+					{#each presets as p (p.label)}
+						<button class="preset-chip" onclick={() => applyPreset(p.w, p.h)}>{p.label}</button>
+					{/each}
+				</div>
+			</div>
+
+			<div>
+				<span class="field-label">Background</span>
+				<div class="mt-1 flex items-center gap-4">
+					<label class="radio"><input type="radio" bind:group={background} value="transparent" /> Transparent</label>
+					<label class="radio"><input type="radio" bind:group={background} value="white" /> White</label>
+					<label class="radio">
+						<input type="radio" bind:group={background} value="custom" /> Custom
+						{#if background === 'custom'}
+							<input type="color" bind:value={customColor} class="ml-2 h-6 w-8 align-middle" />
+						{/if}
+					</label>
+				</div>
+			</div>
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				~{formatBytes(bytes)} per layer &middot; background: <span style="color:#e0e0e0;">{selectedBg}</span>
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => void fromClipboard()} title="Create a document from an image on the clipboard">
+				📋 From Clipboard…
+			</button>
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={create}>Create</button>
+		</div>
+	</div>[36m
+</div>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:73:2
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	[35m<div class="dialog" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="New image">
+		<h2 class="dialog-title">New Image</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
+				</label>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input type="number" min="1" max={MAX_DIMENSION} bind:value={height} />
+				</label>
+			</div>
+
+			<div>
+				<span class="field-label">Presets</span>
+				<div class="mt-1 flex flex-wrap gap-1.5">
+					{#each presets as p (p.label)}
+						<button class="preset-chip" onclick={() => applyPreset(p.w, p.h)}>{p.label}</button>
+					{/each}
+				</div>
+			</div>
+
+			<div>
+				<span class="field-label">Background</span>
+				<div class="mt-1 flex items-center gap-4">
+					<label class="radio"><input type="radio" bind:group={background} value="transparent" /> Transparent</label>
+					<label class="radio"><input type="radio" bind:group={background} value="white" /> White</label>
+					<label class="radio">
+						<input type="radio" bind:group={background} value="custom" /> Custom
+						{#if background === 'custom'}
+							<input type="color" bind:value={customColor} class="ml-2 h-6 w-8 align-middle" />
+						{/if}
+					</label>
+				</div>
+			</div>
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				~{formatBytes(bytes)} per layer &middot; background: <span style="color:#e0e0e0;">{selectedBg}</span>
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => void fromClipboard()} title="Create a document from an image on the clipboard">
+				📋 From Clipboard…
+			</button>
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={create}>Create</button>
+		</div>
+	</div>[36m
+</div>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\MovableDialog.svelte[39m:56:2
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m>
+	[35m<div class="m-title" onpointerdown={beginDrag} onpointermove={moveDrag} onpointerup={endDrag} onpointercancel={endDrag}>
+		<span class="m-title-text">{title}</span>
+		<button class="m-close" title="Close" onclick={onClose}>✕</button>
+	</div>[36m
+	<div class="m-body">{@render children()}</div>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XYPicker.svelte[39m:109:3
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m	<div class="xyp-body">
+		[35m<div
+			class="xyp-pad"
+			bind:this={padEl}
+			onpointerdown={onPadDown}
+			onpointermove={onPadMove}
+			onpointerup={onPadUp}
+			onpointercancel={onPadUp}
+		>
+			<div class="xyp-dot" style="left:{tx * 100}%; top:{ty * 100}%"></div>
+		</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\AnglePicker.svelte[39m:105:3
+[33mWarn[39m: `<svg>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m	<div class="ang-body">
+		[35m<svg
+			class="ang-svg"
+			viewBox="0 0 100 100"
+			bind:this={svgEl}
+			onpointerdown={onDown}
+			onpointermove={onMove}
+			onpointerup={onUp}
+			onpointercancel={onUp}
+		>
+			<circle cx={C} cy={C} r={R} class="ang-ring" />
+			<line x1={C} y1={C} x2={hx} y2={hy} class="ang-line" />
+			<circle cx={hx} cy={hy} r="6" class="ang-handle" />
+		</svg>[36m
+		<div class="ang-side">[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:15:16
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	const kx = `${[35mparam[36m.key}X`;
+	const ky = `${param.key}Y`;[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:16:16
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	const kx = `${param.key}X`;
+	const ky = `${[35mparam[36m.key}Y`;
+	let xy = $state({[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:18:6
+[33mWarn[39m: This reference only captures the initial value of `settings`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let xy = $state({
+		x: [35msettings[36m[kx] ?? param.default,
+		y: settings[ky] ?? (param.defaultY ?? param.default)[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:18:22
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let xy = $state({
+		x: settings[kx] ?? [35mparam[36m.default,
+		y: settings[ky] ?? (param.defaultY ?? param.default)[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:19:6
+[33mWarn[39m: This reference only captures the initial value of `settings`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m		x: settings[kx] ?? param.default,
+		y: [35msettings[36m[ky] ?? (param.defaultY ?? param.default)
+	});[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:19:23
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m		x: settings[kx] ?? param.default,
+		y: settings[ky] ?? ([35mparam[36m.defaultY ?? param.default)
+	});[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:19:41
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m		x: settings[kx] ?? param.default,
+		y: settings[ky] ?? (param.defaultY ?? [35mparam[36m.default)
+	});[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\EffectDialog.svelte[39m:26:25
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	const def = effectById([35mpayload[36m.effectId);[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LayerEffectDialog.svelte[39m:30:25
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	const def = effectById([35mpayload[36m.effectId);
+	const layer = documentRegistry.active?.layers.find((l) => l.id === payload.layerId);[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LayerEffectDialog.svelte[39m:33:3
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	const existing =
+		[35mpayload[36m.effectIndex !== undefined
+			? layer?.effects?.[payload.effectIndex][39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LayerEffectDialog.svelte[39m:34:23
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m		payload.effectIndex !== undefined
+			? layer?.effects?.[[35mpayload[36m.effectIndex]
+			: undefined;[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\ImageSizeDialog.svelte[39m:120:1
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m
+[35m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	<div
+		class="dialog"
+		onclick={(e) => e.stopPropagation()}
+		role="dialog"
+		aria-modal="true"
+		aria-label={mode === 'resize' ? 'Resize Image' : 'Canvas Size'}
+	>
+		<h2 class="dialog-title">{mode === 'resize' ? 'Resize Image' : 'Canvas Size'}</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="seg" role="group" aria-label="Resize mode">
+				<button class="seg-btn" class:on={mode === 'resize'} onclick={() => (mode = 'resize')} type="button">
+					Resize image
+				</button>
+				<button class="seg-btn" class:on={mode === 'canvas'} onclick={() => (mode = 'canvas')} type="button">
+					Canvas size
+				</button>
+			</div>
+
+			<div class="dims">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={width}
+						onchange={updateFromWidth}
+					/>
+				</label>
+				<!-- The width/height ratio lock. Sits between the two fields it
+				     relates, rather than beside the dialog as a labelled
+				     checkbox; the words survive as the tooltip / accessible
+				     name. -->
+				<button
+					type="button"
+					class="lock-btn"
+					class:on={constrain}
+					aria-pressed={constrain}
+					aria-label="Constrain proportions"
+					title="Constrain proportions: {constrain ? 'on' : 'off'}"
+					onclick={toggleConstrain}
+				>
+					<span class="lock-ic" aria-hidden="true">{@html constrain ? LockIcon : LockOpenIcon}</span>
+				</button>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={height}
+						onchange={updateFromHeight}
+					/>
+				</label>
+			</div>
+
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Scale (%)</span>
+					<input type="number" min="1" max="1000" bind:value={scalePct} onchange={updateFromPercent} />
+				</label>
+			</div>
+
+			{#if mode === 'canvas'}
+				<div>
+					<span class="field-label">Anchor</span>
+					<div class="anchor-grid" role="group" aria-label="Content anchor">
+						{#each anchors as row}
+							{#each anchors as col}
+								<button
+									type="button"
+									class="anchor-cell"
+									class:active={ax === col && ay === row}
+									onclick={() => {
+										ax = col;
+										ay = row;
+									}}
+									aria-pressed={ax === col && ay === row}
+									aria-label={`Anchor ${row + 1} ${col + 1}`}
+								>
+									<span class="anchor-dot" class:center={col === 0 && row === 0}></span>
+								</button>
+							{/each}
+						{/each}
+					</div>
+					<div class="text-xs" style="color:#9a9a9a;">
+						The area beyond the current image becomes transparent.
+					</div>
+				</div>
+			{/if}
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				Current: {origW} × {origH} px &middot; New: {Math.round(width || 0)} × {Math.round(height || 0)} px
+				&middot; ~{formatBytes(surfaceBytes(Math.round(width || 0), Math.round(height || 0)))} per layer
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={apply}>OK</button>
+		</div>
+	</div>
+</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\ImageSizeDialog.svelte[39m:120:1
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m
+[35m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	<div
+		class="dialog"
+		onclick={(e) => e.stopPropagation()}
+		role="dialog"
+		aria-modal="true"
+		aria-label={mode === 'resize' ? 'Resize Image' : 'Canvas Size'}
+	>
+		<h2 class="dialog-title">{mode === 'resize' ? 'Resize Image' : 'Canvas Size'}</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="seg" role="group" aria-label="Resize mode">
+				<button class="seg-btn" class:on={mode === 'resize'} onclick={() => (mode = 'resize')} type="button">
+					Resize image
+				</button>
+				<button class="seg-btn" class:on={mode === 'canvas'} onclick={() => (mode = 'canvas')} type="button">
+					Canvas size
+				</button>
+			</div>
+
+			<div class="dims">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={width}
+						onchange={updateFromWidth}
+					/>
+				</label>
+				<!-- The width/height ratio lock. Sits between the two fields it
+				     relates, rather than beside the dialog as a labelled
+				     checkbox; the words survive as the tooltip / accessible
+				     name. -->
+				<button
+					type="button"
+					class="lock-btn"
+					class:on={constrain}
+					aria-pressed={constrain}
+					aria-label="Constrain proportions"
+					title="Constrain proportions: {constrain ? 'on' : 'off'}"
+					onclick={toggleConstrain}
+				>
+					<span class="lock-ic" aria-hidden="true">{@html constrain ? LockIcon : LockOpenIcon}</span>
+				</button>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={height}
+						onchange={updateFromHeight}
+					/>
+				</label>
+			</div>
+
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Scale (%)</span>
+					<input type="number" min="1" max="1000" bind:value={scalePct} onchange={updateFromPercent} />
+				</label>
+			</div>
+
+			{#if mode === 'canvas'}
+				<div>
+					<span class="field-label">Anchor</span>
+					<div class="anchor-grid" role="group" aria-label="Content anchor">
+						{#each anchors as row}
+							{#each anchors as col}
+								<button
+									type="button"
+									class="anchor-cell"
+									class:active={ax === col && ay === row}
+									onclick={() => {
+										ax = col;
+										ay = row;
+									}}
+									aria-pressed={ax === col && ay === row}
+									aria-label={`Anchor ${row + 1} ${col + 1}`}
+								>
+									<span class="anchor-dot" class:center={col === 0 && row === 0}></span>
+								</button>
+							{/each}
+						{/each}
+					</div>
+					<div class="text-xs" style="color:#9a9a9a;">
+						The area beyond the current image becomes transparent.
+					</div>
+				</div>
+			{/if}
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				Current: {origW} × {origH} px &middot; New: {Math.round(width || 0)} × {Math.round(height || 0)} px
+				&middot; ~{formatBytes(surfaceBytes(Math.round(width || 0), Math.round(height || 0)))} per layer
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={apply}>OK</button>
+		</div>
+	</div>
+</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\ImageSizeDialog.svelte[39m:121:2
+[33mWarn[39m: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+[36m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	[35m<div
+		class="dialog"
+		onclick={(e) => e.stopPropagation()}
+		role="dialog"
+		aria-modal="true"
+		aria-label={mode === 'resize' ? 'Resize Image' : 'Canvas Size'}
+	>
+		<h2 class="dialog-title">{mode === 'resize' ? 'Resize Image' : 'Canvas Size'}</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="seg" role="group" aria-label="Resize mode">
+				<button class="seg-btn" class:on={mode === 'resize'} onclick={() => (mode = 'resize')} type="button">
+					Resize image
+				</button>
+				<button class="seg-btn" class:on={mode === 'canvas'} onclick={() => (mode = 'canvas')} type="button">
+					Canvas size
+				</button>
+			</div>
+
+			<div class="dims">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={width}
+						onchange={updateFromWidth}
+					/>
+				</label>
+				<!-- The width/height ratio lock. Sits between the two fields it
+				     relates, rather than beside the dialog as a labelled
+				     checkbox; the words survive as the tooltip / accessible
+				     name. -->
+				<button
+					type="button"
+					class="lock-btn"
+					class:on={constrain}
+					aria-pressed={constrain}
+					aria-label="Constrain proportions"
+					title="Constrain proportions: {constrain ? 'on' : 'off'}"
+					onclick={toggleConstrain}
+				>
+					<span class="lock-ic" aria-hidden="true">{@html constrain ? LockIcon : LockOpenIcon}</span>
+				</button>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={height}
+						onchange={updateFromHeight}
+					/>
+				</label>
+			</div>
+
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Scale (%)</span>
+					<input type="number" min="1" max="1000" bind:value={scalePct} onchange={updateFromPercent} />
+				</label>
+			</div>
+
+			{#if mode === 'canvas'}
+				<div>
+					<span class="field-label">Anchor</span>
+					<div class="anchor-grid" role="group" aria-label="Content anchor">
+						{#each anchors as row}
+							{#each anchors as col}
+								<button
+									type="button"
+									class="anchor-cell"
+									class:active={ax === col && ay === row}
+									onclick={() => {
+										ax = col;
+										ay = row;
+									}}
+									aria-pressed={ax === col && ay === row}
+									aria-label={`Anchor ${row + 1} ${col + 1}`}
+								>
+									<span class="anchor-dot" class:center={col === 0 && row === 0}></span>
+								</button>
+							{/each}
+						{/each}
+					</div>
+					<div class="text-xs" style="color:#9a9a9a;">
+						The area beyond the current image becomes transparent.
+					</div>
+				</div>
+			{/if}
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				Current: {origW} × {origH} px &middot; New: {Math.round(width || 0)} × {Math.round(height || 0)} px
+				&middot; ~{formatBytes(surfaceBytes(Math.round(width || 0), Math.round(height || 0)))} per layer
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={apply}>OK</button>
+		</div>
+	</div>[36m
+</div>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\ImageSizeDialog.svelte[39m:121:2
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m<div class="dialog-backdrop" onclick={() => closeDialog()}>
+	[35m<div
+		class="dialog"
+		onclick={(e) => e.stopPropagation()}
+		role="dialog"
+		aria-modal="true"
+		aria-label={mode === 'resize' ? 'Resize Image' : 'Canvas Size'}
+	>
+		<h2 class="dialog-title">{mode === 'resize' ? 'Resize Image' : 'Canvas Size'}</h2>
+
+		<div class="space-y-3 p-4">
+			<div class="seg" role="group" aria-label="Resize mode">
+				<button class="seg-btn" class:on={mode === 'resize'} onclick={() => (mode = 'resize')} type="button">
+					Resize image
+				</button>
+				<button class="seg-btn" class:on={mode === 'canvas'} onclick={() => (mode = 'canvas')} type="button">
+					Canvas size
+				</button>
+			</div>
+
+			<div class="dims">
+				<label class="field">
+					<span class="field-label">Width (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={width}
+						onchange={updateFromWidth}
+					/>
+				</label>
+				<!-- The width/height ratio lock. Sits between the two fields it
+				     relates, rather than beside the dialog as a labelled
+				     checkbox; the words survive as the tooltip / accessible
+				     name. -->
+				<button
+					type="button"
+					class="lock-btn"
+					class:on={constrain}
+					aria-pressed={constrain}
+					aria-label="Constrain proportions"
+					title="Constrain proportions: {constrain ? 'on' : 'off'}"
+					onclick={toggleConstrain}
+				>
+					<span class="lock-ic" aria-hidden="true">{@html constrain ? LockIcon : LockOpenIcon}</span>
+				</button>
+				<label class="field">
+					<span class="field-label">Height (px)</span>
+					<input
+						type="number"
+						min="1"
+						max={MAX_DIMENSION}
+						bind:value={height}
+						onchange={updateFromHeight}
+					/>
+				</label>
+			</div>
+
+			<div class="grid grid-cols-2 gap-3">
+				<label class="field">
+					<span class="field-label">Scale (%)</span>
+					<input type="number" min="1" max="1000" bind:value={scalePct} onchange={updateFromPercent} />
+				</label>
+			</div>
+
+			{#if mode === 'canvas'}
+				<div>
+					<span class="field-label">Anchor</span>
+					<div class="anchor-grid" role="group" aria-label="Content anchor">
+						{#each anchors as row}
+							{#each anchors as col}
+								<button
+									type="button"
+									class="anchor-cell"
+									class:active={ax === col && ay === row}
+									onclick={() => {
+										ax = col;
+										ay = row;
+									}}
+									aria-pressed={ax === col && ay === row}
+									aria-label={`Anchor ${row + 1} ${col + 1}`}
+								>
+									<span class="anchor-dot" class:center={col === 0 && row === 0}></span>
+								</button>
+							{/each}
+						{/each}
+					</div>
+					<div class="text-xs" style="color:#9a9a9a;">
+						The area beyond the current image becomes transparent.
+					</div>
+				</div>
+			{/if}
+
+			<div class="text-xs" style="color:#9a9a9a;">
+				Current: {origW} × {origH} px &middot; New: {Math.round(width || 0)} × {Math.round(height || 0)} px
+				&middot; ~{formatBytes(surfaceBytes(Math.round(width || 0), Math.round(height || 0)))} per layer
+				&middot; limit: {MAX_PIXELS.toLocaleString()} px
+			</div>
+
+			{#if !validation.ok}
+				<div class="error-box">{validation.error}</div>
+			{/if}
+		</div>
+
+		<div class="dialog-footer">
+			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
+			<button class="btn-primary" disabled={!validation.ok} onclick={apply}>OK</button>
+		</div>
+	</div>[36m
+</div>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\ImageSizeDialog.svelte[39m:269:2
+[33mWarn[39m: Unused CSS selector ".lock-ic svg"
+https://svelte.dev/e/css_unused_selector (svelte)
+[36m	}
+	[35m.lock-ic svg[36m {
+		width: 16px;[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\CurvesDialog.svelte[39m:203:3
+[33mWarn[39m: `<svg>` with a pointerdown, pointermove, pointerup or dblclick handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m	<div class="editor">
+		[35m<svg
+			bind:this={svgEl}
+			viewBox="-0.02 -0.02 1.04 1.04"
+			width="256"
+			height="256"
+			onpointerdown={onPointerDown}
+			onpointermove={onPointerMove}
+			onpointerup={onPointerUp}
+			ondblclick={onDblClick}
+		>
+			<rect x="0" y="0" width="1" height="1" fill="#1f2937" rx="0.01" />
+			<!-- grid -->
+			{#each [0.25, 0.5, 0.75] as g}
+				<line x1={g} y1="0" x2={g} y2="1" stroke="#374151" stroke-width="0.002" />
+				<line x1="0" y1={g} x2="1" y2={g} stroke="#374151" stroke-width="0.002" />
+			{/each}
+			<!-- diagonal -->
+			<line x1="0" y1="1" x2="1" y2="0" stroke="#4b5563" stroke-width="0.003" />
+			<!-- curve -->
+			{#each CHANNELS as ch}
+				{#if activeChannel === ch.key}
+					<path d={curvePath(pointsFor(ch.key))} fill="none" stroke={ch.color} stroke-width="0.006" />
+				{/if}
+			{/each}
+			<!-- points -->
+			{#each pointsFor(activeChannel) as p, i}
+				<circle
+					cx={p.x}
+					cy={1 - p.y}
+					r={draggingIndex === i ? 0.012 : 0.008}
+					fill={i === 0 || i === pointsFor(activeChannel).length - 1 ? '#e5e7eb' : '#ffffff'}
+					stroke={CHANNELS.find((c) => c.key === activeChannel)?.color ?? '#fff'}
+					stroke-width="0.003"
+				/>
+			{/each}
+		</svg>[36m
+	</div>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LevelsDialog.svelte[39m:363:5
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m				</div>
+				[35m<div
+					class="lv-track"
+					bind:this={inTrack}
+					onpointerdown={(e) => beginBar(e, 'in', inTrack)}
+					onpointermove={(e) => moveBar(e, inTrack)}
+					onpointerup={endBar}
+					onpointercancel={endBar}
+				>
+					<div class="lv-handle lv-left lv-white" style="top:{yOf(inWhite)}px"></div>
+					<div class="lv-handle lv-left lv-black" style="top:{yOf(inBlack)}px"></div>
+				</div>[36m
+			</div>[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LevelsDialog.svelte[39m:377:5
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m			<div class="lv-bargroup">
+				[35m<div
+					class="lv-track"
+					bind:this={outTrack}
+					onpointerdown={(e) => beginBar(e, 'out', outTrack)}
+					onpointermove={(e) => moveBar(e, outTrack)}
+					onpointerup={endBar}
+					onpointercancel={endBar}
+				>
+					<div class="lv-handle lv-right lv-white" style="top:{yOf(outWhite)}px"></div>
+					<div class="lv-handle lv-right lv-gamma" style="top:{yOfGamma(gamma)}px"></div>
+					<div class="lv-handle lv-right lv-black" style="top:{yOf(outBlack)}px"></div>
+				</div>[36m
+				<div class="lv-side">[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\ContextSlider.svelte[39m:14:19
+[33mWarn[39m: This reference only captures the initial value of `value`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let val = $state([35mvalue[36m);
+	function changed() {[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\ContextMenu.svelte[39m:54:2
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m	{@const m = $contextMenu}
+	[35m<div
+		bind:this={root}
+		class="ctx-menu"
+		style="left:{m.x}px; top:{m.y}px;"
+		oncontextmenu={(e) => e.preventDefault()}
+	>
+		{#each m.items as item, i (i)}
+			{#if item.type === 'separator'}
+				<div class="ctx-sep"></div>
+			{:else if item.type === 'slider'}
+				<ContextSlider
+					label={item.label}
+					min={item.min}
+					max={item.max}
+					step={item.step}
+					value={item.value}
+					oninput={item.oninput}
+				/>
+			{:else}
+				<button
+					class="ctx-item"
+					class:disabled={item.disabled}
+					disabled={item.disabled}
+					onclick={() => activate(item)}
+				>
+					<span>{item.label}</span>
+					{#if item.shortcut}<span class="ctx-shortcut">{item.shortcut}</span>{/if}
+				</button>
+			{/if}
+		{/each}
+	</div>[36m
+{/if}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\ContextMenu.svelte[39m:10:6
+[33mWarn[39m: `root` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+[36m
+	let [35mroot: HTMLDivElement[36m;[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:192:1
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m
+[35m<div class="color-mode" oncontextmenu={(e) => e.preventDefault()}>
+	<div class="color-mode-head">
+		<span class="color-mode-title">Colour</span>
+		<div class="seg">
+			<button class="seg-btn" class:on={$colorPicker?.target === 'fg'} onclick={() => openColorPicker('fg')}>
+				{labelOf('fg')}
+			</button>
+			<button class="seg-btn" class:on={$colorPicker?.target === 'bg'} onclick={() => openColorPicker('bg')}>
+				{labelOf('bg')}
+			</button>
+		</div>
+		<button class="mini-btn" title="Copy colour" onclick={copyCurrent}>⧉ Copy</button>
+		<button class="btn-primary color-mode-done" onclick={() => closeColorPicker()}>Done</button>
+	</div>
+
+	{#if $colorPicker}
+		<div class="cp-body">
+			<div class="cp-stage">
+				<!-- SV surface -->
+				<div
+					class="cp-sv"
+					style="--hue-css:{hueColor};"
+					role="slider"
+					tabindex="0"
+					aria-label="Saturation and brightness"
+					onpointerdown={svPointer}
+					onpointermove={svMove}
+				>
+					<div
+						class="cp-handle"
+						style="left:{sat * 100}%; top:{(1 - val) * 100}%; background:{rgbaToCss(rgba)};"
+					></div>
+				</div>
+
+				<!-- hue + alpha strips -->
+				<div class="cp-strips">
+					<div
+						class="cp-strip cp-hue"
+						role="slider"
+						tabindex="0"
+						aria-label="Hue"
+						onpointerdown={(e) => stripPointer('hue', e)}
+						onpointermove={(e) => stripMove('hue', e)}
+					>
+						<div class="cp-strip-handle" style="top:{hue / 360 * 100}%; background:{hueColor};"></div>
+					</div>
+					<div
+						class="cp-strip cp-alpha"
+						style="--opaque:{opaqueCss};"
+						role="slider"
+						tabindex="0"
+						aria-label="Alpha"
+						onpointerdown={(e) => stripPointer('alpha', e)}
+						onpointermove={(e) => stripMove('alpha', e)}
+					>
+						<div class="cp-strip-handle" style="top:{(1 - alpha / 255) * 100}%; background:{rgbaToCss(rgba)};"></div>
+					</div>
+				</div>
+			</div>
+
+			<!-- right: readout -->
+			<div class="cp-fields">
+				<div class="cp-preview">
+					<div class="cp-preview-swatch" style="--swatch:{rgbaToCss(rgba)};"></div>
+					<div>
+						<div class="cp-hex">#{byteHex(rgba.r)}{byteHex(rgba.g)}{byteHex(rgba.b)}</div>
+						<div class="cp-alpha-pct">Alpha {alpha}</div>
+					</div>
+					<button class="mini-btn" title="Copy" onclick={copyCurrent}>⧉</button>
+				</div>
+
+				<div class="cp-num-grid">
+					<label class="cp-num">R<input type="number" min="0" max="255" value={rgba.r} oninput={(e) => setRgb(e, 'r')} /></label>
+					<label class="cp-num">G<input type="number" min="0" max="255" value={rgba.g} oninput={(e) => setRgb(e, 'g')} /></label>
+					<label class="cp-num">B<input type="number" min="0" max="255" value={rgba.b} oninput={(e) => setRgb(e, 'b')} /></label>
+					<label class="cp-num">A<input type="number" min="0" max="255" value={alpha} oninput={(e) => (alpha = fieldInt((e.currentTarget as HTMLInputElement).value, 255, alpha))} /></label>
+				</div>
+
+				<label class="cp-hexfield">
+					<span>Hex</span>
+					<input
+						type="text"
+						spellcheck="false"
+						placeholder="#rrggbb"
+						value={rgbaToHex(rgba)}
+						onchange={(e) => setHex((e.currentTarget as HTMLInputElement).value)}
+						onkeydown={(e) => e.key === 'Enter' && setHex((e.currentTarget as HTMLInputElement).value)}
+					/>
+				</label>
+
+				<div class="cp-quick">
+					{#each QUICK as q (q.hex)}
+						<button
+							class="cp-chip"
+							style="background:{q.hex};"
+							title={q.hex}
+							onclick={() => applyQuick(q.hex)}
+						></button>
+					{/each}
+				</div>
+			</div>
+		</div>
+	{/if}
+</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:214:6
+[33mWarn[39m: Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props (svelte)
+[36m					style="--hue-css:{hueColor};"
+					[35mrole="slider"[36m
+					tabindex="0"[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:230:7
+[33mWarn[39m: Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props (svelte)
+[36m						class="cp-strip cp-hue"
+						[35mrole="slider"[36m
+						tabindex="0"[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:241:7
+[33mWarn[39m: Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props (svelte)
+[36m						style="--opaque:{opaqueCss};"
+						[35mrole="slider"[36m
+						tabindex="0"[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:241:1
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m
+[35m<div class="fx-panel" style="height:{panelHeight}px" oncontextmenu={(e) => e.preventDefault()}>
+	<div
+		class="fx-head"
+		title="Drag to resize the panel"
+		onpointerdown={onGripDown}
+		onpointermove={onGripMove}
+		onpointerup={onGripUp}
+		onpointercancel={onGripUp}
+	>
+		<span class="fx-title">Layer Effects</span>
+		{#if layerName}<span class="fx-layer">· {layerName}</span>{/if}
+		<span class="fx-grip" aria-hidden="true">⇕</span>
+		<button class="fx-close" title="Close layer-effects panel" onclick={closeLayerEffectsPanel}>
+			<img src={CloseIcon} class="fx-ic" alt="Close" draggable="false" />
+		</button>
+	</div>
+
+	<div class="fx-body">
+		<div class="fx-tools">
+			<div class="fx-add">
+				<button class="fx-btn" title="Add effect" onclick={() => (addOpen = !addOpen)}>
+					<img src={AddIcon} class="fx-ic" alt="Add" draggable="false" />
+				</button>
+				{#if addOpen}
+					<div class="fx-add-backdrop" onclick={() => (addOpen = false)}></div>
+					<div class="fx-add-menu">
+						{#each effectMenusWithEntries as group, gi}
+							{#if gi > 0}<div class="fx-add-sep"></div>{/if}
+							<div class="fx-add-head">{group.label}</div>
+							{#each group.effects as eff (eff.id)}
+								<button class="fx-add-item" onclick={() => addEffect(eff.id)}>
+									<span class="fx-add-ic">{eff.icon ?? ''}</span>
+									<span>{eff.label}</span>
+								</button>
+							{/each}
+						{/each}
+					</div>
+				{/if}
+			</div>
+			<button class="fx-btn" title="Remove selected effect" disabled={selectedIndex === null} onclick={removeSelected}>
+				<img src={RemoveIcon} class="fx-ic" alt="Remove" draggable="false" />
+			</button>
+			<button class="fx-btn" title="Copy all effects" disabled={layerId === null} onclick={doCopy}>
+				<img src={CopyIcon} class="fx-ic" alt="Copy" draggable="false" />
+			</button>
+			<button class="fx-btn" title="Paste copied effects" disabled={!canPaste || layerId === null} onclick={doPaste}>
+				<img src={PasteIcon} class="fx-ic" alt="Paste" draggable="false" />
+			</button>
+		</div>
+
+		<div class="fx-list" ondragover={onFxListDragOver} ondrop={onFxListDrop}>
+			{#each effects as eff, i (i)}
+				<div
+					class="fx-item"
+					class:on={selectedIndex === i}
+					class:dragging={draggedIdx === i}
+					class:drop-before={dropTarget?.index === i && dropTarget.before}
+					class:drop-after={dropTarget?.index === i && !dropTarget.before}
+					draggable="true"
+					onclick={() => selectEntry(i)}
+					ondragstart={(e) => onFxDragStart(e, i)}
+					ondragover={(e) => onFxDragOver(e, i)}
+					ondrop={(e) => onFxDrop(e, i)}
+					ondragend={onFxDragEnd}
+				>
+					<input
+						type="checkbox"
+						title={eff.enabled ? 'Disable effect' : 'Enable effect'}
+						checked={eff.enabled}
+						onclick={(e) => {
+							e.stopPropagation();
+							toggleEntry(i);
+						}}
+					/>
+					<span class="fx-item-ic">{effectById(eff.id)?.icon ?? ''}</span>
+					<span class="fx-item-name">{effectById(eff.id)?.label ?? eff.id}</span>
+				</div>
+			{:else}
+				<p class="fx-empty">No effects. Press ＋ to add one.</p>
+			{/each}
+		</div>
+
+		<div class="fx-props">
+			{#if selectedEff && selectedDef}
+				{#each selectedDef.params as param (param.key)}
+					{#if param.kind === 'color'}
+						<EffectColorRow
+							label={param.label}
+							bind:value={selectedEff.settings[param.key]}
+							oninput={pushSettings}
+							onCommit={commitSettings}
+						/>
+					{:else if param.kind === 'checkbox'}
+						<EffectCheckbox
+							label={param.label}
+							bind:value={selectedEff.settings[param.key]}
+							oninput={pushSettings}
+							onCommit={commitSettings}
+						/>
+					{:else if param.kind === 'xy'}
+						<XyParam {param} settings={selectedEff.settings} onChange={pushSettings} />
+					{:else if param.kind === 'angle'}
+						<AnglePicker
+							bind:value={selectedEff.settings[param.key]}
+							min={param.min ?? 0}
+							max={param.max ?? 360}
+							step={param.step ?? 1}
+							default={param.default}
+							label={param.label}
+							oninput={pushSettings}
+							onCommit={commitSettings}
+						/>
+					{:else}
+						<FilterSlider
+							label={param.label}
+							min={param.min ?? 0}
+							max={param.max ?? 100}
+							step={param.step ?? 1}
+							default={param.default}
+							bind:value={selectedEff.settings[param.key]}
+							oninput={pushSettings}
+							gradient={param.gradient}
+						/>
+					{/if}
+				{/each}
+			{:else}
+				<p class="fx-empty">Select an effect to edit its settings.</p>
+			{/if}
+		</div>
+	</div>
+</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:242:2
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m<div class="fx-panel" style="height:{panelHeight}px" oncontextmenu={(e) => e.preventDefault()}>
+	[35m<div
+		class="fx-head"
+		title="Drag to resize the panel"
+		onpointerdown={onGripDown}
+		onpointermove={onGripMove}
+		onpointerup={onGripUp}
+		onpointercancel={onGripUp}
+	>
+		<span class="fx-title">Layer Effects</span>
+		{#if layerName}<span class="fx-layer">· {layerName}</span>{/if}
+		<span class="fx-grip" aria-hidden="true">⇕</span>
+		<button class="fx-close" title="Close layer-effects panel" onclick={closeLayerEffectsPanel}>
+			<img src={CloseIcon} class="fx-ic" alt="Close" draggable="false" />
+		</button>
+	</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:265:6
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m				{#if addOpen}
+					[35m<div class="fx-add-backdrop" onclick={() => (addOpen = false)}></div>[36m
+					<div class="fx-add-menu">[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:265:6
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m				{#if addOpen}
+					[35m<div class="fx-add-backdrop" onclick={() => (addOpen = false)}></div>[36m
+					<div class="fx-add-menu">[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:291:3
+[33mWarn[39m: `<div>` with a dragover or drop handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m
+		[35m<div class="fx-list" ondragover={onFxListDragOver} ondrop={onFxListDrop}>
+			{#each effects as eff, i (i)}
+				<div
+					class="fx-item"
+					class:on={selectedIndex === i}
+					class:dragging={draggedIdx === i}
+					class:drop-before={dropTarget?.index === i && dropTarget.before}
+					class:drop-after={dropTarget?.index === i && !dropTarget.before}
+					draggable="true"
+					onclick={() => selectEntry(i)}
+					ondragstart={(e) => onFxDragStart(e, i)}
+					ondragover={(e) => onFxDragOver(e, i)}
+					ondrop={(e) => onFxDrop(e, i)}
+					ondragend={onFxDragEnd}
+				>
+					<input
+						type="checkbox"
+						title={eff.enabled ? 'Disable effect' : 'Enable effect'}
+						checked={eff.enabled}
+						onclick={(e) => {
+							e.stopPropagation();
+							toggleEntry(i);
+						}}
+					/>
+					<span class="fx-item-ic">{effectById(eff.id)?.icon ?? ''}</span>
+					<span class="fx-item-name">{effectById(eff.id)?.label ?? eff.id}</span>
+				</div>
+			{:else}
+				<p class="fx-empty">No effects. Press ＋ to add one.</p>
+			{/each}
+		</div>[36m[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:293:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+[36m			{#each effects as eff, i (i)}
+				[35m<div
+					class="fx-item"
+					class:on={selectedIndex === i}
+					class:dragging={draggedIdx === i}
+					class:drop-before={dropTarget?.index === i && dropTarget.before}
+					class:drop-after={dropTarget?.index === i && !dropTarget.before}
+					draggable="true"
+					onclick={() => selectEntry(i)}
+					ondragstart={(e) => onFxDragStart(e, i)}
+					ondragover={(e) => onFxDragOver(e, i)}
+					ondrop={(e) => onFxDrop(e, i)}
+					ondragend={onFxDragEnd}
+				>
+					<input
+						type="checkbox"
+						title={eff.enabled ? 'Disable effect' : 'Enable effect'}
+						checked={eff.enabled}
+						onclick={(e) => {
+							e.stopPropagation();
+							toggleEntry(i);
+						}}
+					/>
+					<span class="fx-item-ic">{effectById(eff.id)?.icon ?? ''}</span>
+					<span class="fx-item-name">{effectById(eff.id)?.label ?? eff.id}</span>
+				</div>[36m
+			{:else}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:293:5
+[33mWarn[39m: `<div>` with a click, dragstart, dragover, drop or dragend handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m			{#each effects as eff, i (i)}
+				[35m<div
+					class="fx-item"
+					class:on={selectedIndex === i}
+					class:dragging={draggedIdx === i}
+					class:drop-before={dropTarget?.index === i && dropTarget.before}
+					class:drop-after={dropTarget?.index === i && !dropTarget.before}
+					draggable="true"
+					onclick={() => selectEntry(i)}
+					ondragstart={(e) => onFxDragStart(e, i)}
+					ondragover={(e) => onFxDragOver(e, i)}
+					ondrop={(e) => onFxDrop(e, i)}
+					ondragend={onFxDragEnd}
+				>
+					<input
+						type="checkbox"
+						title={eff.enabled ? 'Disable effect' : 'Enable effect'}
+						checked={eff.enabled}
+						onclick={(e) => {
+							e.stopPropagation();
+							toggleEntry(i);
+						}}
+					/>
+					<span class="fx-item-ic">{effectById(eff.id)?.icon ?? ''}</span>
+					<span class="fx-item-name">{effectById(eff.id)?.label ?? eff.id}</span>
+				</div>[36m
+			{:else}[39m
+
+c:\dev\paint.svelte\[32msrc\lib\components\App.svelte[39m:42:1
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+[36m
+[35m<div
+	class="relative flex h-screen w-screen flex-col overflow-hidden"
+	oncontextmenu={(e) => e.preventDefault()}
+>
+	<div class="menubar-strip"><MenuBar /></div>
+
+	{#if hasDocs && !colorOpen}
+		<div class="options-strip"><ToolOptions /></div>
+		<div class="tab-tray-overlay"><TabBar /></div>
+	{/if}
+
+	<div class="relative flex min-h-0 flex-1">
+		{#if hasDocs && !colorOpen}
+			<div class="toolbar-col"><Toolbar /></div>
+		{/if}
+
+		<div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+			<div class="relative min-h-0 flex-1">
+				<EditorCanvas />
+				{#if !hasDocs && !colorOpen}
+					<div class="absolute inset-0 z-10"><StartScreen /></div>
+				{/if}
+			</div>
+			{#if hasDocs && !colorOpen && $layerEffectsPanelOpen}
+				<EffectPanel />
+			{/if}
+		</div>
+
+		{#if hasDocs && !colorOpen}
+			<div class="sidebar-col"><Sidebar /></div>
+		{/if}
+
+		{#if colorOpen}
+			<div class="absolute inset-0 z-30"><ColorPickerPanel /></div>
+		{/if}
+	</div>
+
+	<div class="status-strip">
+		<div class="flex h-full items-center"><ColorBar /></div>
+		<div class="flex h-full flex-1 items-stretch border-l" style="border-color:#3a3a3a;">
+			<StatusBar />
+		</div>
+		<ZoomBar />
+	</div>
+
+	<DialogHost />
+	<ContextMenu />
+</div>[36m[39m
+
+====================================
+[33msvelte-check found 0 errors and 57 warnings in 19 files
+[39m

@@ -7,7 +7,7 @@
 // session state. `rotate` also owns the affine helpers the engine needs for
 // hit-testing around the pivot.
 
-import type { Point, Rect } from '../../core/geometry';
+import type { FramePoints, Point, Rect } from '../../core/geometry';
 import { clampScale, cloneTransform, type TransformGesture, type TransformState } from './types';
 
 export interface RotateOptions {
@@ -93,18 +93,31 @@ export function rotateTo(g: TransformGesture, p: Point, b: Rect, opts: RotateOpt
 	}
 
 	// --- corner / edge handles: scale about the opposite anchor -----------
-	const anchorX = g.handle.includes('w') ? b.x + b.width : g.handle.includes('e') ? b.x : b.x + b.width / 2;
-	const anchorY = g.handle.includes('n') ? b.y + b.height : g.handle.includes('s') ? b.y : b.y + b.height / 2;
+	// Anchors come from the gesture's frozen frame (selection-space extremes
+	// of the committed outline — the same points the overlay draws) so the
+	// math tracks the visible shape even for rotated outlines. Without a
+	// frame this is exactly the classic bounds math below.
+	const OPPOSITE = { n: 's', s: 'n', w: 'e', e: 'w', nw: 'se', se: 'nw', ne: 'sw', sw: 'ne' } as const;
+	const oppKey = (OPPOSITE as Record<string, keyof FramePoints | undefined>)[g.handle];
+	const fr = g.frame && oppKey ? g.frame : null;
+	const anchorX = fr ? fr[oppKey as keyof FramePoints].x : g.handle.includes('w') ? b.x + b.width : g.handle.includes('e') ? b.x : b.x + b.width / 2;
+	const anchorY = fr ? fr[oppKey as keyof FramePoints].y : g.handle.includes('n') ? b.y + b.height : g.handle.includes('s') ? b.y : b.y + b.height / 2;
 	const localPointer = inverseTransformPoint(p, start);
-	const movingX = g.handle.includes('w') ? b.x : g.handle.includes('e') ? b.x + b.width : anchorX;
-	const movingY = g.handle.includes('n') ? b.y : g.handle.includes('s') ? b.y + b.height : anchorY;
+	const movingX = fr ? (fr[g.handle as keyof FramePoints]?.x ?? anchorX) : g.handle.includes('w') ? b.x : g.handle.includes('e') ? b.x + b.width : anchorX;
+	const movingY = fr ? (fr[g.handle as keyof FramePoints]?.y ?? anchorY) : g.handle.includes('n') ? b.y : g.handle.includes('s') ? b.y + b.height : anchorY;
+	const spanX = movingX - anchorX;
+	const spanY = movingY - anchorY;
 	let sx =
 		g.handle.includes('w') || g.handle.includes('e')
-			? start.scaleX + ((localPointer.x - movingX) / (movingX - anchorX)) * start.scaleX
+			? Math.abs(spanX) < 1e-9
+				? start.scaleX
+				: start.scaleX + ((localPointer.x - movingX) / spanX) * start.scaleX
 			: start.scaleX;
 	let sy =
 		g.handle.includes('n') || g.handle.includes('s')
-			? start.scaleY + ((localPointer.y - movingY) / (movingY - anchorY)) * start.scaleY
+			? Math.abs(spanY) < 1e-9
+				? start.scaleY
+				: start.scaleY + ((localPointer.y - movingY) / spanY) * start.scaleY
 			: start.scaleY;
 	if (opts.shift) {
 		const magnitude = Math.max(Math.abs(sx), Math.abs(sy));

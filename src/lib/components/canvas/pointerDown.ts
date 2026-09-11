@@ -14,6 +14,7 @@ import { sampleCompositeColorAt } from '../../render/eyedropper';
 import { MoveEngine } from '../../render/MoveEngine';
 import type { TransformHandle } from '../../render/MoveEngine';
 import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
+import { cancelFloatingMove } from '../../state/moveTransform';
 import { CloneEngine } from '../../render/CloneEngine';
 import { RecolorEngine } from '../../render/RecolorEngine';
 import { BrushEngine } from '../../render/BrushEngine';
@@ -178,6 +179,9 @@ export function handlePointerDown(e: PointerEvent, a: PointerDownApi): void {
 	// drag always subtracts. The draft outline is shown live and committed on
 	// pointer-up.
 	if ((e.button === 0 || e.button === 2) && SELECT_TOOLS.has(tool) && hasDoc && selectionToolKind()) {
+		// A new marquee replaces the selection — a floating transform cannot
+		// survive that (reset rule: only Apply keeps it).
+		cancelFloatingMove();
 		a.setDragMode(e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey || e.shiftKey ? 'add' : get(selectionMode));
 		console.log('[editor] pointerdown: selection tool', tool, 'kind', selectionToolKind(), 'mode', get(selectionMode));
 		e.preventDefault();
@@ -253,6 +257,8 @@ export function handlePointerDown(e: PointerEvent, a: PointerDownApi): void {
 		if (!a.moveSelEngine()) a.setMoveSelEngine(new MoveSelectionEngine(getEditorRenderer()));
 		const moveSelEngine = a.moveSelEngine()!;
 		const img = a.toImage(e);
+		// A pixels float cannot survive a selection drag — reset it first.
+		cancelFloatingMove();
 		if (moveSelEngine.begin(img)) {
 			a.syncTransformUi();
 			const handle = a.transformHandleAt(img);

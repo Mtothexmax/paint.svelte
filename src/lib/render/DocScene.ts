@@ -6,7 +6,7 @@ import type { Point } from '../core/geometry';
 import type { Layer, LayerEffect, SurfaceId } from '../core/layers/Layer';
 import { checkerTexture } from './checkerboard';
 import { SPRITE_BLENDS, type SurfaceStore } from './SurfaceStore';
-import { effectById } from '../effects';
+import { asFilterChain, effectById } from '../effects';
 import type { EffectSettings } from '../effects';
 
 const SQUARE = 8; // checker square in screen px
@@ -225,10 +225,13 @@ this.root.addChild(this.checker);
 		for (const eff of effects) {
 			const def = effectById(eff.id);
 			if (!def) continue;
-			const filter = def.filter(eff.settings);
-			filtersToDestroy.push(filter);
+			// An effect may be a single pass or a chain (e.g. the separable
+			// median: one horizontal + one vertical pass).
+			const chain = asFilterChain(def.filter(eff.settings));
+			if (!chain.length) continue;
+			filtersToDestroy.push(...chain);
 			const sprite = new Sprite(src);
-			sprite.filters = [filter];
+			sprite.filters = chain;
 			this.surfaces.renderInto(ping, sprite, true);
 			sprite.destroy();
 			src = ping;
@@ -450,14 +453,15 @@ this.root.addChild(this.checker);
 	 *
 	 * `filter` is consumed (destroyed) by this call.
 	 */
-	setActiveLayerFilter(filter: Filter | null): void {
+	setActiveLayerFilter(filter: Filter | Filter[] | null): void {
 		this.clearActiveLayerFilter();
-		if (!filter) return;
+		const chain = filter ? asFilterChain(filter) : [];
+		if (!chain.length) return;
 
 		const layer = this.doc.activeLayer;
 		const sprite = this.activeLayerSprite();
 		if (!layer || !sprite || !this.surfaces.has(layer.surfaceId)) {
-			filter.destroy();
+			for (const f of chain) f.destroy();
 			return;
 		}
 
@@ -473,10 +477,10 @@ this.root.addChild(this.checker);
 		// 1) the effect, rendered at document resolution — identical to
 		//    applyFilterSwap's off-screen pass.
 		const source = new Sprite(original);
-		source.filters = [filter];
+		source.filters = chain;
 		surfaces.renderInto(filtered, source, true);
 		source.destroy();
-		filter.destroy();
+		for (const f of chain) f.destroy();
 
 		// 2) scope it to the selection (the mask is doc-sized, so it lines up
 		//    with the filtered result 1:1).

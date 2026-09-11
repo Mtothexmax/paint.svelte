@@ -386,16 +386,11 @@ export class EditorRenderer {
 	 * complement (Invert Selection) the document border is added so the whole
 	 * selection boundary is visible. */
 	private selectionOutlineLoops(doc: ImageDocument): Point[][] | null {
-		const sel = doc.selection;
 		const loops: Point[][] = [];
-		// Composite (mask-derived) selections use the traced outline loops.
-		if (sel.composite) {
-			if (sel.outlineLoops?.length) loops.push(...sel.outlineLoops);
-			return loops.length ? loops : null;
-		}
-		const geometry = selectionOutlinePoints(sel.kind, sel.rect, sel.points);
-		if (geometry.length) loops.push(geometry);
-		if (sel.inverted) {
+		const shape = this.committedShapeLoops(doc);
+		if (shape) loops.push(...shape);
+		const sel = doc.selection;
+		if (!sel.composite && sel.inverted) {
 			loops.push([
 				{ x: 0, y: 0 },
 				{ x: doc.width, y: 0 },
@@ -404,6 +399,22 @@ export class EditorRenderer {
 			]);
 		}
 		return loops.length ? loops : null;
+	}
+
+	/** The committed selection geometry the transform handles are fitted to:
+	 * traced loops for composite (mask-derived) selections, otherwise the
+	 * plain shape geometry. No inverted border loop — handles fit the shape,
+	 * never the document. Null when there is nothing to fit. */
+	committedShapeLoops(doc: ImageDocument): Point[][] | null {
+		const sel = doc.selection;
+		// Composite (mask-derived) selections use the traced outline loops.
+		if (sel.composite) {
+			if (sel.outlineLoops?.length) return sel.outlineLoops;
+			return null;
+		}
+		const geometry = selectionOutlinePoints(sel.kind, sel.rect, sel.points);
+		if (geometry.length) return [geometry];
+		return null;
 	}
 
 	/** Reads a mask surface back to the CPU and returns its outline loops — used
@@ -428,7 +439,7 @@ export class EditorRenderer {
 	 * sprite, so the preview is pixel-identical to what Apply produces and does
 	 * not shift with zoom/pan. `null` removes the preview.
 	 */
-	setActiveLayerFilterPreview(filter: import('pixi.js').Filter | null): void {
+	setActiveLayerFilterPreview(filter: import('pixi.js').Filter | import('pixi.js').Filter[] | null): void {
 		this.activeScene?.setActiveLayerFilter(filter);
 	}
 

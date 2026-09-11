@@ -33,6 +33,10 @@ img.layer-thumb {
 }
 .layer-list {
 	overflow-y: auto;
+	/* `overflow-y: auto` forces `overflow-x` to compute to `auto` too, so a
+	   single sub-pixel of horizontal overflow popped a scrollbar into the
+	   panel. Only vertical scrolling is ever wanted here. */
+	overflow-x: hidden;
 	min-height: 0;
 	flex: 1 1 auto;
 	display: flex;
@@ -50,6 +54,10 @@ img.layer-thumb {
 	border-radius: 5px;
 	cursor: pointer;
 	border: 1px solid transparent;
+	/* Never let a row's content dictate its own width — it must always fit
+	   the panel, or the list grows a horizontal scrollbar. */
+	min-width: 0;
+	max-width: 100%;
 }
 .layer-row:hover {
 	background: rgba(255, 255, 255, 0.05);
@@ -70,15 +78,18 @@ img.layer-thumb {
 .layer-row.drop-after {
 	box-shadow: 0 2px 0 var(--accent);
 }
-.layer-eye {
-	background: none;
-	border: none;
+.layer-vis {
+	flex-shrink: 0;
+	width: 13px;
+	height: 13px;
+	margin: 0;
 	cursor: pointer;
-	font-size: 12px;
-	padding: 0;
+	accent-color: var(--accent);
 }
 .layer-name {
-	flex: 1 1 auto;
+	/* flex-basis 0: the name never contributes its intrinsic width to the
+	   row, so it can only ever shrink, never widen the panel. */
+	flex: 1 1 0;
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -86,9 +97,34 @@ img.layer-thumb {
 	font-size: 12px;
 	color: var(--text);
 }
+.layer-name.renameable {
+	cursor: text;
+}
+/* The inline editor occupies exactly the slot the name had. `flex-basis: 0`
+   plus `width: 0` means the <input>'s intrinsic width (its default `size`
+   of 20 characters, ~177px) can never widen the row — which is what used to
+   push a horizontal scrollbar into the panel the moment you clicked a name. */
+.layer-rename {
+	flex: 1 1 0;
+	width: 0;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+	font: inherit;
+	font-size: 12px;
+	line-height: 16px;
+	color: var(--text);
+	background: var(--bg);
+	border: 1px solid var(--accent);
+	border-radius: 3px;
+	padding: 0 3px;
+	outline: none;
+}
 .layer-fx {
 	display: inline-flex;
 	align-items: center;
+	/* Direct child of the row now, so it sits at the far right on its own. */
+	align-self: center;
 	gap: 3px;
 	font: inherit;
 	font-size: 9px;
@@ -99,12 +135,24 @@ img.layer-thumb {
 	border-radius: 3px;
 	flex-shrink: 0;
 	cursor: pointer;
-	/* gray while the layer has no effects */
-	color: var(--text-dim);
-	background: rgba(255, 255, 255, 0.06);
+	/* gray while the layer has no effects — must be SOLID (not a translucent
+	   white wash) so users never confuse it with the blueish hasFx state
+	   below, which also reads as "soft/dim". */
+	color: var(--text);
+	background: var(--border);
+	/* Hidden unless the row is hovered or the layer has effects. The panel
+	   being open (.on) only adds the ring when the badge is shown. */
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 120ms ease;
+}
+.layer-row:hover .layer-fx,
+.layer-fx.hasFx {
+	opacity: 1;
+	pointer-events: auto;
 }
 .layer-fx:hover {
-	background: rgba(255, 255, 255, 0.12);
+	background: #4a4a4a;
 	color: var(--text);
 }
 /* blueish once the layer has at least one effect */
@@ -126,21 +174,32 @@ img.layer-thumb {
 .layer-fx-n {
 	font-weight: 700;
 }
-/* Second row line (blend-mode dropdown): keep its height even while the
-   dropdown is hidden (Normal + not hovered) so rows don't collapse. */
+.layer-main {
+	flex: 1 1 0;
+	min-width: 0;
+}
 .layer-line {
 	min-height: 16px;
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
 }
 .layer-blend {
-	transform: translateY(-5px);
+	/* Overlay (not flow) so mounting the <select> on hover doesn't change
+	   the row height. */
+	position: absolute;
+	left: 0;
+	bottom: -1px;
 	max-width: 92px;
-	padding: -5px;
+	padding: 0 2px;
 	background: var(--bg);
 	border: 1px solid var(--border);
 	border-radius: 3px;
 	color: var(--text-dim);
 	font-size: 10px;
-
+	line-height: 14px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

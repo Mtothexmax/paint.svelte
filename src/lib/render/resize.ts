@@ -6,6 +6,7 @@
 
 import { RenderTexture, Sprite } from 'pixi.js';
 import { documentRegistry } from '../core/document/registry';
+import { cancelFloatingMove } from '../state/moveTransform';
 import { emptySelection } from '../core/selection/SelectionModel';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { SurfaceId } from '../core/layers/Layer';
@@ -142,6 +143,7 @@ export function resizeImage(renderer: EditorRenderer, width: number, height: num
 	const w = snap(width, doc.width);
 	const h = snap(height, doc.height);
 	if (w === doc.width && h === doc.height) return false;
+	cancelFloatingMove();
 
 	const swaps: LayerSwap[] = [];
 	for (const layer of doc.layers) {
@@ -177,6 +179,7 @@ export function resizeCanvas(
 	const w = snap(width, doc.width);
 	const h = snap(height, doc.height);
 	if (w === doc.width && h === doc.height) return false;
+	cancelFloatingMove();
 
 	const dx = anchorOffset(ax, w - doc.width);
 	const dy = anchorOffset(ay, h - doc.height);

@@ -1,9 +1,11 @@
-// Layer: render (pure maths). 3D rotation gizmo for the Move-Pixels ROTATE
-// sub-mode: Blender-style. The tool keeps a 3×3 rotation matrix; the three
-// rings are the great circles perpendicular to the X / Y / Z axes, drawn with
-// a fixed camera tilt so all three read as 3D circles (exactly like Blender's
-// default 3/4 view), and dragging one rotates the floating selection about
-// that object axis.
+// Layer: render (pure maths). Flat rotation gizmo for the Move-Pixels ROTATE
+// sub-mode: three colour- AND shape-coded handles around the pivot —
+//   green vertical line   → tip forward/back  (rotation about X),
+//   blue horizontal line  → turn left/right   (rotation about Y),
+//   red circle            → spin in the plane (rotation about Z).
+// The tool keeps a 3×3 rotation matrix; dragging a handle projects the pointer
+// travel onto the handle's tangent and maps arc length to angle, so every grab
+// point on a handle behaves the same way.
 //
 // The rotated plane is projected with a weak perspective camera, so a purely
 // in-plane (Z) rotation is undistorted while X/Y rotations foreshorten the
@@ -26,14 +28,14 @@ export interface Vec3 {
 
 export const IDENTITY3: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
-/** Axis order used by the ring drawing / hit-testing (Blender: X, Y, Z). */
+/** Axis order used by the handle drawing / hit-testing: X, Y, Z. */
 export const AXES3: readonly Axis3[] = ['x', 'y', 'z'];
 
-/** Blender-ish gizmo colours. */
+/** Handle colours — keyed by the rotation axis each handle drives. */
 export const AXIS_COLORS: Record<Axis3, string> = {
-	x: '#e5534b', // red
-	y: '#7ac74f', // green
-	z: '#4a90e2' // blue
+	x: '#7ac74f', // green — vertical tip line
+	y: '#4a90e2', // blue — horizontal turn line
+	z: '#e5534b' // red — in-plane spin circle
 };
 
 export function mul3(a: Mat3, b: Mat3): Mat3 {
@@ -94,9 +96,48 @@ export function project3(v: Vec3, distance: number): Point {
 	return { x: v.x * s, y: v.y * s };
 }
 
-/** Fixed camera tilt applied to the gizmo rings only, so that all three read
- * as circles instead of collapsing into lines in the front view. */
-export const GIZMO_TILT: Mat3 = mul3(rotationAxis3('x', 0.42), rotationAxis3('y', -0.5));
+/** One draggable rotate handle: the drawn polyline plus, for the straight
+ * handles, the nominal radius used as the drag sensitivity. A grab near the
+ * middle of a line sits almost ON the centre, so measuring the radius from
+ * the grab point would turn tiny drags into wild spins — the line's own
+ * half-length keeps the sensitivity constant instead. The circle keeps the
+ * measured grab distance (≈ the radius everywhere on it). */
+export interface RotateRing {
+	axis: Axis3;
+	points: Point[];
+	grabRadius?: number;
+}
+
+/** Wraps a signed radian difference to (-π, π]. The spin handle accumulates
+ * these per-frame deltas, so circling the pointer keeps turning the content
+ * for as many revolutions as the gesture lasts instead of rocking it back
+ * and forth past the grab point's tangent. */
+export function wrapPi(d: number): number {
+	const TAU = Math.PI * 2;
+	return ((((d + Math.PI) % TAU) + TAU) % TAU) - Math.PI;
+}
+
+/** Face-on circle in image space (the red in-plane spin handle). */
+export function circlePoints(center: Point, radius: number, segments = 72): Point[] {
+	const points: Point[] = [];
+	for (let i = 0; i < segments; i++) {
+		const t = (i / segments) * Math.PI * 2;
+		points.push({ x: center.x + Math.cos(t) * radius, y: center.y + Math.sin(t) * radius });
+	}
+	return points;
+}
+
+/** Straight diameter handle through `center`, from -radius to +radius.
+ * Sampled as an open polyline; `hitRing` closes it, which just retraces the
+ * same segment, and `ringTangent` yields the line direction everywhere on it. */
+export function linePoints(center: Point, radius: number, horizontal: boolean, segments = 24): Point[] {
+	const points: Point[] = [];
+	for (let i = 0; i <= segments; i++) {
+		const d = -radius + (2 * radius * i) / segments;
+		points.push(horizontal ? { x: center.x + d, y: center.y } : { x: center.x, y: center.y + d });
+	}
+	return points;
+}
 
 /** Camera distance for the content projection, as a multiple of the selection
  * size — the larger, the weaker the perspective foreshortening. */
@@ -129,20 +170,27 @@ export function quadFromRotation3(
 	};
 }
 
-/** Great circle perpendicular to `axis`, in the gizmo tilt + object rotation
- * frame, projected to image space around `center`. */
-export function ringPolyline(axis: Axis3, radius: number, rotation: Mat3, center: Point, segments = 72): Point[] {
-	const m = mul3(GIZMO_TILT, rotation);
-	const points: Point[] = [];
-	for (let i = 0; i < segments; i++) {
-		const t = (i / segments) * Math.PI * 2;
-		const c = Math.cos(t) * radius;
-		const s = Math.sin(t) * radius;
-		const base: Vec3 = axis === 'x' ? { x: 0, y: c, z: s } : axis === 'y' ? { x: c, y: 0, z: s } : { x: c, y: s, z: 0 };
-		const p = project3(apply3(m, base), radius * 6 + 1);
-		points.push({ x: center.x + p.x, y: center.y + p.y });
-	}
-	return points;
+/** The three rotate handles around `center`, ALWAYS in the unrotated gizmo frame.
+ *
+ * The handles stay put while the content turns, so you can keep dragging the
+ * same one — and a fixed handle is what keeps the drag sensitivity constant
+ * for the whole gesture. `rot3` rotates the content only — never this. */
+export function rotateRingsFor(center: Point, radius: number): RotateRing[] {
+	return [
+		{ axis: 'x', points: linePoints(center, radius, false), grabRadius: radius },
+		{ axis: 'y', points: linePoints(center, radius, true), grabRadius: radius },
+		{ axis: 'z', points: circlePoints(center, radius) }
+	];
+}
+
+/** Radius of the rotate gizmo for a selection of this size.
+ *
+ * Deliberately derived from the UNrotated selection box: if it came from the
+ * projected quad it would shrink and grow as the content tips through X/Y, so
+ * the handles would resize mid-gesture and the arc-length-to-angle mapping
+ * would drift with them. */
+export function gizmoRadiusFor(bounds: Rect, scaleX = 1, scaleY = 1): number {
+	return Math.max(bounds.width * scaleX, bounds.height * scaleY) * 0.6 || 40;
 }
 
 export interface RingHit {

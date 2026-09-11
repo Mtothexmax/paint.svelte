@@ -2,25 +2,63 @@
 // surface and swap the layer's surfaceId (undoable)" pipeline out of
 // render/effects.ts so every effect (and the legacy adjustments) can share it.
 
-import { RenderTexture, Sprite, type Filter } from 'pixi.js';
+import { RenderTexture, Sprite, type Filter, type Texture } from 'pixi.js';
 import { documentRegistry } from '../core/document/registry';
 import type { EditorRenderer } from '../render/EditorRenderer';
 import { blitMaskedInto, eraseSelectionRegion } from '../render/selection';
 import type { SurfaceId } from '../core/layers/Layer';
-import type { EffectContext, EffectSettings, ResolvedEffect } from './types';
+import { asFilterChain, type EffectContext, type EffectSettings, type ResolvedEffect } from './types';
+import { cancelFloatingMove } from '../state/moveTransform';
 
 /**
- * Applies an arbitrary filter off-screen and swaps the active layer's surface
- * (recorded as one reversible history entry — no readbacks).
+ * Renders `src` through a chain of filters into `target`. A single pass is
+ * rendered straight through; longer chains ping-pong via temporary textures.
+ * Every filter in the chain is destroyed afterwards — the caller must not
+ * reuse them.
+ */
+export function renderFilterChain(
+	renderer: EditorRenderer,
+	src: Texture,
+	target: RenderTexture,
+	chain: Filter[]
+): void {
+	if (!chain.length) {
+		const sprite = new Sprite(src);
+		renderer.app.renderer.render({ container: sprite, target, clear: true });
+		sprite.destroy();
+		return;
+	}
+	let current: Texture = src;
+	let temp: RenderTexture | null = null;
+	for (let i = 0; i < chain.length; i++) {
+		const last = i === chain.length - 1;
+		const out = last ? target : RenderTexture.create({ width: target.width, height: target.height, resolution: 1 });
+		const sprite = new Sprite(current);
+		sprite.filters = [chain[i]];
+		renderer.app.renderer.render({ container: sprite, target: out, clear: true });
+		sprite.destroy();
+		chain[i].destroy();
+		if (temp) temp.destroy(true);
+		temp = last ? null : out;
+		current = out;
+	}
+}
+
+/**
+ * Applies an arbitrary filter (or filter chain) off-screen and swaps the
+ * active layer's surface (recorded as one reversible history entry — no
+ * readbacks). A chain is rendered pass by pass, ping-ponging between two
+ * temporary textures.
  */
 export function applyFilterSwap(
 	renderer: EditorRenderer,
 	label: string,
-	makeFilter: () => Filter
+	makeFilter: () => Filter | Filter[]
 ): boolean {
 	const doc = documentRegistry.active;
 	const layer = doc?.activeLayer;
 	if (!doc || !layer) return false;
+	cancelFloatingMove();
 
 	const surfaces = renderer.surfaces;
 	const w = doc.width;
@@ -29,12 +67,8 @@ export function applyFilterSwap(
 	const src = surfaces.getTexture(before);
 	const target = RenderTexture.create({ width: w, height: h, resolution: 1 });
 
-	const sprite = new Sprite(src);
-	const filter = makeFilter();
-	sprite.filters = [filter];
-	renderer.app.renderer.render({ container: sprite, target, clear: true });
-	sprite.destroy();
-	filter.destroy();
+	const chain = asFilterChain(makeFilter());
+	renderFilterChain(renderer, src, target, chain);
 	const filteredId = surfaces.adopt(target);
 
 	// Filter only inside the active selection (Paint.NET semantics): clone the
@@ -86,6 +120,7 @@ export function applyEffect(
 	settings: EffectSettings
 ): boolean {
 	if (def.isNoop?.(settings)) return false;
+	cancelFloatingMove();
 	if (def.apply) {
 		const ctx: EffectContext = {
 			renderer,

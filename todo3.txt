@@ -17,8 +17,21 @@ src/lib/render/move/distortLogic.ts 4-corner warp PLACEHOLDER (+ working homogra
                                     helper, not wired yet; still shears for now)
 MoveEngine = session only (lift/float/drop/commit) and delegates to the mode files.
 ToolOptions: 3 buttons (Move / Rotate / Distort), store moveToolMode.
--- step 2 TODO --
+-- step 2 DONE (verified in a real headless Chrome) --
 rotate: draggable + 3 blender-style 3d axis rings (x/y/z) around the selection
+        (src/lib/render/move/gizmo3d.ts + rings drawn as SVG in EditorCanvas).
+        The rings are gated by a `quadIsSafe` probe so a drag cannot collapse
+        or flip the quad.
 distort: 4 independent corner draggers + projective (homography) warp of the
-floating pixels so the image follows the 4 points (renderer: per-pixel /
-mesh warp — SurfaceStore.blitTransformed is affine only today)
+        floating pixels so the image follows the 4 points
+        (distortLogic homography + SurfaceStore.blitPerspective via Pixi
+        PerspectivePlaneGeometry + Mesh, DocScene floating mesh). The mask is
+        warped from a BOUNDS-sized crop of the selection (not the whole
+        document) so the homography never has to project any corner across its
+        own vanishing line. `safeQuad` binary-searches the drag back to the
+        last convex pose if a corner is pulled past the opposite edge.
+MoveEngine.unwarpPoint() hit-tests through the inverse homography.
+Verified headlessly: 4 draggers appear the moment Distort is selected (no
+click needed); dragging a corner straight toward the opposite corner stops at
+the convexity limit instead of exploding; 3 axis rings render in Rotate
+mode; zero console errors. tsc clean, svelte-check 0 errors / 53 warnings.

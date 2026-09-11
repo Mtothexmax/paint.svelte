@@ -23,6 +23,7 @@ import {
 } from '../render/selection';
 import { clamp } from '../core/geometry';
 import { showNotice } from '../state/ui';
+import { cancelFloatingMove } from '../state/moveTransform';
 
 function activeDoc(): ImageDocument | null {
 	return documentRegistry.active;
@@ -72,6 +73,7 @@ export function setRectSelection(kind: 'rect' | 'ellipse', a: Point, b: Point): 
 	if (!doc || !hasEditorRenderer()) return false;
 	const rect = normalizedRect(a, b);
 	if (rect.width < 1 || rect.height < 1) return false;
+	cancelFloatingMove();
 
 	const renderer = getEditorRenderer();
 	const maskId = renderer.ensureSelectionMask(doc);
@@ -94,6 +96,7 @@ export function setRectSelection(kind: 'rect' | 'ellipse', a: Point, b: Point): 
 export function setLassoSelection(points: Point[]): boolean {
 	const doc = activeDoc();
 	if (!doc || !hasEditorRenderer() || points.length < 2) return false;
+	cancelFloatingMove();
 	const snapped = clampedPoints(points, doc);
 
 	const renderer = getEditorRenderer();
@@ -117,6 +120,7 @@ export function setLassoSelection(points: Point[]): boolean {
 export function selectAll(): boolean {
 	const doc = activeDoc();
 	if (!doc || !hasEditorRenderer()) return false;
+	cancelFloatingMove();
 	const renderer = getEditorRenderer();
 	const maskId = renderer.ensureSelectionMask(doc);
 	maskAll(renderer.surfaces, maskId, doc.width, doc.height);
@@ -137,6 +141,7 @@ export function deselect(): void {
 	const doc = activeDoc();
 	if (!doc) return;
 	if (!doc.selection.active) return;
+	cancelFloatingMove();
 	doc.selection.active = false;
 	touch(doc);
 }
@@ -154,6 +159,7 @@ export function invertSelection(): boolean {
 	if (!doc || !hasEditorRenderer()) return false;
 	const sel = doc.selection;
 	if (!sel.active || !sel.maskId) return false;
+	cancelFloatingMove();
 
 	const renderer = getEditorRenderer();
 	const surfaces = renderer.surfaces;
@@ -299,6 +305,7 @@ export function applySelectionRect(mode: 'replace' | 'add' | 'subtract', kind: '
 	const doc = activeDoc();
 	if (!doc || !hasEditorRenderer()) return false;
 	if (!rect || rect.width < 1 || rect.height < 1) return false;
+	cancelFloatingMove();
 	const renderer = getEditorRenderer();
 	const surfaces = renderer.surfaces;
 
@@ -373,6 +380,7 @@ export function deleteSelection(label = 'Delete'): boolean {
 	const sel = doc.selection;
 	const layer = doc.activeLayer;
 	if (!doc || !sel.active || !sel.maskId || !layer) return false;
+	cancelFloatingMove();
 
 	const renderer = getEditorRenderer();
 	const surfaces = renderer.surfaces;
@@ -430,6 +438,7 @@ export function fillSelection(color: RGBA): boolean {
 	if (!doc || !hasEditorRenderer()) return false;
 	const layer = doc.activeLayer;
 	if (!layer) return false;
+	cancelFloatingMove();
 
 	const colorInt =
 		((Math.round(color.r) & 0xff) << 16) | ((Math.round(color.g) & 0xff) << 8) | (Math.round(color.b) & 0xff);

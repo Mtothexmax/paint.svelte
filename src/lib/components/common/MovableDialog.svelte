@@ -58,5 +58,9 @@
 		<button class="m-close" title="Close" onclick={onClose}>✕</button>
 	</div>
 	<div class="m-body">{@render children()}</div>
-	<div class="m-footer">{@render actions?.()}</div>
+	<!-- The footer is skipped entirely when the dialog puts its own buttons in
+	the body (e.g. the paste choice dialog) — an empty bar looks broken. -->
+	{#if actions}
+		<div class="m-footer">{@render actions()}</div>
+	{/if}
 </div>

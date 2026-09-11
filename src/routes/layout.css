@@ -93,6 +93,10 @@ body {
 	background: var(--panel);
 	border-left: 1px solid var(--border);
 	overflow-y: auto;
+	/* `overflow-y: auto` alone makes `overflow-x` compute to `auto` as well,
+	   so any 1px of overflow inside a panel popped a horizontal scrollbar
+	   into the sidebar. It only ever scrolls vertically. */
+	overflow-x: hidden;
 }
 .status-strip {
 	height: 25px;
@@ -301,6 +305,27 @@ background-size: 6px 6px;
 	background: rgba(255, 255, 255, 0.08);
 	color: var(--text);
 }
+/* Primary action in an options strip (e.g. the Move tool's Apply). */
+.mini-btn.accent {
+	background: var(--accent);
+	color: #fff;
+}
+.mini-btn.accent:hover {
+	background: var(--accent);
+	color: #fff;
+	filter: brightness(1.15);
+}
+/* Disabled last, so it also wins over .accent's colours. */
+.mini-btn:disabled,
+.mini-btn:disabled:hover,
+.mini-btn.accent:disabled,
+.mini-btn.accent:disabled:hover {
+	background: transparent;
+	color: var(--text-dim);
+	opacity: 0.45;
+	cursor: default;
+	filter: none;
+}
 
 /* ---- panels ---- */
 .panel-card {
@@ -443,6 +468,7 @@ background-size: 6px 6px;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	gap: 5px;
 	height: 22px;
 	padding: 0 8px;
 	background: transparent;
@@ -458,6 +484,38 @@ background-size: 6px 6px;
 	background: rgba(255, 255, 255, 0.08);
 	border-color: var(--border);
 	color: #eee;
+}
+
+/* Read-outs that are not buttons (selection size, pointer position). */
+.sb-read {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	white-space: nowrap;
+}
+
+/* Leading glyphs on the status read-outs. The Material Symbols files carry no
+   `fill`, so they render solid black by default — invisible on this dark bar.
+   Deliberately ONE muted grey, dimmer than the values they label: these are
+   captions for the numbers, not decoration, and three hues pulled the eye to
+   the wrong end of the bar. `.sb-image` / `.sb-marquee` / `.sb-mouse` remain on
+   the elements as stable hooks saying which read-out a glyph belongs to. */
+.sb-ic {
+	display: inline-flex;
+	flex: 0 0 auto;
+	width: 14px;
+	height: 14px;
+	color: #9a9a9a;
+}
+.sb-ic svg {
+	width: 14px;
+	height: 14px;
+	fill: currentColor;
+}
+/* The one read-out that is a button brightens its label on hover — keep the
+   glyph in step instead of leaving it stranded at the resting grey. */
+.status-dim:hover .sb-ic {
+	color: #cfcfcf;
 }
 
 /* ---- Paint.NET-style brush preview ring (canvas cursor) ---- */

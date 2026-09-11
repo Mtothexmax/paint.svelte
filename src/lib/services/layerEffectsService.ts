@@ -9,7 +9,8 @@ import { Sprite } from 'pixi.js';
 import { documentRegistry } from '../core/document/registry';
 import type { Layer, LayerEffect } from '../core/layers/Layer';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
-import { effectById } from '../effects';
+import { asFilterChain, effectById } from '../effects';
+import { cancelFloatingMove } from '../state/moveTransform';
 import type { EffectSettings } from '../effects';
 
 function getDocAndLayer(layerId: string): { doc: import('../core/document/ImageDocument').ImageDocument; layer: Layer } | null {
@@ -156,6 +157,7 @@ export function bakeLayerEffects(layerId: string): boolean {
 	if (!r) return false;
 	const { doc, layer } = r;
 	if (!hasEditorRenderer()) return false;
+	cancelFloatingMove();
 	const renderer = getEditorRenderer();
 
 	const effs = layer.effects?.filter((e) => e.enabled) ?? [];
@@ -167,12 +169,11 @@ export function bakeLayerEffects(layerId: string): boolean {
 
 	// Build a filter chain from the enabled effects and render it off-screen
 	// through applyFilterSwap's pipeline.
-	const filters = effs
-		.map((e) => {
-			const def = effectById(e.id);
-			return def ? def.filter(e.settings) : null;
-		})
-		.filter((f): f is import('pixi.js').Filter => f !== null);
+	// One effect can contribute more than one pass (see EffectFilterChain).
+	const filters = effs.flatMap((e) => {
+		const def = effectById(e.id);
+		return def ? asFilterChain(def.filter(e.settings)) : [];
+	});
 
 	if (!filters.length) return false;
 

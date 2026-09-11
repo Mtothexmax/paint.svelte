@@ -44,12 +44,18 @@ async function main() {
 			// skip effects with no custom shader (they still build a Filter iff filter() exists)
 			let f;
 			try { f = e.filter(e.defaults); } catch (err) { out.push([e.id, 'THROW', e.message || String(err)]); continue; }
-			const prog = f['glProgram'];
-			try { f.destroy(); } catch { /* ignore */ }
-			if (!prog || !prog.fragment) { out.push([e.id, 'NO-FILTER']); continue; }
-			const res = link(prog.vertex, prog.fragment);
-			const status = res.vsOk && res.fsOk && res.linkOk ? 'OK' : 'FAIL';
-			if (status === 'FAIL') out.push([e.id, status, res.logs.join(' | ')]);
+			// Chain-returning filters (median, gaussianBlur, …) yield an array —
+			// link every pass, not just the first.
+			const chain = Array.isArray(f) ? f : [f];
+			if (!chain.length) { out.push([e.id, 'NO-FILTER']); continue; }
+			for (const pass of chain) {
+				const prog = pass['glProgram'];
+				try { pass.destroy(); } catch { /* ignore */ }
+				if (!prog || !prog.fragment) { out.push([e.id, 'NO-FILTER']); continue; }
+				const res = link(prog.vertex, prog.fragment);
+				const status = res.vsOk && res.fsOk && res.linkOk ? 'OK' : 'FAIL';
+				if (status === 'FAIL') out.push([e.id, status, res.logs.join(' | ')]);
+			}
 		}
 		return out;
 	});

@@ -14,7 +14,7 @@
 //   • move/moveLogic.ts    — translate (move)
 //   • move/rotateLogic.ts  — rotate / scale / pivot (formerly "transform")
 //   • move/distortLogic.ts — 4-corner warp: dragger quad + homography
-//   • move/gizmo3d.ts      — Blender-style 3 axis rings for the rotate mode
+//   • move/gizmo3d.ts      — flat rotation handles for the rotate mode
 //
 // Rotate and Distort are PROJECTIVE (a four-corner pin), so they cannot run
 // through the affine sprite path: while either is active the engine keeps a
@@ -24,6 +24,7 @@
 
 import { Rectangle, Sprite } from 'pixi.js';
 import type { Point, Rect } from '../core/geometry';
+import { framePointsFromLoops, type FramePoints } from '../core/geometry';
 import type { MoveToolMode } from '../core/toolMode';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
@@ -37,29 +38,36 @@ import { beginMove, moveTo as translateTo, nudge as nudgeOffset, sameOffset, typ
 import { pivotTo, rotateTo, snapRotation } from './move/rotateLogic';
 import {
 	applyHomography,
+	invertHomography,
+	isConvexQuad,
+	lerpQuad,
 	cloneQuad,
 	cornerFromHandle,
 	homographyForQuad,
-	invertHomography,
+	quadArea,
+	quadConvexWinding,
 	quadFromBounds,
 	quadPoints,
 	translateQuad,
+	withCorner,
 	type DistortCorner,
 	type DistortQuad
 } from './move/distortLogic';
 import {
-	AXES3,
 	IDENTITY3,
 	apply3,
+	gizmoRadiusFor,
 	hitRing,
 	isIdentity3,
 	mul3,
 	project3,
-	ringPolyline,
 	ringTangent,
+	rotateRingsFor,
 	rotationAxis3,
+	wrapPi,
 	type Axis3,
-	type Mat3
+	type Mat3,
+	type RotateRing
 } from './move/gizmo3d';
 import { beginGesture, isTranslationHandle, ringAxis, type TransformGesture, type TransformHandle, type TransformState } from './move/types';
 
@@ -94,15 +102,20 @@ export class MoveEngine {
 	/** Base quad in image space (corners of the selection box once a
 	 * projective sub-mode took over). Null while the affine path is in use. */
 	private warpQuad: DistortQuad | null = null;
-	/** 3D rotation of the rotate sub-mode (Blender-style axis rings). */
+	/** 3D rotation of the rotate sub-mode (flat axis handles). */
 	private rot3: Mat3 = IDENTITY3;
-	/** Ring drag in flight. */
+	/** Ring drag in flight. `tangent`/`radius`/`origin` drive the straight
+	 * tip/turn handles; `center`/`lastAngle`/`spun` accumulate the spin
+	 * handle's revolutions around the pivot. */
 	private ringGesture: {
 		axis: Axis3;
 		index: number;
 		origin: Point;
 		tangent: Point;
 		radius: number;
+		center: Point;
+		lastAngle: number;
+		spun: number;
 		startRotation: Mat3;
 	} | null = null;
 
@@ -153,10 +166,61 @@ export class MoveEngine {
 		if (v === 'distort') {
 			// A 3D rotation is baked into the quad so the corners can be
 			// dragged directly afterwards.
-			this.warpQuad = this.currentQuad() ?? this.warpQuad;
+			const baked = this.currentQuad() ?? this.warpQuad;
 			this.rot3 = IDENTITY3;
+			this.warpQuad = baked && this.bounds ? this.safeQuad(baked, quadFromBounds(this.bounds)) : baked;
 		}
 		this.refreshVisuals();
+	}
+
+	/** Smallest renderable quad (px²) — below this the warp is pure noise. */
+	private static readonly MIN_QUAD_AREA = 4;
+
+	/**
+	 * A quad may only be sent to the GPU while it stays strictly convex and
+	 * keeps the winding of the source rectangle. As soon as a corner is pulled
+	 * past the opposite edge the quad turns concave / self-intersecting, the
+	 * corner-pin homography sends part of the source plane through infinity and
+	 * the mesh covers the whole canvas ("the image explodes"). Dragging is
+	 * clamped to the convex, correctly-wound region.
+	 *
+	 * Note: only the SELECTION rectangle is ever warped (the mask is cropped to
+	 * the bounds first, see `warpMask`), so no document corner is pushed
+	 * through the homography and no vanishing-line test is needed here.
+	 */
+	private quadIsSafe(q: DistortQuad): boolean {
+		if (!isConvexQuad(q)) return false;
+		if (Math.abs(quadArea(q)) < MoveEngine.MIN_QUAD_AREA) return false;
+		if (!this.bounds) return true;
+		return homographyForQuad(this.bounds, q) !== null;
+	}
+
+	/** Safety gate for the rotate sub-mode: like `quadIsSafe`, but revolving
+	 * content shows its mirrored back half every turn, so either consistent
+	 * winding passes. The exact edge-on frame has (near-)zero area and is
+	 * skipped — the following frames pass again, so the revolution continues
+	 * straight through instead of stopping. */
+	private quadIsSafeForRotation(q: DistortQuad): boolean {
+		if (quadConvexWinding(q) === 0) return false;
+		if (Math.abs(quadArea(q)) < MoveEngine.MIN_QUAD_AREA) return false;
+		if (!this.bounds) return true;
+		return homographyForQuad(this.bounds, q) !== null;
+	}
+
+	/** Pulls `candidate` back toward the known-good quad `from` until it is
+	 * renderable (binary search). A drag therefore stops at the limit instead
+	 * of exploding. */
+	private safeQuad(candidate: DistortQuad, from: DistortQuad): DistortQuad {
+		if (this.quadIsSafe(candidate)) return candidate;
+		if (!this.quadIsSafe(from)) return from;
+		let lo = 0;
+		let hi = 1;
+		for (let i = 0; i < 18; i++) {
+			const mid = (lo + hi) / 2;
+			if (this.quadIsSafe(lerpQuad(from, candidate, mid))) lo = mid;
+			else hi = mid;
+		}
+		return lerpQuad(from, candidate, lo);
 	}
 
 	get moveMode(): MoveToolMode {
@@ -182,12 +246,13 @@ export class MoveEngine {
 		return q ? homographyForQuad(this.bounds, q) : null;
 	}
 
-	/** The three rotation rings (image space) for the overlay. */
-	get rotateRings(): Array<{ axis: Axis3; points: Point[] }> {
+	/** The three rotation handles (image space) for the overlay.
+	 *
+	 * Built from the UNrotated gizmo frame — see `rotateRingsFor`. `rot3` turns
+	 * the content, not the handles, so the gizmo stays put while you drag. */
+	get rotateRings(): RotateRing[] {
 		if (!this.active || !this.bounds) return [];
-		const center = this.gizmoCenter();
-		const radius = this.gizmoRadius();
-		return AXES3.map((axis) => ({ axis, points: ringPolyline(axis, radius, this.rot3, center) }));
+		return rotateRingsFor(this.gizmoCenter(), this.gizmoRadius());
 	}
 
 	/** Corners of the selection box pushed through the affine state. */
@@ -223,15 +288,21 @@ export class MoveEngine {
 
 	/** The quad with the 3D rotation (if any) and the translation applied. */
 	private currentQuad(): DistortQuad | null {
+		return this.quadForRotation(this.rot3);
+	}
+
+	/** Same as currentQuad() but for a candidate rotation — lets a ring drag
+	 * be rejected BEFORE it collapses or flips the quad. */
+	private quadForRotation(rot: Mat3): DistortQuad | null {
 		const base = this.warpQuad;
 		if (!base) return null;
-		if (this.rot3 === IDENTITY3 || isIdentity3(this.rot3)) return translateQuad(base, this.offset.x, this.offset.y);
+		if (rot === IDENTITY3 || isIdentity3(rot)) return translateQuad(base, this.offset.x, this.offset.y);
 		const distance = this.cameraDistance();
 		const out = cloneQuad(base);
 		for (const key of ['nw', 'ne', 'se', 'sw'] as const) {
 			const c = base[key];
 			const p = project3(
-				apply3(this.rot3, { x: c.x - this.pivot.x, y: c.y - this.pivot.y, z: 0 }),
+				apply3(rot, { x: c.x - this.pivot.x, y: c.y - this.pivot.y, z: 0 }),
 				distance
 			);
 			out[key] = { x: this.pivot.x + this.offset.x + p.x, y: this.pivot.y + this.offset.y + p.y };
@@ -249,59 +320,97 @@ export class MoveEngine {
 		return { x: this.pivot.x + this.offset.x, y: this.pivot.y + this.offset.y };
 	}
 
+	/** Ring radius. Independent of `rot3` on purpose — a radius taken from the
+	 * projected quad would change as the content tips through X/Y, resizing the
+	 * rings and shifting the drag sensitivity mid-gesture. */
 	private gizmoRadius(): number {
-		const q = this.currentQuad();
-		if (q) {
-			const w = Math.hypot(q.ne.x - q.nw.x, q.ne.y - q.nw.y);
-			const h = Math.hypot(q.sw.x - q.nw.x, q.sw.y - q.nw.y);
-			return Math.max(w, h) * 0.6 || 40;
-		}
 		const b = this.bounds;
 		if (!b) return 40;
-		return Math.max(b.width * this.scaleX, b.height * this.scaleY) * 0.6 || 40;
+		return gizmoRadiusFor(b, this.scaleX, this.scaleY);
 	}
 
 	/** Starts a ring drag (rotate sub-mode). */
 	beginRing(axis: Axis3, p: Point): boolean {
 		if (!this.active || !this.bounds) return false;
-		const points = ringPolyline(axis, this.gizmoRadius(), this.rot3, this.gizmoCenter());
+		// Same handles the overlay draws, so a click always lands on what the user
+		// sees — the tangent (and therefore the sensitivity) is fixed for the
+		// whole gesture along with them. Straight handles carry their nominal
+		// radius: a grab near the middle of a line sits almost on the centre,
+		// which would make the arc-length mapping hypersensitive.
+		const ring = rotateRingsFor(this.gizmoCenter(), this.gizmoRadius()).find((r) => r.axis === axis);
+		if (!ring) return false;
+		const points = ring.points;
 		const hit = hitRing(points, p);
 		const center = this.gizmoCenter();
-		const radius = Math.max(1, Math.hypot(points[hit.index].x - center.x, points[hit.index].y - center.y));
+		const radius = ring.grabRadius ?? Math.max(1, Math.hypot(points[hit.index].x - center.x, points[hit.index].y - center.y));
 		this.ringGesture = {
 			axis,
 			index: hit.index,
 			origin: { x: p.x, y: p.y },
 			tangent: ringTangent(points, hit.index),
 			radius,
+			center,
+			lastAngle: Math.atan2(p.y - center.y, p.x - center.x),
+			spun: 0,
 			startRotation: this.rot3
 		};
 		this.origin = { ...p };
 		return true;
 	}
 
-	/** Continues a ring drag: the pointer travel along the ring's tangent is
-	 * the rotation angle (arc length / radius). */
+	/** Continues a ring drag.
+	 *
+	 * The spin handle (red circle) accumulates the pointer's wrapped angle
+	 * around the pivot, so circling keeps turning the content past 360° for
+	 * as many revolutions as the gesture lasts. The straight tip/turn handles
+	 * keep the tangent projection: dragging along the line tips or turns the
+	 * content (arc length / radius), which is the natural gesture there. */
 	rotateRingTo(p: Point, shift = false): void {
 		const g = this.ringGesture;
 		if (!g) return;
-		const dx = p.x - g.origin.x;
-		const dy = p.y - g.origin.y;
-		let delta = (dx * g.tangent.x + dy * g.tangent.y) / g.radius;
-		if (shift) delta = snapRotation(delta);
-		this.rot3 = mul3(g.startRotation, rotationAxis3(g.axis, delta));
+		let delta: number;
+		if (g.axis === 'z') {
+			const dx = p.x - g.center.x;
+			const dy = p.y - g.center.y;
+			// Dead zone at the pivot: the angle is undefined there, and
+			// banking noise as the reference would kick on exit.
+			if (dx * dx + dy * dy < 16) return;
+			const a = Math.atan2(dy, dx);
+			g.spun += wrapPi(a - g.lastAngle);
+			g.lastAngle = a;
+			delta = shift ? snapRotation(g.spun) : g.spun;
+		} else {
+			const dx = p.x - g.origin.x;
+			const dy = p.y - g.origin.y;
+			delta = (dx * g.tangent.x + dy * g.tangent.y) / g.radius;
+			if (shift) delta = snapRotation(delta);
+		}
+		const next = mul3(g.startRotation, rotationAxis3(g.axis, delta));
+		// Reject a rotation that would collapse or flip the quad (the
+		// projection would send the pixels through infinity). Mirrored quads
+		// are fine here — they are the back half of the revolution.
+		const probe = this.quadForRotation(next);
+		if (probe && !this.quadIsSafeForRotation(probe)) return;
+		this.rot3 = next;
 		this.refreshVisuals();
 		logTransformDebug('engine.rotateRingTo', { axis: g.axis, delta, transform: this.transformState });
 	}
 
-	/** Moves one corner of the distort quad (image space, absolute). */
+	/** Moves one corner of the distort quad (image space, absolute). The new
+	 * pose is clamped to the renderable region, so pulling a corner "inward"
+	 * stops at the limit instead of exploding the warp. */
 	distortCornerTo(corner: DistortCorner, p: Point): void {
 		if (!this.warpQuad) return;
-		const next = cloneQuad(this.warpQuad);
-		next[corner] = { x: p.x - this.offset.x, y: p.y - this.offset.y };
+		const target = { x: p.x - this.offset.x, y: p.y - this.offset.y };
+		const next = this.safeQuad(withCorner(this.warpQuad, corner, target), this.warpQuad);
 		this.warpQuad = next;
 		this.refreshVisuals();
-		logTransformDebug('engine.distortCornerTo', { corner, pointer: p, quad: this.currentQuad() });
+		logTransformDebug('engine.distortCornerTo', {
+			corner,
+			pointer: p,
+			clamped: next[corner].x !== target.x || next[corner].y !== target.y,
+			quad: this.currentQuad()
+		});
 	}
 
 	/** Maps a doc-space point back into the UN-warped document while the
@@ -444,16 +553,29 @@ export class MoveEngine {
 		this.updateLivePreview();
 	}
 
-	/** Corners of a doc-sized surface (0,0)-(w,h) pushed through `h` — used to
-	 * warp the selection mask along with the pixels. */
-	private warpedDocCorners(h: { h: ArrayLike<number> } | null, w: number, h2: number): [Point, Point, Point, Point] | null {
-		if (!h) return null;
-		const m = h.h;
-		const map = (x: number, y: number): Point => {
-			const wd = m[6] * x + m[7] * y + m[8] || 1;
-			return { x: (m[0] * x + m[1] * y + m[2]) / wd, y: (m[3] * x + m[4] * y + m[5]) / wd };
-		};
-		return [map(0, 0), map(w, 0), map(w, h2), map(0, h2)];
+	/**
+	 * Warps the SELECTION MASK through the current projective map into
+	 * `destId`. Returns false when no projective session is active, so the
+	 * caller can fall back to the affine blit.
+	 *
+	 * The mask is cropped to the selection bounds BEFORE being warped. Warping
+	 * the whole doc-sized mask (what this used to do) pushes the document
+	 * corners — far outside the source quad — through the homography; they
+	 * cross the vanishing line after only a few pixels of drag and the mesh
+	 * explodes over the entire canvas. Cropping keeps the source and the
+	 * corner-pin quad identical, which is always finite for a convex quad.
+	 */
+	private warpMask(destId: SurfaceId, blend: 'normal' | 'erase'): boolean {
+		const surfaces = this.renderer.surfaces;
+		const maskId = this.doc?.selection.maskId;
+		const bounds = this.bounds;
+		const quad = this.currentQuad();
+		if (!maskId || !bounds || !quad || !surfaces.has(maskId)) return false;
+		if (bounds.width < 1 || bounds.height < 1) return false;
+		const crop = surfaces.copyRegion(maskId, bounds);
+		surfaces.blitPerspective(crop, destId, quadPoints(quad), blend);
+		surfaces.dispose(crop);
+		return true;
 	}
 
 	/** Corners of the bounds-sized floating texture pushed through `h`. */
@@ -477,9 +599,7 @@ export class MoveEngine {
 		const maskId = this.doc?.selection.maskId;
 		if (maskId && surfaces.has(maskId)) {
 			const movedMaskId = surfaces.create(w, h);
-			const corners = this.warpedDocCorners(this.warpHomography, w, h);
-			if (corners) surfaces.blitPerspective(maskId, movedMaskId, corners, 'normal');
-			else
+			if (!this.warped || !this.warpMask(movedMaskId, 'normal'))
 				surfaces.blitTransformed(maskId, movedMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, this.offset.x, this.offset.y, this.scaleX, this.scaleY, this.rotation, 'normal', this.skewX, this.skewY);
 			eraseSelectionRegion(surfaces, movedMaskId, previewId, w, h);
 			surfaces.dispose(movedMaskId);
@@ -522,6 +642,19 @@ export class MoveEngine {
 		);
 	}
 
+	/** Handle frame for the overlay: the armed gesture's frozen extremes, else
+	 * a refit from the committed selection geometry. Selection-space points —
+	 * the canvas maps them through the live affine state, so draggers sit on
+	 * the visible shape (rotated outlines included) instead of a detached
+	 * bounding box. Null when there is nothing to fit (overlay falls back to
+	 * the bounds rect). */
+	get dragFrame(): FramePoints | null {
+		if (this.transformGesture?.frame) return this.transformGesture.frame;
+		const doc = this.doc ?? documentRegistry.active;
+		const loops = doc ? this.renderer.committedShapeLoops(doc) : null;
+		return loops?.length ? framePointsFromLoops(loops) : null;
+	}
+
 	/** Starts a resize, pivot move, or rotation gesture. Only the gesture is
 	 * captured here — the maths lives in ./move (rotateLogic / distortLogic). */
 	beginTransform(handle: TransformHandle, p: Point): void {
@@ -532,12 +665,22 @@ export class MoveEngine {
 		this.moveGesture = beginMove(p, this.offset);
 		const axis = ringAxis(handle);
 		if (axis) {
-			// rotate sub-mode: Blender-style 3D ring.
+			// rotate sub-mode: flat rotation handle drag.
 			this.beginRing(axis, p);
 			this.transformGesture = beginGesture(handle, p, this.currentState());
 			return;
 		}
 		this.transformGesture = beginGesture(handle, p, this.currentState());
+		// Freeze the dragger frame the gesture grabbed (selection-space
+		// extremes of the committed outline). The overlay draws these same
+		// points and the scale maths anchors to them, so pointer, handles and
+		// math agree for the whole drag — for plain rects this is exactly the
+		// classic bounds frame.
+		const doc = this.doc ?? documentRegistry.active;
+		const loops = doc ? this.renderer.committedShapeLoops(doc) : null;
+		if (this.transformGesture && loops?.length) {
+			this.transformGesture.frame = framePointsFromLoops(loops);
+		}
 		logTransformDebug('engine.beginTransform', {
 			handle,
 			pointer: p,
@@ -598,7 +741,7 @@ export class MoveEngine {
 		if (!this.active || !this.bounds || !g) return;
 		const b = this.bounds;
 
-		// Rotate sub-mode: a 3D ring drag (Blender style).
+		// Rotate sub-mode: a flat rotation-handle drag.
 		if (ringAxis(g.handle) && this.ringGesture) {
 			this.rotateRingTo(p, shift);
 			return;
@@ -706,20 +849,15 @@ export class MoveEngine {
 		// source pixels must still create a hole on this layer.
 		const sel = doc.selection;
 		const oldMaskId = sel.maskId;
-		// projective path (rotate / distort): mask corners travel through the
-		// homography instead of the affine sprite transform.
-		const maskCorners = this.warpedDocCorners(warp, w, h);
+		// projective path (rotate / distort): the mask travels through the
+		// homography instead of the affine sprite transform (see `warpMask`).
 		const floatingCorners = this.warpedBoundsCorners(warp);
-		if (warped && oldMaskId && surfaces.has(oldMaskId) && maskCorners)
-			surfaces.blitPerspective(oldMaskId, afterId, maskCorners, 'erase');
-		else if (oldMaskId && surfaces.has(oldMaskId))
+		if (!(warped && this.warpMask(afterId, 'erase')) && oldMaskId && surfaces.has(oldMaskId))
 			surfaces.blitTransformed(oldMaskId, afterId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation, 'erase', this.skewX, this.skewY);
 
 		// move the selection (mask surface + geometry) by the same offset
 		const newMaskId = surfaces.create(w, h);
-		if (warped && oldMaskId && surfaces.has(oldMaskId) && maskCorners)
-			surfaces.blitPerspective(oldMaskId, newMaskId, maskCorners, 'normal');
-		else if (oldMaskId && surfaces.has(oldMaskId))
+		if (!(warped && this.warpMask(newMaskId, 'normal')) && oldMaskId && surfaces.has(oldMaskId))
 			surfaces.blitTransformed(oldMaskId, newMaskId, this.pivot.x, this.pivot.y, this.pivot.x, this.pivot.y, dx, dy, this.scaleX, this.scaleY, this.rotation, 'normal', this.skewX, this.skewY);
 		// A floating selection is a cut/paste operation, not just a normal
 		// alpha blend: transparent selected pixels must clear the destination.

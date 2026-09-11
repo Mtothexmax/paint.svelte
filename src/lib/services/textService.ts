@@ -9,6 +9,7 @@ import type { RGBA } from '../core/color';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import { rasterizeText, blitTextCanvas, type TextCommitOptions } from '../render/text';
 import type { TextAlign } from '../state/text';
+import { cancelFloatingMove } from '../state/moveTransform';
 
 export interface TextDraftInput {
 	x: number;
@@ -139,6 +140,7 @@ export function convertTextToRaster(id: string): void {
 	if (!doc || !hasEditorRenderer()) return;
 	const layer = doc.layers.find((l) => l.id === id);
 	if (!layer || layer.kind !== 'text') return;
+	cancelFloatingMove();
 	const renderer = getEditorRenderer();
 	const text = layer.text ? { ...layer.text, color: { ...layer.text.color } } : undefined;
 	const beforeName = layer.name;

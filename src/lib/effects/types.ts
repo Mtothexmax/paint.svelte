@@ -49,14 +49,29 @@ export type EffectSettings = Record<string, number>;
 /** Runtime context handed to effects that need a custom apply pipeline. */
 export interface EffectContext {
 	renderer: EditorRenderer;
-	/** The standard off-screen filter-swap apply (undoable surface swap). */
-	applyFilterSwap: (label: string, makeFilter: () => Filter) => boolean;
+	/** The standard off-screen filter-swap apply (undoable surface swap).
+	 * A returned chain is rendered pass by pass. */
+	applyFilterSwap: (label: string, makeFilter: () => EffectFilterChain) => boolean;
+}
+
+/**
+ * What `EffectDefinition.filter` may return: a single pass, or a chain that is
+ * rendered back-to-back (ping-pong). Multi-pass effects — e.g. the separable
+ * median, which needs one horizontal and one vertical pass — return an array.
+ */
+export type EffectFilterChain = Filter | Filter[];
+
+/** Normalises a filter factory result into a chain (never empty-safe: an
+ * empty array stays empty, callers must check). */
+export function asFilterChain(f: EffectFilterChain): Filter[] {
+	return Array.isArray(f) ? f : [f];
 }
 
 /**
  * Declarative effect definition. `params` fully drive both the settings
  * object and the generated dialog; `filter(settings)` must return a NEW
- * filter instance per call (the preview and the apply each own one).
+ * filter (or chain of filters) per call — the preview and the apply each own
+ * one.
  */
 export interface EffectDefinition {
 	/** Menu label of the effect (e.g. "Gaussian Blur"). */
@@ -67,8 +82,8 @@ export interface EffectDefinition {
 	icon?: string;
 	/** Sliders shown in the dialog, in order. */
 	params: EffectParam[];
-	/** Builds a NEW filter for the current settings (preview + apply). */
-	filter: (settings: EffectSettings) => Filter;
+	/** Builds a NEW filter (or filter chain) for the current settings. */
+	filter: (settings: EffectSettings) => EffectFilterChain;
 	/** True when the settings cause no visible change (disables Apply). */
 	isNoop?: (settings: EffectSettings) => boolean;
 	/**

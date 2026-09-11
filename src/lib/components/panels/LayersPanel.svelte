@@ -18,6 +18,7 @@
 		commitLayerOpacity,
 		setLayerVisibility,
 		setLayerBlendMode,
+		setLayerName,
 		layerRows,
 		BLEND_MODE_OPTIONS,
 		type LayerRow
@@ -41,6 +42,10 @@
 	let unsubHist: (() => void) | null = null;
 	/** Row currently hovered — reveals the blend-mode dropdown when its mode is Normal. */
 	let hoveredId: string | null = $state(null);
+	/** Inline layer-name editor state. */
+	let editingId: string | null = $state(null);
+	let editingName = $state('');
+	let editInput: HTMLInputElement | null = $state(null);
 
 	function refresh() {
 		const doc = documentRegistry.active;
@@ -95,6 +100,43 @@
 	function moveActive(delta: number): void {
 		const active = activeRow();
 		if (active) moveLayer(active.id, delta);
+	}
+
+	// --- inline rename ---------------------------------------------------
+
+	/** Click on the layer name — selects the row and opens the editor.
+	 * Text layers still get selected, they just refuse to be renamed (their
+	 * name is derived from the text content by the text service). */
+	function startRename(row: LayerRow, e: MouseEvent): void {
+		e.stopPropagation();
+		selectLayer(row.id);
+		if (row.isText) return;
+		editingId = row.id;
+		editingName = row.name;
+		queueMicrotask(() => editInput?.focus());
+	}
+
+	function commitRename(row: LayerRow): void {
+		if (editingId !== row.id) return;
+		const name = editingName.trim();
+		if (name && name !== row.name) setLayerName(row.id, name);
+		editingId = null;
+		editingName = '';
+	}
+
+	function cancelRename(): void {
+		editingId = null;
+		editingName = '';
+	}
+
+	function onRenameKey(row: LayerRow, e: KeyboardEvent): void {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			(e.currentTarget as HTMLInputElement).blur();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			cancelRename();
+		}
 	}
 
 	// --- drag & drop reorder --------------------------------------------
@@ -341,6 +383,14 @@
 					onpointerenter={() => (hoveredId = row.id)}
 					onpointerleave={() => (hoveredId = null)}
 				>
+<input
+						type="checkbox"
+						class="layer-vis"
+						checked={row.visible}
+						title={row.visible ? 'Hide layer' : 'Show layer'}
+						onclick={(e) => e.stopPropagation()}
+						onchange={() => setLayerVisibility(row.id, !row.visible)}
+					/>
 {#if $layerThumbnails[row.id]}
 					<img
 						class="layer-thumb"
@@ -353,26 +403,27 @@
 					{/if}
 					<div class="layer-main">
 						<div class="layer-line">
-							<button
-								class="layer-eye"
-								title={row.visible ? 'Hide layer' : 'Show layer'}
-								onclick={(e) => {
-									e.stopPropagation();
-									setLayerVisibility(row.id, !row.visible);
-								}}
-							>{row.visible ? '👁' : '🚫'}</button>
-							<span class="layer-name">{row.name}</span>
-							<button
-								class="layer-fx"
-								class:on={$layerEffectsPanelOpen}
-								class:hasFx={row.effectCount > 0}
-								title="Toggle the layer-effects panel"
-								onclick={(e) => {
-									e.stopPropagation();
-									selectLayer(row.id);
-									toggleLayerEffectsPanel();
-								}}
-							>fx{#if row.effectCount > 0}<span class="layer-fx-n">{row.effectCount}</span>{/if}</button>
+							{#if editingId === row.id}
+								<!-- size=1 keeps the <input>'s intrinsic width at one
+								character, so even a browser that ignores the
+								flex-basis: 0 in .layer-rename cannot widen the row. -->
+								<input
+									class="layer-rename"
+									size="1"
+									bind:this={editInput}
+									bind:value={editingName}
+									onkeydown={(e) => onRenameKey(row, e)}
+									onblur={() => commitRename(row)}
+									onclick={(e) => e.stopPropagation()}
+								/>
+							{:else}
+								<span
+									class="layer-name"
+									class:renameable={!row.isText}
+									title={row.isText ? 'Text layers cannot be renamed' : 'Click to rename'}
+									onclick={(e) => startRename(row, e)}
+								>{row.name}</span>
+							{/if}
 						</div>
 						<div class="layer-line">
 							{#if row.blendMode !== 'normal' || hoveredId === row.id}
@@ -391,6 +442,20 @@
 							{/if}
 						</div>
 					</div>
+					<!-- Pinned to the row's far right, independent of the name /
+					blend lines above. Hidden while the row is not hovered UNLESS
+					the layer actually has effects. -->
+					<button
+						class="layer-fx"
+						class:on={$layerEffectsPanelOpen}
+						class:hasFx={row.effectCount > 0}
+						title="Toggle the layer-effects panel"
+						onclick={(e) => {
+							e.stopPropagation();
+							selectLayer(row.id);
+							toggleLayerEffectsPanel();
+						}}
+					>fx{#if row.effectCount > 0}<span class="layer-fx-n">{row.effectCount}</span>{/if}</button>
 				</div>
 			{/each}
 		</div>

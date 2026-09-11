@@ -2,7 +2,17 @@
 
 import { writable } from 'svelte/store';
 
-export type DialogKind = 'newImage' | 'effect' | 'layerEffect' | 'curves' | 'levels' | 'rasterizeConfirm' | 'imageSize' | null;
+export type DialogKind =
+	| 'newImage'
+	| 'effect'
+	| 'layerEffect'
+	| 'curves'
+	| 'levels'
+	| 'rasterizeConfirm'
+	| 'imageSize'
+	| 'selectionSize'
+	| 'paste'
+	| null;
 
 export interface DialogState {
 	kind: DialogKind;
@@ -30,6 +40,24 @@ export interface RasterizeConfirmPayload {
 /** Payload for the 'imageSize' dialog: which tab to start on. */
 export interface ImageSizeDialogPayload {
 	mode?: 'resize' | 'canvas';
+}
+
+/** How an oversized paste should be handled (Paint.NET's "larger than the
+ * canvas" question). 'cancel' aborts the paste entirely. */
+export type PasteOversizeChoice = 'expand' | 'keep' | 'cancel';
+
+/** Payload for the 'paste' dialog: shown when the pasted image does not fit
+ * on the canvas. `onChoose` is called exactly once with the user's answer. */
+export interface PasteDialogPayload {
+	/** Small PNG data URL of the image being pasted (for the preview). */
+	previewUrl: string;
+	/** Size of the image being pasted, in pixels. */
+	imageWidth: number;
+	imageHeight: number;
+	/** Current canvas size, in pixels. */
+	canvasWidth: number;
+	canvasHeight: number;
+	onChoose: (choice: PasteOversizeChoice) => void;
 }
 
 export const dialog = writable<DialogState>({ kind: null });

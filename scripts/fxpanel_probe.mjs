@@ -70,6 +70,21 @@ async function main() {
 	log('[1] panel visible:', await page.evaluate(() => !!document.querySelector('.fx-panel')));
 	log('    head:', await page.evaluate(() => document.querySelector('.fx-head')?.textContent?.replace(/\s+/g, ' ').trim()));
 
+	// --- [0] open the panel through the real UX path ----------------------
+	// The panel starts closed; hovering a layer row reveals its fx badge
+	// (opacity 0 → 1 when the layer has no effects), clicking the badge
+	// selects the layer and opens the panel.
+	const rowBox = await (await page.$('.layer-row')).boundingBox();
+	const idleOpacity = await page.evaluate(() => getComputedStyle(document.querySelector('.layer-fx')).opacity);
+	await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+	await sleep(250);
+	const hoverOpacity = await page.evaluate(() => getComputedStyle(document.querySelector('.layer-fx')).opacity);
+	await page.evaluate(() => document.querySelector('.layer-fx')?.click());
+	await sleep(400);
+	const opened = await page.evaluate(() => !!document.querySelector('.fx-panel'));
+	log('[0] badge reveal + open:', JSON.stringify({ idleOpacity, hoverOpacity, opened }));
+	if (!(idleOpacity === '0' && hoverOpacity === '1' && opened)) throw new Error('panel open FAILED');
+
 	// --- via service: add, toggle, copy, second layer, paste ---------------
 	const serviceStep = await page.evaluate(async () => {
 		const { addLayer, selectLayer } = await import('/src/lib/services/layersService.ts');

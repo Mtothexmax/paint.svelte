@@ -10,6 +10,7 @@ import { rendererReady } from '../render/EditorRenderer';
 import { fitView } from '../render/Viewport';
 import { deviceMaxTextureSize } from './device';
 import { showNotice } from '../state/ui';
+import { cancelFloatingMove } from '../state/moveTransform';
 
 export interface NewCanvasRequest {
 	name?: string;
@@ -186,16 +187,19 @@ export async function exportActiveDocument(): Promise<void> {
 /** Closes the active document (if any). */
 export function closeActiveDocument(): void {
 	const doc = documentRegistry.active;
+	cancelFloatingMove();
 	if (doc) documentRegistry.close(doc.id);
 }
 
 /** Switches the active tab to the given document. */
 export function switchToDocument(id: string): void {
+	cancelFloatingMove();
 	documentRegistry.setActive(id);
 }
 
 /** Closes a specific document (tab). */
 export function closeDocument(id: string): void {
+	cancelFloatingMove();
 	documentRegistry.close(id);
 }
 

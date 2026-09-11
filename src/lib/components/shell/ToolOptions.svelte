@@ -32,6 +32,11 @@
 	import { get } from 'svelte/store';
 	import { MOVE_TOOL_MODES, MOVE_TOOL_MODE_LABELS, type MoveToolMode } from '../../core/toolMode';
 	import { requestPolygonFinish } from '../../state/polygon';
+	import {
+		moveTransformFloating,
+		requestMoveTransformApply,
+		requestMoveTransformCancel
+	} from '../../state/moveTransform';
 	import PdnSlider from '../common/PdnSlider.svelte';
 	import IconSplitButton from '../common/IconSplitButton.svelte';
 	import FontDropdown from '../common/FontDropdown.svelte';
@@ -134,9 +139,9 @@
 	const isMovePixels = $derived($activeToolId === 'move-pixels');
 	const isMoveSelection = $derived($activeToolId === 'move-selection');
 
-	// Move-Pixels sub-modes (todo3): Move / Rotate / Distort. Rotate is the old
-	// "Transform" option renamed; Distort is the new 4-dragger warp (placeholder
-	// until the corner-pin warp lands — it still shears for now).
+// Move-Pixels sub-modes (todo3): Move / Rotate / Distort. Rotate is the old
+// "Transform" option renamed and now uses the Blender-style 3D axis gizmo;
+// Distort is the 4-dragger corner-pin warp.
 	const MOVE_MODE_ICONS: Record<MoveToolMode, string> = {
 		move: '⤢',
 		rotate: '⟳',
@@ -144,8 +149,8 @@
 	};
 	const MOVE_MODE_TITLES: Record<MoveToolMode, string> = {
 		move: 'Move the selection',
-		rotate: 'Rotate and scale about the pivot (axis gizmo follows in the next step)',
-		distort: 'Distort with four independent corner draggers (placeholder — shears for now)'
+		rotate: 'Rotate in 3D — drag the red / green / blue axis rings',
+		distort: 'Distort — drag the four corners; the image stretches to match'
 	};
 
 	const LINE_STYLE_OPTIONS = [
@@ -728,6 +733,30 @@
 				</button>
 			{/each}
 		</div>
+		{#if $moveToolMode !== 'move'}
+			<!-- Rotate / Distort build up a floating transform; these commit or
+			     discard it (Enter and Escape do the same). -->
+			<button
+				class="mini-btn accent"
+				disabled={!$moveTransformFloating}
+				title={$moveTransformFloating
+					? 'Apply the transform to the layer (Enter)'
+					: 'Nothing floating yet — drag the rings or corner handles first'}
+				onclick={requestMoveTransformApply}
+			>
+				✓ Apply
+			</button>
+			<button
+				class="mini-btn"
+				disabled={!$moveTransformFloating}
+				title={$moveTransformFloating
+					? 'Discard the transform — the pixels go back (Escape)'
+					: 'Nothing floating yet'}
+				onclick={requestMoveTransformCancel}
+			>
+				✕ Cancel
+			</button>
+		{/if}
 		{#if $selectionActive}
 			<button
 				class="mini-btn"

@@ -102,17 +102,37 @@ async function main() {
 		await sleep(250);
 		if (direct) {
 			const itemText = hasParams ? effectLabel + '…' : effectLabel;
-			const clicked = await page.evaluate(
+			const res = await page.evaluate(
 				(lbl) => {
+					const h0 = window.__REGISTRY__.active.history.length;
 					const b = [...document.querySelectorAll('.menu-panel .menu-item .menu-text')]
 						.find((s) => (s.textContent || '').trim() === lbl)?.closest('.menu-item');
-					if (!b) return false;
+					if (!b) return { clicked: false, h0 };
 					b.click();
-					return true;
+					return { clicked: true, h0 };
 				},
 				itemText
 			);
-			if (!clicked) throw new Error('adjustment menu item not found: ' + itemText);
+			if (!res.clicked) throw new Error('adjustment menu item not found: ' + itemText);
+			if (!hasParams) {
+				// Instant adjustment (no '…'): applies straight away. A few
+				// (e.g. Curves) still pop a custom dialog — close it again.
+				const after = await page.evaluate(async (h0) => {
+					await new Promise((r) => setTimeout(r, 800));
+					const doc = window.__REGISTRY__.active;
+					const d = document.querySelector('.m-dialog');
+					const title = d ? (d.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40) : null;
+					if (d) {
+						const btn = d.querySelector('.btn-secondary');
+						if (btn) btn.click();
+						else d.remove();
+						await new Promise((r) => setTimeout(r, 250));
+					}
+					return { grew: doc.history.length > h0, title };
+				}, res.h0);
+				await sleep(250);
+				return itemText + ` (instant, histGrew=${after.grew}` + (after.title ? `, dialog=${after.title}` : '') + ')';
+			}
 			await page.waitForSelector('.m-dialog', { timeout: 8000 });
 			await sleep(900);
 			const title = await page.evaluate(() => {
@@ -137,17 +157,36 @@ async function main() {
 		if (!subOpen) throw new Error('submenu not found: ' + menuLabel);
 		await sleep(250);
 		const itemText = hasParams ? effectLabel + '…' : effectLabel;
-		const clicked = await page.evaluate(
+		const res = await page.evaluate(
 			(lbl) => {
+				const h0 = window.__REGISTRY__.active.history.length;
 				const b = [...document.querySelectorAll('.menu-panel.sub-panel .menu-item .menu-text')]
 					.find((s) => (s.textContent || '').trim() === lbl)?.closest('.menu-item');
-				if (!b) return false;
+				if (!b) return { clicked: false, h0 };
 				b.click();
-				return true;
+				return { clicked: true, h0 };
 			},
 			itemText
 		);
-		if (!clicked) throw new Error('effect menu item not found: ' + itemText);
+		if (!res.clicked) throw new Error('effect menu item not found: ' + itemText);
+		if (!hasParams) {
+			// Instant effect (no '…'): applies straight away.
+			const after = await page.evaluate(async (h0) => {
+				await new Promise((r) => setTimeout(r, 800));
+				const doc = window.__REGISTRY__.active;
+				const d = document.querySelector('.m-dialog');
+				const title = d ? (d.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40) : null;
+				if (d) {
+					const btn = d.querySelector('.btn-secondary');
+					if (btn) btn.click();
+					else d.remove();
+					await new Promise((r) => setTimeout(r, 250));
+				}
+				return { grew: doc.history.length > h0, title };
+			}, res.h0);
+			await sleep(250);
+			return itemText + ` (instant, histGrew=${after.grew}` + (after.title ? `, dialog=${after.title}` : '') + ')';
+		}
 		await page.waitForSelector('.m-dialog', { timeout: 8000 });
 		await sleep(900); // give the preview render + shader compile time
 		const title = await page.evaluate(() => {

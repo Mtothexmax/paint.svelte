@@ -17,6 +17,7 @@ import { get } from 'svelte/store';
 import { checkerTheme } from '../state/view';
 import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
+import { cancelFloatingMove } from '../state/moveTransform';
 import { copySelection, cutSelection, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
 import { invertColorsScoped, autoLevelScoped, blackAndWhiteScoped, sepiaScoped, invertAlphaScoped } from '../render/effects';
 import { cropToSelection } from '../render/crop';
@@ -130,6 +131,7 @@ export function registerBuiltinCommands(): void {
 			run: () => {
 				const doc = documentRegistry.active;
 				if (doc) {
+					cancelFloatingMove();
 					doc.history.undo();
 					documentRegistry.notifyChange(doc);
 				}
@@ -143,6 +145,7 @@ export function registerBuiltinCommands(): void {
 			run: () => {
 				const doc = documentRegistry.active;
 				if (doc) {
+					cancelFloatingMove();
 					doc.history.redo();
 					documentRegistry.notifyChange(doc);
 				}
@@ -192,6 +195,7 @@ export function registerBuiltinCommands(): void {
 			id: 'image.cropToSelection',
 			label: 'Crop to Selection',
 			run: () => {
+				cancelFloatingMove();
 				const renderer = getEditorRenderer();
 				if (cropToSelection(renderer)) {
 					showNotice('Cropped to selection.');

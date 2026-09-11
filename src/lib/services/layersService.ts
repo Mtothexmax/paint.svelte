@@ -5,6 +5,7 @@
 import { documentRegistry } from '../core/document/registry';
 import { createRasterLayer, isLayerBlendMode, LAYER_BLEND_MODES, type Layer } from '../core/layers/Layer';
 import { getEditorRenderer } from '../render/EditorRenderer';
+import { cancelFloatingMove } from '../state/moveTransform';
 
 function touch(doc: import('../core/document/ImageDocument').ImageDocument) {
 	doc.setDirty(true);
@@ -30,6 +31,7 @@ function ensureActive(doc: import('../core/document/ImageDocument').ImageDocumen
 export function addLayer(): void {
 	const doc = activeDoc();
 	if (!doc) return;
+	cancelFloatingMove();
 	const renderer = getEditorRenderer();
 	const surfaceId = renderer.surfaces.create(doc.width, doc.height);
 	const name = `Layer ${doc.layers.length + 1}`;
@@ -68,6 +70,7 @@ export function deleteLayer(id?: string): void {
 	const target = id ?? doc.activeLayerId ?? '';
 	const index = doc.indexOfLayer(target);
 	if (index < 0) return;
+	cancelFloatingMove();
 	const layer = doc.layers[index];
 	const renderer = getEditorRenderer();
 	const surfaceId = layer.surfaceId;
@@ -115,6 +118,7 @@ export function reorderLayer(id: string, to: number): void {
 	if (from < 0) return;
 	to = Math.max(0, Math.min(doc.layers.length - 1, to));
 	if (to === from) return;
+	cancelFloatingMove();
 
 	doc.moveLayer(id, to);
 	rebuild();
@@ -129,6 +133,42 @@ export function reorderLayer(id: string, to: number): void {
 		},
 		redo: () => {
 			doc.moveLayer(id, to);
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		dispose: () => {}
+	});
+}
+
+/**
+ * Renames a layer (undoable). Text layers are skipped — their name is
+ * auto-derived from the text content by the text service and is not
+ * user-editable.
+ */
+export function setLayerName(id: string, name: string): void {
+	const doc = activeDoc();
+	if (!doc) return;
+	const layer = doc.layers.find((l) => l.id === id);
+	if (!layer) return;
+	if (layer.kind === 'text') return;
+	const trimmed = name.trim();
+	if (!trimmed || trimmed === layer.name) return;
+	const old = layer.name;
+
+	layer.name = trimmed;
+	rebuild();
+	touch(doc);
+	documentRegistry.notifyChange(doc);
+
+	doc.history.push({
+		label: 'Rename Layer',
+		undo: () => {
+			layer.name = old;
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		redo: () => {
+			layer.name = trimmed;
 			rebuild();
 			documentRegistry.notifyChange(doc);
 		},
@@ -213,6 +253,7 @@ export function commitLayerOpacity(id: string, from: number, to: number): void {
 export function selectLayer(id: string): void {
 	const doc = activeDoc();
 	if (!doc) return;
+	cancelFloatingMove();
 	doc.setActiveLayer(id);
 	documentRegistry.notifyChange(doc);
 }
@@ -224,6 +265,7 @@ export function mergeDown(): void {
 	if (!doc) return;
 	const index = doc.indexOfLayer(doc.activeLayerId ?? '');
 	if (index <= 0) return;
+	cancelFloatingMove();
 	const renderer = getEditorRenderer();
 	const surfaces = renderer.surfaces;
 	const active = doc.layers[index];
@@ -274,6 +316,7 @@ export function duplicateLayer(id: string): void {
 	if (!doc) return;
 	const src = doc.layers.find((l) => l.id === id);
 	if (!src) return;
+	cancelFloatingMove();
 	const renderer = getEditorRenderer();
 	const copyId = renderer.surfaces.copyRegion(src.surfaceId, {
 		x: 0,

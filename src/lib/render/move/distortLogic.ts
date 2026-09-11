@@ -1,18 +1,19 @@
-// Layer: render (pixi). DISTORT sub-mode of the Move-Pixels tool —
-// PLACEHOLDER (todo3, step 1).
+// Layer: render (pixi). DISTORT sub-mode of the Move-Pixels tool.
 //
-// Target behaviour (step 2, not implemented yet):
 //   • four independent corner draggers (nw / ne / se / sw) that can each be
 //     moved on their own,
 //   • the floating pixels are warped by the homography (projective map) that
 //     sends the original quad to the dragged quad, so the image always
 //     stretches to match the four points — i.e. a perspective "corner-pin".
 //
-// Until the GPU-side projective warp exists, this module keeps the legacy
-// shear behaviour (Photoshop-style skew on the corner/edge handles) so the
-// Distort option that already shipped stays functional. The quad + homography
-// helpers below are the API the real implementation will use; they are written
-// and unit-testable already, just not wired into MoveEngine yet.
+// The homography is only usable while the quad stays convex and correctly
+// wound — see `isConvexQuad`. MoveEngine clamps every drag with that
+// predicate, otherwise a corner pulled "inward" makes the warp explode across
+// the canvas.
+//
+// Only the SELECTION rectangle is ever warped (the mask is cropped to the
+// selection bounds first), so the source rect and the corner-pin quad are the
+// same size and the map is always finite for a convex quad.
 
 import type { Point, Rect } from '../../core/geometry';
 import { cloneTransform, type TransformGesture, type TransformState } from './types';
@@ -178,6 +179,69 @@ export function quadPoints(q: DistortQuad): [Point, Point, Point, Point] {
 
 export function quadFromPoints(points: [Point, Point, Point, Point]): DistortQuad {
 	return { nw: { ...points[0] }, ne: { ...points[1] }, se: { ...points[2] }, sw: { ...points[3] } };
+}
+
+/** Signed area of the quad (shoelace). Positive when the winding matches the
+ * source rectangle (nw → ne → se → sw, clockwise in image space). */
+export function quadArea(q: DistortQuad): number {
+	const p = quadPoints(q);
+	let a = 0;
+	for (let i = 0; i < 4; i++) {
+		const c = p[i];
+		const n = p[(i + 1) % 4];
+		a += c.x * n.y - n.x * c.y;
+	}
+	return a / 2;
+}
+
+function crossZ(a: Point, b: Point, c: Point): number {
+	return (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+}
+
+/**
+ * A quad is RENDERABLE when it is strictly convex and keeps the winding of
+ * the source rectangle. As soon as a corner is pulled "inward" past the
+ * opposite edge the quad turns concave (or self-intersects, or flips) — the
+ * homography then sends part of the source plane through infinity and the
+ * mesh explodes across the whole canvas. Dragging must be clamped to the
+ * convex / correctly-wound region.
+ */
+export function isConvexQuad(q: DistortQuad): boolean {
+	return quadConvexWinding(q) > 0;
+}
+
+/**
+ * Strictly convex with CONSISTENT winding in either direction: +1 for the
+ * source winding, -1 for uniformly mirrored, 0 for concave / degenerate /
+ * self-intersecting. The rotate sub-mode revolves the content through
+ * edge-on, so the back half of every turn is mirrored — still bijective,
+ * still renderable. Distort keeps the stricter `isConvexQuad`: pulling one
+ * corner through flips only part of the mesh.
+ */
+export function quadConvexWinding(q: DistortQuad): number {
+	const p = quadPoints(q);
+	let sign = 0;
+	for (let i = 0; i < 4; i++) {
+		const c = crossZ(p[i], p[(i + 1) % 4], p[(i + 2) % 4]);
+		if (!Number.isFinite(c) || Math.abs(c) < 1e-9) return 0; // collinear / degenerate
+		const s = c > 0 ? 1 : -1;
+		if (sign === 0) sign = s;
+		else if (s !== sign) return 0;
+	}
+	return sign;
+}
+
+/** Cross-fade between two quads (used to walk a drag back to a safe pose). */
+export function lerpQuad(a: DistortQuad, b: DistortQuad, t: number): DistortQuad {
+	const at = (p: Point, q: Point): Point => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+	return { nw: at(a.nw, b.nw), ne: at(a.ne, b.ne), se: at(a.se, b.se), sw: at(a.sw, b.sw) };
+}
+
+/** The quad with one corner replaced. */
+export function withCorner(q: DistortQuad, corner: DistortCorner, p: Point): DistortQuad {
+	const next = cloneQuad(q);
+	next[corner] = { x: p.x, y: p.y };
+	return next;
 }
 
 /** Shifts all four corners (the quad is stored in final image space). */

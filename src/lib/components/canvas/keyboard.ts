@@ -10,8 +10,10 @@ import {
 	copySelection,
 	cutSelection,
 	hasClipboardImage,
-	pasteAsNewLayer
+	pasteAsNewLayer,
+	systemClipboardHasImage
 } from '../../services/clipboardService';
+import { focusPasteCatcher, isPasteCatcher } from './pasteCatcher';
 import {
 	deleteSelection,
 	deselect,
@@ -52,6 +54,9 @@ export interface KeyApi {
 }
 
 export function isTextTarget(target: EventTarget | null): boolean {
+	// The hidden paste catcher is a textarea purely so the browser will emit
+	// image 'paste' events — it must never count as "the user is typing".
+	if (isPasteCatcher(target)) return false;
 	if (!(target instanceof HTMLElement)) return false;
 	if (target.tagName === 'TEXTAREA') return true;
 	if (target.tagName === 'INPUT') {
@@ -121,12 +126,24 @@ const CTRL_SHORTCUTS: Record<string, (e: KeyboardEvent, a: KeyApi) => boolean> =
 	},
 	c: (e) => (e.shiftKey ? false : (copySelection(), true)),
 	x: (e) => (e.shiftKey ? false : (cutSelection(), true)),
-	v: () => (hasClipboardImage() ? (pasteAsNewLayer(), true) : false)
+	// Paste: the OS clipboard always wins, so Ctrl+V is normally left alone and
+	// the browser's own 'paste' event does the work (that is the only way to
+	// get an image out of Paint.NET / a screenshot). The internal clipboard is
+	// only used when our last copy could NOT be mirrored to the system
+	// clipboard — otherwise a stale in-app copy would shadow the real thing.
+	v: () => (systemClipboardHasImage() || !hasClipboardImage() ? false : (pasteAsNewLayer(), true))
 };
 
 export function handleKeyDown(e: KeyboardEvent, a: KeyApi): void {
 	const typing = isTextTarget(e.target);
 	const modal = !!get(dialog).kind;
+	// Ctrl/⌘+V (or Shift+Insert) must land on an EDITABLE node or Chrome will
+	// not emit a 'paste' event for image content at all. Hand focus to the
+	// hidden catcher first — synchronously, so it is in place by the time the
+	// browser runs the paste command as the default action of this event.
+	if (!typing && !modal && (e.ctrlKey || e.metaKey) && !e.altKey) {
+		if (e.key.toLowerCase() === 'v' || (e.shiftKey && e.key === 'Insert')) focusPasteCatcher();
+	}
 	// Escape cancels an in-progress selection drag AND clears an active
 	// selection (Paint.NET behaviour). Guarded against typing inputs and open
 	// modal dialogs so it never steals Escape from them.

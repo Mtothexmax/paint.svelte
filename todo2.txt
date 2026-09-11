@@ -1,3 +1,261 @@
 when pasting an image it is somehow sometimes weirdly placed so that hte top left of the pasted image is in the center of tha canvas. it should be placed at the top left of the canvas but even better, if pasting show a dialog like paint.net that asks expand canvas, keep canvas size or reset, but only if the dimensions are bigger than the image
 
 also make that dialog so cool like in paint.net where the options are only 3 big buttons and above it the text with already a preview in small of the image to paste
+
+-- DONE --
+- Pasting now lands at the TOP-LEFT (not centred). Both paths (internal
+  clipboard / Ctrl+V AND OS-clipboard image) use the same `placePastedImage`.
+  Fixes the "top left in the centre" bug in `pasteAsNewLayer` and
+  `pasteBitmapAsLayer` (src/lib/services/clipboardService.ts).
+- When the pasted image is bigger than the canvas a Paint.NET-style dialog
+  appears with a small checkerboard preview, the dimension comparison
+  ("The image you are pasting (2600 × 1500) is larger than the canvas
+  (1920 × 1080).") and three big buttons:
+    * Expand Canvas  → resizeCanvas to max(canvas, image), top-left anchor
+                       (existing content stays put), then paste at (0, 0).
+    * Keep Canvas Size → paste at (0, 0), clipped to the current canvas.
+    * Cancel           → no paste (the 3rd option the user remembered).
+- New components / APIs:
+    src/lib/services/dialogService.ts         ('paste' kind + PasteDialogPayload)
+    src/lib/components/dialogs/PasteDialog.svelte (Paint.NET-styled dialog)
+    src/lib/components/dialogs/DialogHost.svelte  (mounts it)
+    src/lib/render/export.ts                 surfaceToPngThumbnailUrl
+    MovableDialog.svelte                     footer now only renders when
+                                             `actions` is set (no empty bar).
+- Verified in headless Chrome:
+    SVGA (800x600) canvas + 1600x900 paste:
+      Cancel      → canvas 800x600 unchanged, no new layer
+      Keep        → canvas 800x600 unchanged, +1 pasted layer
+      Expand      → canvas 1600x900,           +1 pasted layer
+    tsc clean, svelte-check 0 errors / 53 warnings, zero console errors.
+
+-- DONE (follow-up: real OS-clipboard paste did not work at all) --
+Reported: "it does not really work to paste an image from paint.net to the
+browser to paint.svelte". Two root causes, both fixed:
+
+1. Chrome emits a 'paste' event for IMAGE clipboard content ONLY when an
+   EDITABLE element has focus. With <body> or a plain <div> focused, Ctrl+V
+   with an image on the OS clipboard fires NOTHING (proved in a headed
+   Chrome probe: text on the clipboard → event fires; image → no event;
+   image + contenteditable/textarea focused → event fires with
+   `types: ["Files"]`, `items: ["file/image/png"]`).
+   → Added src/lib/components/canvas/pasteCatcher.ts: an offscreen
+     <textarea> (tabindex -1, aria-hidden, inputmode none) that owns focus
+     whenever no real input does. Ctrl/⌘+V (and Shift+Insert) focuses it
+     synchronously from the keydown handler, so the browser's paste command
+     has an editable target.
+
+2. Ctrl+V was hijacked by the INTERNAL clipboard:
+   keyboard.ts had `v: () => (hasClipboardImage() ? (pasteAsNewLayer(), true)
+   : false)`. Once anything had been copied in-app the internal clipboard is
+   never cleared, so Ctrl+V forever pasted that stale copy and preventDefault
+   killed the native paste — a Paint.NET image never stood a chance.
+   → Ctrl+V now only falls back to the internal clipboard when our last copy
+     could NOT be mirrored to the system clipboard
+     (`systemClipboardHasImage()` in clipboardService.ts). Otherwise the OS
+     clipboard always wins.
+
+Also: `isTextTarget()` returns false for the catcher, so it never counts as
+"the user is typing" and no shortcut is swallowed; the catcher is wiped on
+every `input` / `paste` so stray keystrokes never accumulate.
+
+- Verified in HEADED Chrome with a REAL OS clipboard image + REAL Ctrl+V
+  (not synthetic events):
+    T1 300x200 image, no in-app copy → +1 layer, no dialog
+    T2 in-app Ctrl+A/Ctrl+C first (internal clipboard NON-empty), then a real
+       1600x900 OS image → dialog appears (OS image wins), Expand → 1600x900
+    T3 2000x1200 OS image → Keep Canvas Size → canvas unchanged, +1 layer
+    T4 2400x1400 OS image → Cancel → nothing changes
+  Focus regression: text-tool draft still receives typing ("Hello"), dialog
+  number inputs still receive typing ("1234"), catcher stays empty, zero
+  console errors. tsc + svelte-check clean.
+
+-- DONE (status bar: label the three read-outs with icons) --
+Reported: "when drawing a rectangle i see 3 dimensions in the bottom bar, i
+want icons ... to tell me what is the dimension of the image, what is the mouse
+position (a mouse icon) and what is the rectangle i am drawing."
+
+The strip showed three bare, indistinguishable numbers:/n    800 x 600      142 x 99      (377, 337)
+Each now leads with a Material Symbols (rounded) glyph, tinted per read-out so
+they are told apart at a glance:/n    photo_size_select_large  #8ab4f8  -> image / document size (still a button
+                                        that opens the Image Size dialog)
+    crop_free                #fdd663  -> the rectangle being drawn (live drag,
+                                        or the committed selection)
+    mouse                    #81c995  -> pointer position
+All three carry a `title` tooltip spelling the value out. The cursor read-out
+dropped its redundant parentheses.
+
+The Material Symbols files ship with no `fill` (solid black => invisible on the
+dark bar), so they are imported `?raw` and inlined via {@html}, then re-coloured
+with `fill: currentColor` + a per-class `color` -- the same convention as
+MenuBar's .menu-svg icons. New CSS lives next to the other status-bar rules:/n`.sb-read`, `.sb-ic`, `.sb-image/.sb-marquee/.sb-mouse`; `.status-dim` gained a
+5px gap so the button icon lines up with the plain read-outs.
+
+Also fixed while in there: the pointer read-out used to keep the last pixel
+forever after the pointer left the canvas. `onLeave` now clears cursorX/Y -- but
+only when no drag is in flight, since pointer capture keeps feeding moves after
+the pointer leaves the host.
+
+- Verified in headless Chrome (800x600 doc, Rectangle Select drag):
+    mid-drag     800 x 600 | 142 x 99 | 377, 337   icons=[image, marquee, mouse]
+    committed    same three (marquee read-out switches to the selection store)
+    pointer left 800 x 600 | 142 x 99              icons=[image, marquee]
+    pointer back same + 263, 259                   icons=[image, marquee, mouse]
+    Ctrl+D       800 x 600 | 263, 259              icons=[image, mouse]
+    Image Size button still opens the resize dialog.
+  Narrow windows 1400/1100/900/760 px: strip stays 25px, no horizontal
+  overflow, zoom bar fully on screen at every width. Start screen: 0 read-outs.
+  tsc clean, svelte-check 0 errors / 56 warnings, zero console errors.
+
+-- FOLLOW-UP: icons are one muted grey, not three colours --
+User: "i want the icons to be just light gray, colors are nice but for this some
+thing less prominent like all just one color is better."
+
+All three glyphs are now a single #9a9a9a -- deliberately DIMMER than the
+#bdbdbd values they label, so they read as captions rather than decoration.
+`.sb-image` / `.sb-marquee` / `.sb-mouse` stay on the elements as stable hooks
+naming which read-out a glyph belongs to (the verify probe reports them), but
+carry no colour of their own. Added `.status-dim:hover .sb-ic { color:#cfcfcf }`
+so the one clickable read-out brightens its glyph in step with its label.
+
+Verified: all three icons compute to rgb(154,154,154); tsc clean;
+svelte-check 0 errors / 56 warnings; zero console errors.
+
+-- DONE (Resize Image: lock toggle between the dimensions) --
+Reported: "the resize image dialog must have a toggle button with a lock between
+the dimensions instead of a checkbox with the label constrain proportions, the
+label may stay as an alt text."
+
+The "Constrain proportions" checkbox is gone. In its place, a compact toggle sits
+BETWEEN the Width and Height fields -- the relationship it controls is now
+physically where it applies. Icons: Material Symbols rounded `lock` (ratio
+locked) / `lock_open` (free), 16px, imported `?raw` + {@html} so they can be
+tinted. On = accent-soft fill + accent border + accent glyph; off = plain
+surface + dim grey glyph. The words survive as aria-label="Constrain
+proportions" (the accessible name) and a stateful title ("Constrain proportions:
+on|off").
+
+Behaviour change worth noting: switching the lock ON now re-syncs the two values
+immediately (whichever field was edited last wins, same rule as typing). Before,
+the checkbox did nothing until you touched a field -- so you could "constrain",
+click OK and still get a distorted image, which is the one thing the lock
+promises not to do.
+
+Layout: the Width/Height row is now `grid-template-columns: 1fr 32px 1fr` and the
+Scale row reuses the same class. The middle column is a FIXED 32px (the lock's
+width) rather than `auto`, so the Scale field lines up with the Width field
+exactly instead of drifting ~54px wider.
+
+Gotcha: `.lock-ic svg { fill: currentColor }` was reported by svelte-check as
+"Unused CSS selector" -- Svelte never adds its scoping class to markup injected
+via {@html}, so a plain descendant selector silently never matches. Fixed with
+`.lock-ic :global(svg)`. (Same reason MenuBar's .menu-svg svg and the status
+bar's .sb-ic svg live in the global layout.css.)
+
+- Verified in headless Chrome (800x600 doc, dialog opened from the status bar):
+    dialog checkboxes       0 (page-wide 1 = the layers-panel visibility box)
+    lock button             aria-label "Constrain proportions", pressed=true
+    glyph fill              rgb(59,130,246) on / rgb(154,154,154) off, 16px
+    bottom alignment        lock=453 width=453 height=453 (flush)
+    field widths            width=187 height=187 scale=187, same left edge
+    locked:   width 400  -> height auto-follows to 300 (4:3 kept)
+    unlocked: height 500 -> width stays 400
+    re-locked: height was last edited -> width snaps to 667 (= 500 * 800/600)
+    Canvas Size mode        title "Canvas Size", 9 anchor cells, lock intact
+  tsc clean, svelte-check 0 errors / 56 warnings (baseline), zero console errors.
+
+-- DONE (Rotate gizmo: rings fixed + visible before the first click) --
+Reported: "for the rotation tool like in blender the circles for each axis must
+not move while rotating but stay constant. also they must appear as soon as one
+activates the rotate mode and not only when one clicks once."
+
+Two independent causes:
+
+1) THE RINGS SPUN WITH THE CONTENT.
+   `MoveEngine.rotateRings` built them as
+   `ringPolyline(axis, radius, this.rot3, center)` -- passing the live 3x3
+   object rotation into the ring frame, so the gizmo rotated with the thing it
+   was rotating. `gizmoRadius()` was also derived from `currentQuad()` (the
+   PROJECTED quad), so the rings visibly resized as the content tipped through
+   X/Y, and the drag sensitivity (arc length / radius) drifted with them.
+
+   Fixed by giving the rings their own rotation-free frame:
+     - new `rotateRingsFor(center, radius)` in render/move/gizmo3d.ts -- always
+       IDENTITY3, so only the fixed GIZMO_TILT applies. Blender's gizmo does not
+       spin with the object; `rot3` rotates the CONTENT only.
+     - new `gizmoRadiusFor(bounds, scaleX, scaleY)` -- from the UNrotated
+       selection box, so the radius is constant for the whole gesture.
+     - `beginRing()` now hit-tests the exact same `rotateRingsFor(...)` output
+       the overlay draws, so a click always lands on what the user sees.
+   `AXES3` / `ringPolyline` imports dropped from MoveEngine (now unused there).
+
+2) THE RINGS ONLY APPEARED AFTER THE FIRST CLICK.
+   The engine is created lazily and reports `rotateRings: []` until `begin()`
+   has lifted the pixels, so the overlay had nothing to draw and rotate mode
+   looked like it had no handles at all. Added `activeRotateRings()` in
+   EditorCanvas: engine rings if present, else built from `handleBounds` --
+   the same fallback `distortQuadPoints()` already used for the distort
+   corners. Both `rotateRingPaths` and `ringHandleAt` go through it.
+
+- Verified in headless Chrome (800x600 doc, 300x230 rect selection):
+    rings right after picking Rotate, BEFORE any canvas click : x, y, z
+    after dragging the Z (blue) ring 90px                     : d identical
+    after dragging the X (red) ring 80px (foreshortening)     : d identical
+    ring bboxes before / after both drags:
+      x:459,205,176,357  y:377,294,364,150  z:411,221,318,338   (unchanged)
+    transform log: engine.rotateRingTo 32, engine.transformTo 0, engine.begin 1
+      -> both drags hit the rings (no translate fallback), content really turned
+  tsc clean, svelte-check 0 errors / 56 warnings (baseline), zero console errors.
+
+  Probe gotcha worth keeping: the ring <path> `d` values are SVG-LOCAL coords.
+  The overlay is `absolute inset-0` inside the canvas host, so a probe must add
+  `ownerSVGElement.getBoundingClientRect()` before feeding them to
+  `page.mouse.move()` -- otherwise the drags land beside the rings and silently
+  become translations.
+
+-- DONE (status bar: click the selection read-out to type an exact size) --
+Reported: "when clicking on the rectangle selection toolbar that shows the
+dimensions in the bottom toolbar one must also have a popup that appears that
+lets one enter exact dimensions."
+
+The selection read-out in the status bar was a plain <span>. It is now a
+`.status-dim` button (same treatment as the image-size read-out next to it) that
+opens a NON-MODAL, movable popup -- `MovableDialog`, so the canvas and the ants
+stay visible and interactive while you type, and you can drag the popup aside.
+
+New:
+  src/lib/components/dialogs/SelectionSizeDialog.svelte
+  dialogService.ts   -- 'selectionSize' DialogKind
+  DialogHost.svelte  -- mounts it
+  StatusBar.svelte   -- both branches (live drag + committed) are now buttons
+
+Behaviour:
+- Pre-fills from the LIVE selection bounds; if there is no selection it falls
+  back to the whole document. Width field is focused on open (type-and-Enter).
+- Enter applies (unless a footer button has focus), Esc/Cancel/close are no-ops.
+- The selection keeps its TOP-LEFT corner -- the predictable anchor when only a
+  size is being typed -- and is clamped so it can never stick out past the
+  canvas. A clamped input is called out in amber ("· clamped to the canvas"),
+  because the applied size then differs from what was typed.
+- Shape is preserved: rect stays rect, ellipse stays ellipse. A lasso/polygon
+  selection has no W×H of its own, so re-sizing it yields a rectangle.
+- A live hint shows the resulting "W × H px at (x, y)".
+
+- Verified in headless Chrome (800x600 doc):
+    read-out is now a BUTTON showing "213 × 163"
+    click -> popup title "Selection Size", aria-modal=false, fields 213 x 163,
+             width field focused, actions [Cancel, Apply]
+    type 400 x 100 -> hint "400 × 100 px at (193, 189)" -> Apply -> read-out 400 × 100
+    reopen -> reads back the LIVE selection (400 x 100), not the typed values
+    type 99999 -> hint "607 × 100 px at (193, 189) · clamped to the canvas"
+                  (607 = 800 - 193) -> Apply -> 607 × 100
+    Cancel -> unchanged.  Escape -> unchanged, popup gone.
+    ELLIPSE proof: fill layer, ellipse-select, force 200x200 through the popup,
+    Delete, then eyedropper-sample the bounds' corner -> still #000000 A255
+    (an ellipse does not cover its corner), centre -> A0 transparent. The shape
+    really is preserved, not silently converted to a rect.
+  tsc clean, svelte-check 0 errors / 56 warnings (baseline), zero console errors.
+
+Svelte note: a leading space inside `{#if}` is trimmed by the compiler, so
+"{x}{#if c} · suffix{/if}" renders as "(...)·suffix". Use an entity
+(`&nbsp;·`) or an expression -- an entity is never trimmed.

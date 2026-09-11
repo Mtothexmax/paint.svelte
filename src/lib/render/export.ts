@@ -83,6 +83,46 @@ export async function surfaceToPngBlob(
 	return blob;
 }
 
+/**
+ * Same as `surfaceToPngBlob` but scaled down to fit a `maxSize`×`maxSize` box
+ * and returned as a PNG **data URL**, which is what the paste dialog needs for
+ * its preview. Downscaling BEFORE the readback keeps the extraction cheap even
+ * for a 6000 px screenshot. Returns '' when the canvas is unavailable.
+ */
+export function surfaceToPngThumbnailUrl(
+	renderer: EditorRenderer,
+	surfaceId: string,
+	w: number,
+	h: number,
+	maxSize = 180
+): string {
+	if (w <= 0 || h <= 0) return '';
+	const scale = Math.min(1, maxSize / Math.max(w, h));
+	const tw = Math.max(1, Math.round(w * scale));
+	const th = Math.max(1, Math.round(h * scale));
+	const rt = RenderTexture.create({ width: tw, height: th, resolution: 1 });
+	const sprite = new Sprite(renderer.surfaces.getTexture(surfaceId));
+	sprite.width = tw;
+	sprite.height = th;
+	const holder = new Container();
+	holder.addChild(sprite);
+	renderer.app.renderer.render({ container: holder, target: rt, clear: true });
+
+	let url = '';
+	try {
+		const probe = new Sprite(rt);
+		const canvas = renderer.app.renderer.extract.canvas({ target: probe, resolution: 1 }) as HTMLCanvasElement;
+		url = canvas.toDataURL('image/png');
+		probe.destroy();
+	} catch {
+		url = '';
+	}
+	sprite.destroy();
+	holder.destroy({ children: true });
+	rt.destroy(true);
+	return url;
+}
+
 /** Writes a surface to the SYSTEM clipboard as PNG (readable by external image
  * editors). Rejects if the Clipboard API or a permission is unavailable. */
 export async function writeSurfaceToSystemClipboard(

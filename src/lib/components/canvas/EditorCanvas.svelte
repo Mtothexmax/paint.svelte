@@ -4,8 +4,8 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
-	import type { Point, Rect } from '../../core/geometry';
-	import { pointInPolygon, rectFromCorners } from '../../core/geometry';
+import type { Point, Rect } from '../../core/geometry';
+import { pointInPolygon, rectFromCorners, framePointsFromLoops, framePointsFromRect, type FramePoints } from '../../core/geometry';
 	import { screenToImage, imageToScreen, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
@@ -15,15 +15,22 @@
 	import { MoveEngine } from '../../render/MoveEngine';
 	import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
 	import type { TransformHandle } from '../../render/MoveEngine';
-	import { AXIS_COLORS, pickRing } from '../../render/move/gizmo3d';
+	import { AXIS_COLORS, gizmoRadiusFor, pickRing, rotateRingsFor, type Axis3 } from '../../render/move/gizmo3d';
 	import { logTransformDebug } from '../../render/transformDebug';
 	import rotateClockwiseCursor from '../../assets/rotate-clockwise.svg';
 	import rotateCounterclockwiseCursor from '../../assets/rotate-counterclockwise.svg';
+	import eyedropperCursor from '../../assets/eyedropper-cursor.svg';
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import {
 		pasteBitmapAsLayer
 	} from '../../services/clipboardService';
+	import {
+		clearPasteCatcher,
+		focusPasteCatcher,
+		registerPasteCatcher
+	} from './pasteCatcher';
+	import { moveTransformAction, moveTransformFloating } from '../../state/moveTransform';
 	import { dialog } from '../../services/dialogService';
 	import { applyCheckerTheme } from '../../services/commands';
 	import { restoreSession, startSessionPersistence, type SessionPersistence } from '../../services/sessionService';
@@ -66,11 +73,14 @@
 	import { lineWidth, lineStyle, lineArrowStart, lineArrowEnd, lineAction } from '../../state/lines';
 	import { gradientMode, gradientRepeat, gradientAction } from '../../state/gradients';
 	import { ensureSystemFontLoaded, withTimeout } from '../../services/fonts';
-	import { rgbaToCss } from '../../core/color';
+	import { rgbaToCss, type RGBA } from '../../core/color';
 	import {
+		EYEDROPPER,
 		PAINT_TOOLS,
 		SELECT_TOOLS
 	} from './tools';
+	import { sampleCompositeColorAt } from '../../render/eyedropper';
+	import ColorProbeHud from './ColorProbeHud.svelte';
 	import ShapePreview from './ShapePreview.svelte';
 	import LinePreview from './LinePreview.svelte';
 	import { handleKeyDown, handleKeyUp, isTextTarget, type KeyApi } from './keyboard';
@@ -98,6 +108,7 @@
 
 let host: HTMLDivElement;
 let canvasEl: HTMLCanvasElement;
+let pasteCatcherEl: HTMLTextAreaElement;
 let ready = false;
 
 // UI interaction state
@@ -151,38 +162,63 @@ let zoomRightHeld = $state(false);
 
 	const transformPoints = $derived.by(() => {
 		transformRevision;
+		const screen = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
+		const pts = frameHandlePoints();
 		const t = transformUi;
+		const out = pts.map((p) => ({ handle: p.handle, sx: screen.panX + p.x * screen.zoom, sy: screen.panY + p.y * screen.zoom }));
+		if (t) {
+			const state = {
+				pivot: t.pivot,
+				offset: t.offset,
+				scaleX: t.scaleX,
+				scaleY: t.scaleY,
+				rotation: t.rotation,
+				skewX: t.skewX ?? 0,
+				skewY: t.skewY ?? 0
+			};
+			const pivot = affinePoint(state, { x: t.pivot.x, y: t.pivot.y });
+			out.push({ handle: 'pivot' as TransformHandle, sx: screen.panX + pivot.x * screen.zoom, sy: screen.panY + pivot.y * screen.zoom });
+		}
+		return out;
+	});
+
+	/** Doc-space positions of the eight scale handles: the engine's frozen
+	 * gesture frame while a drag is armed, else a refit from the committed
+	 * selection geometry — the same points the ants outline shows, so
+	 * draggers sit on the visible shape (rotated outlines included) instead
+	 * of a detached bounding box. For plain rects this is exactly the
+	 * classic bounds frame. Shared by drawing, hit-testing and cursors. */
+	function frameHandlePoints(): Array<{ handle: TransformHandle; x: number; y: number }> {
+		const t = moveEngine?.transformState ?? transformUi;
 		if (!t) return [];
-		const b = t.bounds;
 		const state = {
 			pivot: t.pivot,
 			offset: t.offset,
 			scaleX: t.scaleX,
 			scaleY: t.scaleY,
 			rotation: t.rotation,
-			skewX: t.skewX ?? 0,
-			skewY: t.skewY ?? 0
+			skewX: (t as { skewX?: number }).skewX ?? 0,
+			skewY: (t as { skewY?: number }).skewY ?? 0
 		};
-		const point = (x: number, y: number) => affinePoint(state, { x, y });
-		return [
-			{ handle: 'nw' as TransformHandle, x: b.x, y: b.y },
-			{ handle: 'n' as TransformHandle, x: b.x + b.width / 2, y: b.y },
-			{ handle: 'ne' as TransformHandle, x: b.x + b.width, y: b.y },
-			{ handle: 'e' as TransformHandle, x: b.x + b.width, y: b.y + b.height / 2 },
-			{ handle: 'se' as TransformHandle, x: b.x + b.width, y: b.y + b.height },
-			{ handle: 's' as TransformHandle, x: b.x + b.width / 2, y: b.y + b.height },
-			{ handle: 'sw' as TransformHandle, x: b.x, y: b.y + b.height },
-			{ handle: 'w' as TransformHandle, x: b.x, y: b.y + b.height / 2 },
-			{ handle: 'pivot' as TransformHandle, x: t.pivot.x, y: t.pivot.y }
-		].map((p) => {
-			const screen = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
-			const transformed = point(p.x, p.y);
-			return { ...p, sx: screen.panX + transformed.x * screen.zoom, sy: screen.panY + transformed.y * screen.zoom };
-		});
-	});
+		let frame: FramePoints | null = moveEngine?.dragFrame ?? null;
+		if (!frame) {
+			const doc = documentRegistry.active;
+			if (doc && ready) {
+				const loops = getEditorRenderer().committedShapeLoops(doc);
+				if (loops?.length) frame = framePointsFromLoops(loops);
+			}
+		}
+		const f = frame ?? framePointsFromRect(t.bounds);
+		const at = (p: Point): Point => affinePoint(state, p);
+		const put = (handle: TransformHandle, p: Point) => ({ handle, ...at(p) });
+		return [put('nw', f.nw), put('n', f.n), put('ne', f.ne), put('e', f.e), put('se', f.se), put('s', f.s), put('sw', f.sw), put('w', f.w)];
+	}
 
 	function syncTransformUi(): void {
 		transformRevision++;
+		// Published before the early returns below: the options strip needs to
+		// know about a floating transform even when no selection bounds exist.
+		moveTransformFloating.set(!!moveEngine?.floating);
 		const doc = documentRegistry.active;
 		const selectionBounds =
 			(ready ? getEditorRenderer().getActiveSelectionBounds() : null) ??
@@ -257,8 +293,8 @@ let zoomRightHeld = $state(false);
 		const doc = documentRegistry.active;
 		if (get(activeToolId) !== 'move-pixels' && get(activeToolId) !== 'move-selection') return [];
 		if (!doc || (!transformUi && !handleBounds)) return [];
-		// Rotate sub-mode: the affine grips are replaced by the 3D rings
-		// (drawn as SVG below). Distort sub-mode: only the four corners.
+		// Rotate sub-mode: the affine grips are replaced by the flat rotation
+		// handles (drawn as SVG below). Distort sub-mode: only the four corners.
 		if (get(activeToolId) === 'move-pixels') {
 			const mode = get(moveToolMode);
 			if (mode === 'rotate') return [];
@@ -280,12 +316,31 @@ let zoomRightHeld = $state(false);
 		return points.map(([handle, x, y]) => ({ handle, sx: doc.view.panX + x * zoom, sy: doc.view.panY + y * zoom }));
 	}
 
-	// --- Rotate sub-mode: Blender-style 3D axis rings (SVG overlay) --------
+	// --- Rotate sub-mode: flat rotation handles (SVG overlay) --------
+	/** The handles the overlay draws AND the handle hit test uses.
+	 *
+	 * The engine only exists (and only reports rings) once the pixels have been
+	 * lifted, so before the first click we build them from the selection bounds
+	 * instead — otherwise the gizmo stayed invisible until you had already
+	 * clicked, and the rotate mode looked like it had no handles at all. Same
+	 * fallback the Distort sub-mode's corners use. */
+	function activeRotateRings(): Array<{ axis: Axis3; points: Point[] }> {
+		transformRevision;
+		const engineRings = moveEngine?.rotateRings ?? [];
+		if (engineRings.length) return engineRings;
+		const b = handleBounds;
+		if (!b) return [];
+		return rotateRingsFor(
+			{ x: b.x + b.width / 2, y: b.y + b.height / 2 },
+			gizmoRadiusFor(b)
+		);
+	}
+
 	const rotateRingPaths = $derived.by(() => {
 		transformRevision;
 		if (get(activeToolId) !== 'move-pixels' || get(moveToolMode) !== 'rotate') return [];
 		const view = documentRegistry.active?.view ?? { zoom: 1, panX: 0, panY: 0 };
-		return (moveEngine?.rotateRings ?? []).map((ring) => {
+		return activeRotateRings().map((ring) => {
 			const d = ring.points
 				.map((p, i) => {
 					const s = imageToScreen(view, p.x, p.y);
@@ -298,7 +353,7 @@ let zoomRightHeld = $state(false);
 
 	function ringHandleAt(img: Point): TransformHandle | null {
 		if (get(activeToolId) !== 'move-pixels' || get(moveToolMode) !== 'rotate') return null;
-		const rings = moveEngine?.rotateRings ?? [];
+		const rings = activeRotateRings();
 		const doc = documentRegistry.active;
 		if (!rings.length || !doc) return null;
 		const threshold = 10 / Math.max(doc.view.zoom, 0.01);
@@ -308,9 +363,25 @@ let zoomRightHeld = $state(false);
 	}
 
 	// --- Distort sub-mode: four independently draggable corners ------------
-	function distortCornerPoints(): Array<{ handle: TransformHandle; sx: number; sy: number }> {
+	/** The quad the draggers sit on: the live warp while a session floats,
+	 * otherwise the SELECTION bounds. Without the fallback the four corners
+	 * only appeared after the first click lifted the pixels. */
+	function distortQuadPoints(): [Point, Point, Point, Point] | null {
 		transformRevision;
 		const corners = moveEngine?.warpCorners;
+		if (corners) return corners;
+		const b = handleBounds;
+		if (!b) return null;
+		return [
+			{ x: b.x, y: b.y },
+			{ x: b.x + b.width, y: b.y },
+			{ x: b.x + b.width, y: b.y + b.height },
+			{ x: b.x, y: b.y + b.height }
+		];
+	}
+
+	function distortCornerPoints(): Array<{ handle: TransformHandle; sx: number; sy: number }> {
+		const corners = distortQuadPoints();
 		const doc = documentRegistry.active;
 		if (!corners || !doc) return [];
 		const view = doc.view;
@@ -331,6 +402,9 @@ let zoomRightHeld = $state(false);
 	let moveSelArmed = $state(false);
 	let movingSelection = $state(false);
 	let moveSelPointerId = -1;
+
+	// eyedropper state: armed flag + the live hover readout
+	let eyedropperArmed = $state(false);
 
 	// selection-tool state (rect / ellipse / lasso drags)
 	let selectionArmed = $state(false);
@@ -785,6 +859,7 @@ let zoomRightHeld = $state(false);
 		}
 		if (painting && !isPencil()) return 'cursor: none;';
 		if ((cloning || recoloring) && pointerInside) return 'cursor: none;';
+		if (eyedropperArmed) return pointerInside ? EYEDROPPER_CURSOR : '';
 		if (get(activeToolId) === 'text') return pointerInside ? 'cursor: text;' : '';
 		if (moving) return 'cursor: move;';
 		if (moveArmed) {
@@ -832,6 +907,10 @@ let zoomRightHeld = $state(false);
 		return `cursor: url("${cursor}") 12 12, grab;`;
 	}
 
+	/** Pipette pointer for the Color Picker; hotspot is its sampling tip, so
+	 * the tip lands exactly on the pixel the readout reports. */
+	const EYEDROPPER_CURSOR = `cursor: url("${eyedropperCursor}") 2 22, crosshair;`;
+
 	function updateStatus(doc = documentRegistry.active, cursor?: { x: number; y: number }) {
 		if (!doc) {
 			statusBar.update((s) => ({ ...s, zoomPct: null, imageW: null, imageH: null, cursorX: null, cursorY: null }));
@@ -860,6 +939,10 @@ let zoomRightHeld = $state(false);
 		selectionArmed = SELECT_TOOLS.has(get(activeToolId)) && hasDoc;
 		moveArmed = get(activeToolId) === 'move-pixels' && hasDoc;
 		moveSelArmed = get(activeToolId) === 'move-selection' && hasDoc;
+		eyedropperArmed = get(activeToolId) === EYEDROPPER && hasDoc;
+		// Dropping the readout on a tool switch keeps a stale swatch from
+		// lingering over the canvas.
+		if (!eyedropperArmed) clearProbe();
 		syncTransformUi();
 		if (ready) getEditorRenderer().setTransformHandlesVisible(moveArmed);
 		refreshRing();
@@ -883,8 +966,9 @@ let zoomRightHeld = $state(false);
 			recoloring = false;
 			recolorPointerId = -1;
 		}
-		// Switching away from the move tool drops (applies) a floating selection.
-		if (moveEngine?.floating && !moveArmed) moveEngine.drop();
+		// Switching away from the move tool resets a floating selection
+		// (only Apply keeps it) — committing silently here used to surprise.
+		if (moveEngine?.floating && !moveArmed) moveEngine.cancel();
 		// Switching away from the move-selection tool cancels an in-progress drag.
 		if (moveSelEngine?.dragging && !moveSelArmed) moveSelEngine.cancel();
 		// Debug: only log when the ACTIVE TOOL actually changed (not on every
@@ -920,6 +1004,69 @@ let zoomRightHeld = $state(false);
 		pointerX = sp.x;
 		pointerY = sp.y;
 		refreshRing();
+	}
+
+	// --- eyedropper live readout -----------------------------------------
+	// `sampleCompositeColorAt` is a GPU readback, so it is only run when the
+	// hovered IMAGE pixel actually changed, and at most every PROBE_MS. Moving
+	// within one pixel (or at high pointer rates) reuses the last sample.
+	const PROBE_MS = 40;
+	let probeColor = $state<RGBA | null>(null);
+	let probeAt = { x: Number.NaN, y: Number.NaN };
+	let probeTime = 0;
+	let probeTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/** Samples the composited colour under the pointer for the HUD. */
+	function updateProbe(): void {
+		const doc = documentRegistry.active;
+		if (!eyedropperArmed || !doc || !ready || !pointerInside || panning) return;
+		const img = imageFromScreen({ x: pointerX, y: pointerY });
+		const px = Math.floor(img.x);
+		const py = Math.floor(img.y);
+		if (px === probeAt.x && py === probeAt.y) return;
+		const wait = PROBE_MS - (performance.now() - probeTime);
+		if (wait > 0) {
+			// Inside the readback budget. Retry when it expires, otherwise a
+			// pointer that comes to rest on a new pixel would keep showing the
+			// previous pixel's colour (no further move event would arrive).
+			if (!probeTimer) {
+				probeTimer = setTimeout(() => {
+					probeTimer = null;
+					updateProbe();
+				}, wait);
+			}
+			return;
+		}
+		probeAt = { x: px, y: py };
+		probeTime = performance.now();
+		probeColor = sampleCompositeColorAt(getEditorRenderer(), doc, img.x, img.y);
+	}
+
+	function clearProbe(): void {
+		if (probeTimer) {
+			clearTimeout(probeTimer);
+			probeTimer = null;
+		}
+		probeColor = null;
+		probeAt = { x: Number.NaN, y: Number.NaN };
+	}
+
+	/** Commits the floating Move-Selected-Pixels transform into the layer.
+	 * Shared by Enter, the options-strip Apply button and click-away. */
+	function dropMoveTransform(): void {
+		moveEngine?.drop();
+		moving = false;
+		movePointerId = -1;
+		syncTransformUi();
+	}
+
+	/** Throws the floating transform away — the pixels go back to the layer
+	 * they were lifted from. Shared by Escape and the options strip. */
+	function cancelMoveTransform(): void {
+		moveEngine?.cancel();
+		moving = false;
+		movePointerId = -1;
+		syncTransformUi();
 	}
 
 	const canvasInput: KeyApi & PointerApi & PointerDownApi = {
@@ -1131,12 +1278,8 @@ let zoomRightHeld = $state(false);
 		finishPolygon,
 		finishLineDraft,
 		finishGradientDraft,
-		dropMove: () => moveEngine?.drop(),
-		cancelMove: () => {
-			moveEngine?.cancel();
-			moving = false;
-			movePointerId = -1;
-		},
+		dropMove: dropMoveTransform,
+		cancelMove: cancelMoveTransform,
 		cancelMoveSelection: () => {
 			moveSelEngine?.cancel();
 			movingSelection = false;
@@ -1169,6 +1312,19 @@ let zoomRightHeld = $state(false);
 			}
 		}
 	};
+
+	if (import.meta.env.DEV) {
+		// Dev-only hook for headless probes (same convention as __REGISTRY__):
+		// live access to the move engine + overlay hit-testing.
+		(
+			window as unknown as {
+				__MOVE__?: {
+					engine: () => MoveEngine | null;
+					transformHandleAt: (img: Point) => TransformHandle | null;
+				};
+			}
+		).__MOVE__ = { engine: () => moveEngine, transformHandleAt };
+	}
 
 	function onKeyDown(e: KeyboardEvent) {
 		handleKeyDown(e, canvasInput);
@@ -1334,7 +1490,7 @@ let zoomRightHeld = $state(false);
 
 	function transformHandleAt(img: Point): TransformHandle | null {
 		const activeTool = get(activeToolId);
-		// The projective sub-modes have their own hit-testing: rings (rotate)
+		// The projective sub-modes have their own hit-testing: handles (rotate)
 		// and the four corner draggers (distort). Everything inside the
 		// selection is a plain translation, handled by pointerDown.
 		if (activeTool === 'move-pixels') {
@@ -1342,7 +1498,10 @@ let zoomRightHeld = $state(false);
 			if (mode === 'rotate') return ringHandleAt(img);
 			if (mode === 'distort') {
 				const doc = documentRegistry.active;
-				const corners = moveEngine?.warpCorners;
+				// Same fallback as the overlay: before the pixels are lifted the
+				// draggers sit on the SELECTION bounds, so they can be grabbed on
+				// the very first click instead of only after one lift.
+				const corners = distortQuadPoints();
 				if (!doc || !corners) return null;
 				const threshold = 10 / Math.max(doc.view.zoom, 0.01);
 				const order: Array<[TransformHandle, number]> = [
@@ -1375,12 +1534,24 @@ let zoomRightHeld = $state(false);
 		const transformed = (x: number, y: number): Point => affinePoint(state, { x, y });
 		const pivot = { x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y };
 		if (Math.hypot(img.x - pivot.x, img.y - pivot.y) <= threshold) return 'pivot';
-		const points: Array<[TransformHandle, Point]> = [
-			['nw', transformed(b.x, b.y)], ['n', transformed(b.x + b.width / 2, b.y)], ['ne', transformed(b.x + b.width, b.y)],
-			['e', transformed(b.x + b.width, b.y + b.height / 2)], ['se', transformed(b.x + b.width, b.y + b.height)],
-			['s', transformed(b.x + b.width / 2, b.y + b.height)], ['sw', transformed(b.x, b.y + b.height)],
-			['w', transformed(b.x, b.y + b.height / 2)]
-		];
+		// Same frame the overlay draws (move-pixels engine), so a grab always
+		// lands on a visible dragger. move-selection keeps its bounds frame.
+		const framePts =
+			activeTool === 'move-pixels'
+				? frameHandlePoints().map((p) => [p.handle, { x: p.x, y: p.y }] as [TransformHandle, Point])
+				: (
+						[
+							['nw', transformed(b.x, b.y)],
+							['n', transformed(b.x + b.width / 2, b.y)],
+							['ne', transformed(b.x + b.width, b.y)],
+							['e', transformed(b.x + b.width, b.y + b.height / 2)],
+							['se', transformed(b.x + b.width, b.y + b.height)],
+							['s', transformed(b.x + b.width / 2, b.y + b.height)],
+							['sw', transformed(b.x, b.y + b.height)],
+							['w', transformed(b.x, b.y + b.height / 2)]
+						] as Array<[TransformHandle, Point]>
+					);
+		const points = framePts;
 		for (const [handle, p] of points) if (Math.hypot(img.x - p.x, img.y - p.y) <= threshold) return handle;
 		const outside = Math.hypot(img.x - pivot.x, img.y - pivot.y) > Math.min(b.width, b.height) / 2;
 		const nearHandle = points.some(([, p]) => Math.hypot(img.x - p.x, img.y - p.y) <= 24 / Math.max(doc.view.zoom, 0.01));
@@ -1428,7 +1599,17 @@ let zoomRightHeld = $state(false);
 		};
 		const point = (x: number, y: number): Point => affinePoint(state, { x, y });
 		const pivot = { x: t.pivot.x + t.offset.x, y: t.pivot.y + t.offset.y };
-		const corners = [point(b.x, b.y), point(b.x + b.width, b.y), point(b.x + b.width, b.y + b.height), point(b.x, b.y + b.height)];
+		// Frame quad for move-pixels (same points the draggers draw), plain
+		// bounds corners otherwise — debug only.
+		const framePts =
+			get(activeToolId) === 'move-pixels'
+				? (() => {
+						const byHandle = new Map(frameHandlePoints().map((p) => [p.handle, { x: p.x, y: p.y }] as [TransformHandle, Point]));
+						const q = (h: TransformHandle): Point => byHandle.get(h) ?? point(b.x, b.y);
+						return [q('nw'), q('ne'), q('se'), q('sw')];
+					})()
+				: [point(b.x, b.y), point(b.x + b.width, b.y), point(b.x + b.width, b.y + b.height), point(b.x, b.y + b.height)];
+		const corners = framePts;
 		const outside = !pointInPolygon(img, corners);
 		const debugEntry = {
 			mouse: img,
@@ -1557,6 +1738,9 @@ function onPointerDown(e: PointerEvent) {
 			}
 		}
 		movePointer(sp);
+		// After movePointer, so the HUD samples the pixel under the fresh
+		// pointer position.
+		if (eyedropperArmed) updateProbe();
 		if (!doc || !ready) return;
 		const image = screenToImage(doc.view, sp.x, sp.y);
 		if (image.x >= 0 && image.y >= 0 && image.x < doc.width && image.y < doc.height) {
@@ -1583,11 +1767,13 @@ function onPointerDown(e: PointerEvent) {
 	}
 
 	/**
-	 * Native paste (Ctrl+V with an empty internal clipboard, or context-menu
-	 * paste): pastes an OS-clipboard IMAGE as a new layer of the active document
-	 * — or, with no document open, as a new tab. Text pastes are ignored.
+	 * Native paste (Ctrl+V, or the browser's Edit > Paste): pastes an OS-
+	 * clipboard IMAGE as a new layer of the active document — or, with no
+	 * document open, as a new tab. Text pastes are ignored (the catcher is
+	 * wiped so nothing accumulates in it).
 	 */
 	function onPaste(e: ClipboardEvent) {
+		clearPasteCatcher();
 		if (isTextTarget(e.target) || get(dialog).kind) return;
 		const items = e.clipboardData?.items;
 		if (!items) return;
@@ -1627,6 +1813,26 @@ function onPointerDown(e: PointerEvent) {
 			ready = true;
 			measure();
 
+			// Own the focus so image pastes reach us — including via the
+			// browser's own Edit > Paste menu item, which targets whatever has
+			// focus. Whenever focus falls back to <body> we take it again; a
+			// real input (text tool, dialogs) keeps it.
+			registerPasteCatcher(pasteCatcherEl);
+			focusPasteCatcher();
+			const idle = () => setTimeout(focusPasteCatcher, 0);
+			const onWindowFocus = () => focusPasteCatcher();
+			document.addEventListener('focusout', idle);
+			// Clicks too: closing a dialog removes the focused node, which
+			// drops focus to <body> without firing 'focusout'.
+			document.addEventListener('click', idle, true);
+			window.addEventListener('focus', onWindowFocus);
+			disposers.push(() => {
+				document.removeEventListener('focusout', idle);
+				document.removeEventListener('click', idle, true);
+				window.removeEventListener('focus', onWindowFocus);
+				registerPasteCatcher(null);
+			});
+
 			const ro = new ResizeObserver(() => measure());
 			ro.observe(host);
 			disposers.push(() => ro.disconnect());
@@ -1634,6 +1840,9 @@ function onPointerDown(e: PointerEvent) {
 			disposers.push(
 				documentRegistry.events.on(RegistryEvents.active, () => {
 					updateStatus(documentRegistry.active);
+					// A float belongs to its document — switching docs resets it
+					// even when staying on the move tool.
+					if (moveEngine?.floating) moveEngine.cancel();
 					updateArmed();
 				})
 			);
@@ -1683,10 +1892,33 @@ function onPointerDown(e: PointerEvent) {
 					if (gradientDraft) queueGradientPreview();
 				})
 			);
+			// Options strip → Apply / Cancel the floating transform.
+			const unMoveAction = moveTransformAction.subscribe((a) => {
+				if (!a) return;
+				if (a === 'apply') dropMoveTransform();
+				else cancelMoveTransform();
+				moveTransformAction.set(null);
+			});
 			// Move sub-mode (move / rotate / distort) → move engine (also
 			// applied when the engine is created later).
-			const unMoveMode = moveToolMode.subscribe((v) => moveEngine?.setMode(v));
-			disposers.push(unTool, unSize, unPoly, unText, unLine, unGradient, ...unGradientLive, unMoveMode);
+			const unMoveMode = moveToolMode.subscribe((v) => {
+			moveEngine?.setMode(v);
+			// The handles (rotate) and the corner draggers (distort) are derived
+			// from the sub-mode, so switching it must redraw the overlay even
+			// when nothing is floating yet (syncTransformUi bumps the revision).
+			syncTransformUi();
+		});
+			disposers.push(
+				unTool,
+				unSize,
+				unPoly,
+				unText,
+				unLine,
+				unGradient,
+				...unGradientLive,
+				unMoveMode,
+				unMoveAction
+			);
 
 			const onEnter = () => {
 				pointerInside = true;
@@ -1695,6 +1927,14 @@ function onPointerDown(e: PointerEvent) {
 			const onLeave = () => {
 				pointerInside = false;
 				zoomRightHeld = false;
+				clearProbe();
+				// Drop the stale pointer position, otherwise the "mouse" read-out
+				// keeps claiming the pointer sits on the last pixel it touched.
+				// Skipped mid-drag: pointer capture keeps feeding moves after the
+				// pointer has left the host, and blanking it there would flicker.
+				if (!selecting && !moving && !panning) {
+					statusBar.update((s) => ({ ...s, cursorX: null, cursorY: null }));
+				}
 			};
 
 			host.addEventListener('wheel', onWheel, { passive: false });
@@ -1710,6 +1950,7 @@ function onPointerDown(e: PointerEvent) {
 			window.addEventListener('keyup', onKeyUp);
 			window.addEventListener('paste', onPaste);
 			disposers.push(() => {
+				clearProbe();
 				host.removeEventListener('wheel', onWheel);
 				host.removeEventListener('pointerdown', onPointerDown);
 				host.removeEventListener('pointermove', onPointerMove);
@@ -1750,6 +1991,21 @@ function onPointerDown(e: PointerEvent) {
 	style="touch-action: none; {cursorCss}"
 >
 	<canvas bind:this={canvasEl} class="absolute inset-0 block h-full w-full" style="touch-action:none;"></canvas>
+	<!-- Chrome emits a 'paste' event for IMAGE clipboard content ONLY when an
+	editable element holds focus. This offscreen textarea is that element; see
+	./pasteCatcher.ts -->
+	<textarea
+		bind:this={pasteCatcherEl}
+		tabindex="-1"
+		aria-hidden="true"
+		rows="1"
+		spellcheck="false"
+		autocomplete="off"
+		autocapitalize="off"
+		inputmode="none"
+		oninput={clearPasteCatcher}
+		style="position:absolute;left:0;top:0;width:1px;height:1px;margin:0;padding:0;border:0;outline:none;resize:none;overflow:hidden;opacity:0;z-index:-1;color:transparent;background:transparent;"
+	></textarea>
 	{#if shapeDraft && documentRegistry.active}
 		{@const act = documentRegistry.active}
 		<ShapePreview draft={shapeDraft} view={act.view} />
@@ -1830,6 +2086,10 @@ function onPointerDown(e: PointerEvent) {
 			style="left:{pointerX - ringR}px; top:{pointerY - ringR}px; width:{ringR * 2}px; height:{ringR * 2}px;"
 		></div>
 	{/if}
+	<!-- Color Picker: live RGB / alpha readout of the pixel under the pointer -->
+	{#if eyedropperArmed && pointerInside}
+		<ColorProbeHud x={pointerX} y={pointerY} hostW={host.clientWidth} hostH={host.clientHeight} color={probeColor} />
+	{/if}
 	{#each visibleTransformPoints() as point}
 		<div
 			class="pointer-events-none absolute z-20 box-border border border-white bg-blue-500 shadow-[0_0_0_1px_#1e3a8a]"
@@ -1837,7 +2097,8 @@ function onPointerDown(e: PointerEvent) {
 			style="left:{point.sx - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; top:{point.sy - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; width:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px; height:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px;"
 		></div>
 	{/each}
-	<!-- Rotate sub-mode: Blender-style 3D rotation rings (one per axis) -->
+	<!-- Rotate sub-mode: flat rotation handles (green tip line, blue turn
+	     line, red spin circle) -->
 	{#if rotateRingPaths.length}
 		<svg class="pointer-events-none absolute inset-0 z-20 h-full w-full">
 			{#each rotateRingPaths as ring (ring.axis)}
@@ -1845,8 +2106,10 @@ function onPointerDown(e: PointerEvent) {
 					d={ring.d}
 					fill="none"
 					stroke={AXIS_COLORS[ring.axis]}
-					stroke-width="2"
-					stroke-opacity="0.95"
+					stroke-width="5"
+					stroke-opacity="1"
+					stroke-linecap="round"
+					stroke-linejoin="round"
 				/>
 			{/each}
 		</svg>

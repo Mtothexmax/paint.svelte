@@ -8,23 +8,24 @@
 // warp in `distortLogic.ts`. MoveEngine only owns the session (lift / float /
 // drop / commit) and delegates every gesture to those modules.
 
-import type { Point, Rect } from '../../core/geometry';
+import type { FramePoints, Point, Rect } from '../../core/geometry';
 import type { MoveToolMode } from '../../core/toolMode';
 
 export type { MoveToolMode };
 
 /** Draggable control points of the transform overlay. `ringX/Y/Z` are the
- * Blender-style 3D rotation rings of the rotate sub-mode. */
+ * flat rotation handles of the rotate sub-mode (tip line / turn line /
+ * spin circle). */
 export type TransformHandle = 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'pivot' | 'rotate' | 'ringX' | 'ringY' | 'ringZ';
 
-/** The three 3D rotation rings. */
+/** The three flat rotation handles. */
 export const RING_HANDLES: readonly TransformHandle[] = ['ringX', 'ringY', 'ringZ'];
 
 export function isRingHandle(h: TransformHandle): boolean {
 	return RING_HANDLES.includes(h);
 }
 
-/** Which 3D axis a ring handle rotates about. */
+/** Which rotation axis a ring handle drives. */
 export function ringAxis(h: TransformHandle): 'x' | 'y' | 'z' | null {
 	if (h === 'ringX') return 'x';
 	if (h === 'ringY') return 'y';
@@ -82,11 +83,17 @@ export function isTranslationHandle(h: TransformHandle): boolean {
 
 /** A gesture: which handle is being dragged, where it started and the
  * transform at that moment. Every mode module maps gesture + pointer to the
- * next TransformState. */
+ * next TransformState.
+ *
+ * `frame` freezes the dragger frame the gesture grabbed (selection-space
+ * extremes of the committed outline — the same points the overlay draws, so
+ * pointer, handles and math can never disagree mid-drag). Null means the
+ * classic axis-aligned bounds frame. */
 export interface TransformGesture {
 	handle: TransformHandle;
 	origin: Point;
 	start: TransformState;
+	frame?: FramePoints | null;
 }
 
 export function beginGesture(handle: TransformHandle, p: Point, state: TransformState): TransformGesture {
