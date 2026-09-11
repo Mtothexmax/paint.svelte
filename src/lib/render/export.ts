@@ -5,6 +5,7 @@ import { Container, RenderTexture, Sprite } from 'pixi.js';
 import { SPRITE_BLENDS } from '../render/SurfaceStore';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { EditorRenderer } from './EditorRenderer';
+import { extractStraightCanvas } from './readback';
 
 function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/png'): Promise<Blob> {
 	return new Promise((resolve, reject) => {
@@ -44,14 +45,11 @@ export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): P
 	const rt = RenderTexture.create({ width: doc.width, height: doc.height, resolution: 1 });
 	renderer.app.renderer.render({ container, target: rt, clear: true });
 
-	const probe = new Sprite(rt);
-	// resolution: 1 — without it the extraction inherits the renderer's
-	// resolution (devicePixelRatio) and the exported PNG comes out larger
-	// than the document on scaled displays.
-	const canvas = renderer.app.renderer.extract.canvas({ target: probe, resolution: 1 }) as HTMLCanvasElement;
+	// Straight-alpha encode (see extractStraightCanvas): extract.canvas would
+	// bake premultiplied RGB into the PNG, darkening translucent edges.
+	const canvas = extractStraightCanvas(renderer, rt);
 
 	const blob = await canvasToBlob(canvas);
-	probe.destroy();
 	rt.destroy(true);
 	container.destroy({ children: true });
 
@@ -73,10 +71,9 @@ export async function surfaceToPngBlob(
 	holder.addChild(sprite);
 	renderer.app.renderer.render({ container: holder, target: rt, clear: true });
 
-	const probe = new Sprite(rt);
-	const canvas = renderer.app.renderer.extract.canvas({ target: probe, resolution: 1 }) as HTMLCanvasElement;
+	// Straight-alpha encode (see extractStraightCanvas).
+	const canvas = extractStraightCanvas(renderer, rt);
 	const blob = await canvasToBlob(canvas);
-	probe.destroy();
 	sprite.destroy();
 	holder.destroy();
 	rt.destroy(true);
@@ -110,10 +107,9 @@ export function surfaceToPngThumbnailUrl(
 
 	let url = '';
 	try {
-		const probe = new Sprite(rt);
-		const canvas = renderer.app.renderer.extract.canvas({ target: probe, resolution: 1 }) as HTMLCanvasElement;
+		// Straight-alpha encode (see extractStraightCanvas).
+		const canvas = extractStraightCanvas(renderer, rt);
 		url = canvas.toDataURL('image/png');
-		probe.destroy();
 	} catch {
 		url = '';
 	}

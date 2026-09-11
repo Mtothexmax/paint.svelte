@@ -23,10 +23,11 @@
 
 import { documentRegistry, RegistryEvents } from '../core/document/registry';
 import { ImageDocument } from '../core/document/ImageDocument';
-import { createRasterLayer, createTextLayer, type SurfaceId, type TextContent } from '../core/layers/Layer';
+import { createRasterLayer, createTextLayer, type LayerEffect, type SurfaceId, type TextContent } from '../core/layers/Layer';
 import { hasEditorRenderer, getEditorRenderer, rendererReady } from '../render/EditorRenderer';
 import { surfaceToPngBlob } from '../render/export';
 import { fitView } from '../render/Viewport';
+import { effectById } from '../effects';
 import type { EditorRenderer } from '../render/EditorRenderer';
 
 const DB_NAME = 'paint.svelte';
@@ -43,6 +44,8 @@ interface SavedLayer {
 	blendMode: string;
 	png: Blob;
 	text?: TextContent;
+	/** Live (non-baked) layer effects, in chain order. Plain JSON data. */
+	effects?: LayerEffect[];
 }
 
 interface SavedDoc {
@@ -142,6 +145,9 @@ async function serializeDoc(renderer: EditorRenderer, doc: ImageDocument): Promi
 			png
 		};
 		if (layer.kind === 'text' && layer.text) saved.text = { ...layer.text, color: { ...layer.text.color } };
+		if (layer.effects?.length) {
+			saved.effects = layer.effects.map((e) => ({ id: e.id, settings: { ...e.settings }, enabled: e.enabled }));
+		}
 		layers.push(saved);
 	}
 	return {
@@ -365,6 +371,31 @@ export async function restoreSession(): Promise<void> {
 	}
 }
 
+/**
+ * Validates saved layer effects (untrusted IndexedDB data): unknown effect
+ * ids (e.g. removed in a newer build) are skipped, non-numeric settings are
+ * dropped, and missing keys are filled from the effect defaults (filter
+ * shaders read settings keys directly — a missing key would be NaN).
+ */
+function sanitizeEffects(raw: unknown): LayerEffect[] | undefined {
+	if (!Array.isArray(raw)) return undefined;
+	const out: LayerEffect[] = [];
+	for (const e of raw) {
+		if (!e || typeof e !== 'object') continue;
+		const { id, settings, enabled } = e as { id: unknown; settings: unknown; enabled: unknown };
+		if (typeof id !== 'string') continue;
+		const def = effectById(id);
+		if (!def) continue;
+		if (!settings || typeof settings !== 'object' || Array.isArray(settings)) continue;
+		const clean: Record<string, number> = { ...def.defaults };
+		for (const [k, v] of Object.entries(settings)) {
+			if (typeof v === 'number' && Number.isFinite(v)) clean[k] = v;
+		}
+		out.push({ id, settings: clean, enabled: enabled !== false });
+	}
+	return out.length ? out : undefined;
+}
+
 async function buildDoc(renderer: EditorRenderer, record: SavedDoc): Promise<ImageDocument | null> {
 	if (record.width <= 0 || record.height <= 0 || record.layers.length === 0) return null;
 	const v = { width: record.width, height: record.height };
@@ -391,11 +422,13 @@ async function buildDoc(renderer: EditorRenderer, record: SavedDoc): Promise<Ima
 			} else {
 				restoredLayers.push(createRasterLayer(surfaceId, layer.name));
 			}
-			// Restored layers keep their visibility/opacity/blend.
+			// Restored layers keep their visibility/opacity/blend/effects.
 			const last = restoredLayers[restoredLayers.length - 1];
 			last.visible = layer.visible;
 			last.opacity = layer.opacity;
 			last.blendMode = layer.blendMode;
+			const effects = sanitizeEffects(layer.effects);
+			if (effects) last.effects = effects;
 		}
 
 		const doc = new ImageDocument({

@@ -22,3 +22,4 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 dev_server.log
+dev_server.pid

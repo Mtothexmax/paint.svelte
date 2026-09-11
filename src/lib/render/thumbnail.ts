@@ -5,6 +5,7 @@
 import { Container, RenderTexture, Sprite } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { EditorRenderer } from './EditorRenderer';
+import { extractStraightCanvas } from './readback';
 
 /**
  * Renders the (bottom-most visible) layer scaled to fit within `size` and
@@ -30,10 +31,9 @@ export function renderThumbnail(
 	holder.addChild(sprite);
 	renderer.app.renderer.render({ container: holder, target: rt, clear: true });
 
-	const probe = new Sprite(rt);
-	const canvas = renderer.app.renderer.extract.canvas(probe) as HTMLCanvasElement;
+	// Straight-alpha encode (see extractStraightCanvas).
+	const canvas = extractStraightCanvas(renderer, rt);
 
-	probe.destroy();
 	rt.destroy(true);
 	holder.destroy({ children: true });
 	return canvas;
@@ -63,10 +63,9 @@ export function renderLayerThumbnail(
 	holder.addChild(sprite);
 	renderer.app.renderer.render({ container: holder, target: rt, clear: true });
 
-	const probe = new Sprite(rt);
-	const canvas = renderer.app.renderer.extract.canvas(probe) as HTMLCanvasElement;
+	// Straight-alpha encode (see extractStraightCanvas).
+	const canvas = extractStraightCanvas(renderer, rt);
 
-	probe.destroy();
 	rt.destroy(true);
 	holder.destroy({ children: true });
 	return canvas;

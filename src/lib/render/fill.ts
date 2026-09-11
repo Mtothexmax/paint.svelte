@@ -12,6 +12,7 @@ import type { SurfaceId } from '../core/layers/Layer';
 import type { FloodMode } from '../state/fill';
 import type { SurfaceStore } from './SurfaceStore';
 import type { EditorRenderer } from './EditorRenderer';
+import { extractStraightCanvas } from './readback';
 
 export interface FillSeed {
 	/** Seed pixel in image px (floored by the caller). */
@@ -33,9 +34,9 @@ export interface FillSeed {
  * and the final compositing (see paintMaskedColor). The mask itself is a
  * fast scanline fill over a single GPU readback.
  *
- * Readback path: `extract.canvas` + 2D `getImageData` (the same path export
- * and thumbnails use) — straight-alpha bytes, validated before use. An
- * invalid readback returns null instead of a silently empty mask.
+ * Readback path: `extractStraightCanvas` + 2D `getImageData` (the same path
+ * export and thumbnails use) — straight-alpha bytes, validated before use.
+ * An invalid readback returns null instead of a silently empty mask.
  *
  * Comparison: tolerance 0..100% maps to a max per-channel byte difference,
  * applied to R/G/B and alpha alike. Contiguous mode grows 4-connected from
@@ -50,14 +51,11 @@ export function buildFillMaskSurface(
 ): SurfaceId | null {
 	const surfaces = renderer.surfaces;
 	if (!surfaces.has(layerId)) return null;
-	const probe = new Sprite(surfaces.getTexture(layerId));
 	let canvas: HTMLCanvasElement | null = null;
 	try {
-		canvas = renderer.app.renderer.extract.canvas({ target: probe, resolution: 1 }) as HTMLCanvasElement;
+		canvas = extractStraightCanvas(renderer, surfaces.getTexture(layerId));
 	} catch (err) {
 		console.info('[fill]', `seed=(${seed.x},${seed.y}) readback threw`, err);
-	} finally {
-		probe.destroy();
 	}
 	if (!canvas || canvas.width !== width || canvas.height !== height) {
 		console.info('[fill]', `seed=(${seed.x},${seed.y}) readback size wrong (got ${canvas?.width}x${canvas?.height})`);

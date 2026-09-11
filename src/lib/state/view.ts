@@ -6,7 +6,7 @@ import { writable } from 'svelte/store';
 
 export type CheckerTheme = 'bright' | 'dark';
 
-export const checkerTheme = writable<CheckerTheme>('bright');
+export const checkerTheme = writable<CheckerTheme>('dark');
 
 export function setCheckerTheme(theme: CheckerTheme): void {
 	checkerTheme.set(theme);
