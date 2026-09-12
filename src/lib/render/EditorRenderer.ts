@@ -11,6 +11,7 @@ import { DocScene } from './DocScene';
 import { SurfaceStore } from './SurfaceStore';
 import { affinePoint } from './affine';
 import { selectionOutlinePoints, traceSelectionOutline } from './selection';
+import { extractStraightBytes } from './readback';
 import { checkerTheme } from '../state/view';
 import { get } from 'svelte/store';
 
@@ -425,11 +426,16 @@ export class EditorRenderer {
 	 * shifted the traced outline on scaled displays. */
 	computeMaskOutline(maskId: SurfaceId, width: number, height: number): Point[][] {
 		if (!this.app) return [];
-		const sprite = new Sprite(this.surfaces.getTexture(maskId));
-		const extracted = this.app.renderer.extract.pixels({ target: sprite, resolution: 1 });
-		sprite.destroy();
-		if (extracted.width !== width || extracted.height !== height) return [];
-		return traceSelectionOutline(extracted.pixels, width, height);
+		// Alpha-traced outline via the shared straight readback (alpha is
+		// unaffected by the un-premultiply; routes around float direct-read).
+		const { pixels, width: ew, height: eh } = extractStraightBytes(
+			this,
+			this.surfaces.getTexture(maskId),
+			width,
+			height
+		);
+		if (ew !== width || eh !== height) return [];
+		return traceSelectionOutline(pixels, width, height);
 	}
 
 	/**

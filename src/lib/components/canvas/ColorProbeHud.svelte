@@ -6,8 +6,9 @@
 	// Purely presentational: EditorCanvas owns the sampling and passes the colour
 	// in. `color === null` means the pointer is over the canvas but outside the
 	// document (nothing to sample).
-	import { rgbaToCss, rgbaToHex } from '../../core/color';
+	import { rgbaToCss, rgbaToHex, rgbaToHexA } from '../../core/color';
 	import type { RGBA } from '../../core/color';
+	import { eyedropperIncludeAlpha } from '../../state/eyedropper';
 
 	let {
 		x,
@@ -30,6 +31,10 @@
 
 	const swatch = $derived(color ? rgbaToCss(color) : 'transparent');
 	const alphaPct = $derived(color ? Math.round((color.a / 255) * 100) : 0);
+	// The hex carries the alpha byte only when the eyedropper's include-alpha
+	// toggle is on; the swatch always composites over its checkerboard, so
+	// translucency stays visible either way.
+	const hex = $derived(color ? ($eyedropperIncludeAlpha ? rgbaToHexA(color) : rgbaToHex(color)) : '');
 </script>
 
 <div class="probe-hud" style="left:{left}px; top:{top}px; width:{W}px;">
@@ -47,7 +52,7 @@
 				<span class="probe-k">A</span><span class="probe-v">{color.a}</span>
 				<span class="probe-pct">{alphaPct}%</span>
 			</div>
-			<div class="probe-hex">{rgbaToHex(color)}</div>
+			<div class="probe-hex">{hex}</div>
 		{:else}
 			<div class="probe-row"><span class="probe-dim">Outside the canvas</span></div>
 			<div class="probe-row"><span class="probe-k">R</span><span class="probe-v">—</span><span class="probe-k">G</span><span class="probe-v">—</span><span class="probe-k">B</span><span class="probe-v">—</span></div>

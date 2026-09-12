@@ -3,6 +3,7 @@
 // render/effects.ts so every effect (and the legacy adjustments) can share it.
 
 import { RenderTexture, Sprite, type Filter, type Texture } from 'pixi.js';
+import { createSurfaceTexture } from '../render/surfaceTexture';
 import { documentRegistry } from '../core/document/registry';
 import type { EditorRenderer } from '../render/EditorRenderer';
 import { blitMaskedInto, eraseSelectionRegion } from '../render/selection';
@@ -32,7 +33,7 @@ export function renderFilterChain(
 	let temp: RenderTexture | null = null;
 	for (let i = 0; i < chain.length; i++) {
 		const last = i === chain.length - 1;
-		const out = last ? target : RenderTexture.create({ width: target.width, height: target.height, resolution: 1 });
+		const out = last ? target : createSurfaceTexture(target.width, target.height);
 		const sprite = new Sprite(current);
 		sprite.filters = [chain[i]];
 		renderer.app.renderer.render({ container: sprite, target: out, clear: true });
@@ -65,7 +66,7 @@ export function applyFilterSwap(
 	const h = doc.height;
 	const before = layer.surfaceId;
 	const src = surfaces.getTexture(before);
-	const target = RenderTexture.create({ width: w, height: h, resolution: 1 });
+	const target = createSurfaceTexture(w, h);
 
 	const chain = asFilterChain(makeFilter());
 	renderFilterChain(renderer, src, target, chain);

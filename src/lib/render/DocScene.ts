@@ -6,6 +6,7 @@ import type { Point } from '../core/geometry';
 import type { Layer, LayerEffect, SurfaceId } from '../core/layers/Layer';
 import { checkerTexture } from './checkerboard';
 import { SPRITE_BLENDS, type SurfaceStore } from './SurfaceStore';
+import { createSurfaceTexture } from './surfaceTexture';
 import { asFilterChain, effectById } from '../effects';
 import type { EffectSettings } from '../effects';
 
@@ -217,8 +218,8 @@ this.root.addChild(this.checker);
 		const baseTex = this.surfaces.getTexture(baseId);
 
 		// Ping-pong between two temp textures so we can chain filters.
-		let ping = RenderTexture.create({ width: w, height: h, resolution: 1 });
-		let pong = RenderTexture.create({ width: w, height: h, resolution: 1 });
+		let ping = createSurfaceTexture(w, h);
+		let pong = createSurfaceTexture(w, h);
 		let src: Texture = baseTex;
 		const filtersToDestroy: Filter[] = [];
 
@@ -364,7 +365,7 @@ this.root.addChild(this.checker);
 
 	/** Lazily allocates the pooled stroke buffer + overlay (doc-sized). */	ensureStroke(): { target: RenderTexture; overlay: Sprite } {
 		if (!this.strokeBuffer || !this.strokeOverlay) {
-			this.strokeBuffer = RenderTexture.create({ width: this.doc.width, height: this.doc.height, resolution: 1 });
+			this.strokeBuffer = createSurfaceTexture(this.doc.width, this.doc.height);
 			this.strokeOverlay = new Sprite(this.strokeBuffer);
 			this.strokeOverlay.visible = false;
 			if (this.strokeBuffer.source) {
@@ -428,8 +429,8 @@ this.root.addChild(this.checker);
 		if (this.previewFiltered && this.previewComposed && this.previewWidth === w && this.previewHeight === h)
 			return;
 		this.destroyPreviewTargets();
-		this.previewFiltered = RenderTexture.create({ width: w, height: h, resolution: 1 });
-		this.previewComposed = RenderTexture.create({ width: w, height: h, resolution: 1 });
+		this.previewFiltered = createSurfaceTexture(w, h);
+		this.previewComposed = createSurfaceTexture(w, h);
 		this.previewWidth = w;
 		this.previewHeight = h;
 	}

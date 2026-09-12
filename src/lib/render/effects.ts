@@ -3,7 +3,8 @@
 // pipeline lives in the effects module so both legacy adjustments and the
 // auto-registered effect system share one implementation.
 
-import { BlurFilter, ColorMatrixFilter, RenderTexture, Sprite, Texture } from 'pixi.js';
+import { BlurFilter, ColorMatrixFilter, Sprite, Texture } from 'pixi.js';
+import { createSurfaceTexture } from './surfaceTexture';
 import { applyFilterSwap } from '../effects/apply';
 import { documentRegistry } from '../core/document/registry';
 import type { SurfaceId } from '../core/layers/Layer';
@@ -44,7 +45,7 @@ export function invertColorsActiveLayer(renderer: EditorRenderer): boolean {
 function invertSurfaceCopy(renderer: EditorRenderer, srcId: SurfaceId, width: number, height: number): SurfaceId {
 	const surfaces = renderer.surfaces;
 	const src = surfaces.getTexture(srcId);
-	const target = RenderTexture.create({ width, height, resolution: 1 });
+	const target = createSurfaceTexture(width, height);
 	const sprite = new Sprite(src);
 	const cm = new ColorMatrixFilter();
 	cm.matrix = [

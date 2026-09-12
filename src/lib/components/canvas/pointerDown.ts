@@ -4,7 +4,7 @@
 // from the active tool + open document instead of mirroring component flags.
 import { get } from 'svelte/store';
 import type { Point } from '../../core/geometry';
-import { rgbaToHex } from '../../core/color';
+import { rgbaToHex, rgbaToHexA, type RGBA } from '../../core/color';
 import { documentRegistry } from '../../core/document/registry';
 import type { ImageDocument } from '../../core/document/ImageDocument';
 import { getEditorRenderer } from '../../render/EditorRenderer';
@@ -33,7 +33,7 @@ import {
 } from '../../state/ui';
 import { cloneHardness, cloneOpacity, cloneSize } from '../../state/clone';
 import { recolorHardness, recolorOpacity, recolorSize } from '../../state/recolor';
-import { eyedropperCopyHex } from '../../state/eyedropper';
+import { eyedropperCopyHex, eyedropperIncludeAlpha } from '../../state/eyedropper';
 import { applyFill } from '../../services/fillService';
 import { applyWandSelection } from '../../services/wandService';
 import { deselect } from '../../services/selectionService';
@@ -301,15 +301,19 @@ export function handlePointerDown(e: PointerEvent, a: PointerDownApi): void {
 			showNotice('Could not sample colour.', 'error');
 			return;
 		}
+		// Hex carries the alpha byte only when the eyedropper's include-alpha
+		// toggle is on (#RRGGBBAA vs #RRGGBB).
+		const hexOf = (c: RGBA) =>
+			get(eyedropperIncludeAlpha) ? rgbaToHexA(c) : rgbaToHex(c);
 		if (e.button === 2) {
 			backgroundColor.set(sampled);
-			showNotice(`Background ${rgbaToHex(sampled)}`);
+			showNotice(`Background ${hexOf(sampled)}`);
 		} else {
 			foregroundColor.set(sampled);
-			showNotice(`Foreground ${rgbaToHex(sampled)}`);
+			showNotice(`Foreground ${hexOf(sampled)}`);
 		}
 		if (get(eyedropperCopyHex)) {
-			const hex = rgbaToHex(sampled);
+			const hex = hexOf(sampled);
 			if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
 				navigator.clipboard
 					.writeText(hex)

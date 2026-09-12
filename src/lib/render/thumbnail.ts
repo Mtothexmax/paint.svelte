@@ -2,7 +2,8 @@
 // No backing fill — transparency stays transparent, so the caller's
 // checkerboard shows the document's true shape (same as renderLayerThumbnail).
 
-import { Container, RenderTexture, Sprite } from 'pixi.js';
+import { Container, Sprite } from 'pixi.js';
+import { createU8Texture } from './surfaceTexture';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { EditorRenderer } from './EditorRenderer';
 import { extractStraightCanvas } from './readback';
@@ -23,7 +24,7 @@ export function renderThumbnail(
 	const cw = Math.max(1, Math.round(doc.width * scale));
 	const ch = Math.max(1, Math.round(doc.height * scale));
 
-	const rt = RenderTexture.create({ width: cw, height: ch, resolution: 1 });
+	const rt = createU8Texture(cw, ch);
 
 	const holder = new Container();
 	const sprite = new Sprite(tex);
@@ -56,7 +57,7 @@ export function renderLayerThumbnail(
 	const cw = Math.max(1, Math.round(doc.width * scale));
 	const ch = Math.max(1, Math.round(doc.height * scale));
 
-	const rt = RenderTexture.create({ width: cw, height: ch, resolution: 1 });
+	const rt = createU8Texture(cw, ch);
 	const holder = new Container();
 	const sprite = new Sprite(tex);
 	sprite.scale.set(scale, scale);

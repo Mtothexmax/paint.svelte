@@ -1,19 +1,23 @@
 // Layer: render (pixi). Samples the composited pixel colour at an image-space
 // position by reading back the visible layer surfaces (GPU → CPU) and
-// compositing them bottom-to-top in premultiplied space.
+// compositing them bottom-to-top in STRAIGHT-alpha space (float64).
 //
-// Pixi v8 `extract.pixels` returns premultiplied-alpha bytes, so the "over"
-// compositing happens in premultiplied space and the result is unpremultiplied
-// once at the end (same convention as `effects.ts`).
+// Each layer's 1×1 texel comes through the float-precision un-premultiply
+// blit (divide BEFORE the 8-bit quantize), so soft-edge hue survives: a
+// direct 1×1 `extract.pixels` would hand back 8-bit premultiplied bytes whose
+// CPU divide cannot recover dark translucent texels (e.g. (28,227,57) for a
+// (25,230,70) dab at alpha 9). The per-layer 1×1 blit+read is trivially cheap,
+// which matters because this runs on every pointer move for the live readout.
 //
-// Only a 1×1 `frame` is read back per layer. That matters because this runs on
-// every pointer move for the eyedropper's live RGB/A readout: extracting whole
-// doc-sized buffers would be megabytes of GPU→CPU traffic per frame.
+// The texels are composited with the straight-over operator in float64.
+// Compositing in premultiplied space and un-premultiplying once at the end is
+// algebraically identical with exact arithmetic, but with quantized 8-bit
+// texels the straight-first order preserves soft-edge hue (±1 at most).
 
-import { Rectangle, Sprite } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { RGBA } from '../core/color';
 import type { EditorRenderer } from './EditorRenderer';
+import { extractStraightRegion } from './readback';
 
 function clampByte(n: number): number {
 	return Math.max(0, Math.min(255, Math.round(n)));
@@ -30,9 +34,8 @@ export function sampleCompositeColorAt(
 	const py = Math.floor(y);
 	if (px < 0 || py < 0 || px >= doc.width || py >= doc.height) return null;
 	if (!renderer.app) return null;
-	const frame = new Rectangle(px, py, 1, 1);
 
-	// premultiplied accumulator, 0..1
+	// straight-alpha accumulator, 0..1 float64
 	let outR = 0;
 	let outG = 0;
 	let outB = 0;
@@ -41,33 +44,41 @@ export function sampleCompositeColorAt(
 	for (const layer of doc.layers) {
 		if (!layer.visible || layer.opacity <= 0) continue;
 		if (!renderer.surfaces.has(layer.surfaceId)) continue;
-		const sprite = new Sprite(renderer.surfaces.getTexture(layer.surfaceId));
-		let extracted;
+		// Texel-exact 1x1 straight read (float divide before quantize).
+		let d: Uint8ClampedArray;
 		try {
-			extracted = renderer.app.renderer.extract.pixels({ target: sprite, frame, resolution: 1 });
-		} finally {
-			sprite.destroy();
+			d = extractStraightRegion(renderer, renderer.surfaces.getTexture(layer.surfaceId), px, py, 1, 1).pixels;
+		} catch {
+			continue;
 		}
-		if (!extracted || extracted.width !== 1 || extracted.height !== 1) continue;
-		const d = extracted.pixels;
 		const layerOpacity = Math.max(0, Math.min(1, layer.opacity));
 		const sa = (d[3] / 255) * layerOpacity;
 		if (sa <= 0) continue;
-		const sr = (d[0] / 255) * layerOpacity;
-		const sg = (d[1] / 255) * layerOpacity;
-		const sb = (d[2] / 255) * layerOpacity;
-		outR = sr + outR * (1 - sa);
-		outG = sg + outG * (1 - sa);
-		outB = sb + outB * (1 - sa);
-		outA = sa + outA * (1 - sa);
+		// Already straight: no CPU divide.
+		const sr = d[0] / 255;
+		const sg = d[1] / 255;
+		const sb = d[2] / 255;
+		// Straight-over: out = src·sa + dst·da·(1−sa), renormalized by outA.
+		const dstA = outA * (1 - sa);
+		outA = sa + dstA;
+		if (outA <= 0) {
+			outR = 0;
+			outG = 0;
+			outB = 0;
+		} else {
+			outR = (sr * sa + outR * (outA - sa)) / outA;
+			outG = (sg * sa + outG * (outA - sa)) / outA;
+			outB = (sb * sa + outB * (outA - sa)) / outA;
+		}
 	}
 
 	if (outA <= 0) return { r: 255, g: 255, b: 255, a: 0 };
-	const inv = 1 / outA;
+	// outR/outG/outB already hold the straight-alpha average (renormalized
+	// at every step), so no further divide — just quantize once.
 	return {
-		r: clampByte(outR * inv * 255),
-		g: clampByte(outG * inv * 255),
-		b: clampByte(outB * inv * 255),
+		r: clampByte(outR * 255),
+		g: clampByte(outG * 255),
+		b: clampByte(outB * 255),
 		a: clampByte(outA * 255)
 	};
 }

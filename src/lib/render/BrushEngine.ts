@@ -10,7 +10,8 @@
 // sampling is distance-based (independent of pointer event frequency and
 // velocity).
 
-import { CanvasSource, Container, RenderTexture, Sprite, Texture } from 'pixi.js';
+import { CanvasSource, Container, Sprite, Texture, type RenderTexture } from 'pixi.js';
+import { createSurfaceTexture } from './surfaceTexture';
 import type { Point, Rect } from '../core/geometry';
 import type { RGBA } from '../core/color';
 import type { ImageDocument } from '../core/document/ImageDocument';
@@ -456,7 +457,7 @@ export class BrushEngine {
 		const dh = doc.height;
 		if (!this.previewTex || this.previewTex.width !== dw || this.previewTex.height !== dh) {
 			this.previewTex?.destroy(true);
-			this.previewTex = RenderTexture.create({ width: dw, height: dh, resolution: 1 });
+			this.previewTex = createSurfaceTexture(dw, dh);
 			// Match the layer sprite's sampling so the preview looks identical to
 			// the committed surface at any zoom (doc-sized RTs default to linear).
 			const src = this.renderer.surfaces.getTexture(this.layerId).source;
@@ -539,7 +540,7 @@ export class BrushEngine {
 		let clippedSprite: Sprite | null = null;
 		let clippedTex: import('pixi.js').RenderTexture | null = null;
 		if (maskId && surfaces.has(maskId)) {
-			clippedTex = RenderTexture.create({ width: doc.width, height: doc.height, resolution: 1 });
+			clippedTex = createSurfaceTexture(doc.width, doc.height);
 			const holder = new Container();
 			const srcSprite = new Sprite(stroke.target);
 			const maskSprite = new Sprite(surfaces.getTexture(maskId));

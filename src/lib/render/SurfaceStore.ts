@@ -3,6 +3,7 @@
 // render targets in this slice.
 
 import { Container, Graphics, Mesh, PerspectivePlaneGeometry, RenderTexture, Sprite, Texture, type Application } from 'pixi.js';
+import { createSurfaceTexture } from './surfaceTexture';
 import { newId } from '../core/id';
 import { type Point, type Rect } from '../core/geometry';
 import type { SurfaceId } from '../core/layers/Layer';
@@ -47,7 +48,7 @@ export class SurfaceStore {
 	/** Creates an empty (transparent) surface. Optionally fills it with a color. */
 	create(width: number, height: number, fillColor?: number): SurfaceId {
 		const id = newId('sfc');
-		const rt = RenderTexture.create({ width, height, resolution: 1 });
+		const rt = createSurfaceTexture(width, height);
 		this.surfaces.set(id, rt);
 		if (fillColor !== undefined) this.fill(id, fillColor);
 		return id;
@@ -64,7 +65,7 @@ export class SurfaceStore {
 		const width = texture.width;
 		const height = texture.height;
 		const id = newId('sfc');
-		const rt = RenderTexture.create({ width, height, resolution: 1 });
+		const rt = createSurfaceTexture(width, height);
 		this.surfaces.set(id, rt);
 
 		const sprite = new Sprite(texture);
@@ -103,7 +104,7 @@ export class SurfaceStore {
 	/** Copies a region of a surface into a new owned surface (GPU→GPU). */
 	copyRegion(id: SurfaceId, rect: Rect): SurfaceId {
 		const source = this.getTexture(id);
-		const out = RenderTexture.create({ width: rect.width, height: rect.height, resolution: 1 });
+		const out = createSurfaceTexture(rect.width, rect.height);
 		const outId = newId('sfc');
 		this.surfaces.set(outId, out);
 

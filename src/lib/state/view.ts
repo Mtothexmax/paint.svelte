@@ -12,7 +12,11 @@ export function setCheckerTheme(theme: CheckerTheme): void {
 	checkerTheme.set(theme);
 }
 
-const VIEW_KEY = 'paint.svelte.viewSettings.v1';
+// v2: v1 payloads may hold a stale 'bright' from when bright was the code
+// default. The default is dark, so v1 records are ignored on purpose —
+// anyone who explicitly prefers bright re-toggles once (menu: View) and it
+// persists under v2 from then on.
+const VIEW_KEY = 'paint.svelte.viewSettings.v2';
 
 interface SavedView {
 	checker: CheckerTheme;

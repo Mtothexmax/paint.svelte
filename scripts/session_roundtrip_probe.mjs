@@ -53,9 +53,10 @@ async function sliceStats(page) {
 			const key = A < 64 ? 'a<64' : A < 160 ? 'a<160' : 'a<255';
 			const b = (bins[key] = bins[key] || { n: 0, r: 0, g: 0, b: 0 });
 			b.n++;
-			b.r += Math.round((pixels[i] * 255) / A);
-			b.g += Math.round((pixels[i + 1] * 255) / A);
-			b.b += Math.round((pixels[i + 2] * 255) / A);
+			// readback is STRAIGHT-alpha bytes (no CPU divide)
+			b.r += pixels[i];
+			b.g += pixels[i + 1];
+			b.b += pixels[i + 2];
 		}
 		const res = {};
 		for (const [k, b] of Object.entries(bins)) {
@@ -174,6 +175,9 @@ async function main() {
 	const page2 = await browser.newPage();
 	await page2.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
 	page2.on('pageerror', (e) => console.log('PAGE2ERROR', e.message));
+	page2.on('console', (m) => {
+		if (m.type() === 'error') console.log('PAGE2 console.error:', m.text().slice(0, 300));
+	});
 	await page2.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30000 });
 	// wait for restore: registry non-empty with effects
 	let restored = null;
@@ -204,31 +208,52 @@ async function main() {
 			return hit ? new URL(hit).pathname + new URL(hit).search : p;
 		};
 		const { getEditorRenderer } = await import(u('/src/lib/render/EditorRenderer.ts'));
+		const { extractStraightBytes } = await import(u('/src/lib/render/readback.ts'));
 		const r = getEditorRenderer();
 		const doc = window.__REGISTRY__.active;
 		const tex = r.exportTextureFor(doc.activeLayer);
-		const px = r.app.renderer.extract.pixels({ target: tex });
+		const isBase = tex === r.surfaces.getTexture(doc.activeLayer.surfaceId);
+		const fmt = tex.source?.format ?? null;
+		// straight read (float-precision divide before quantize)
+		const sb = extractStraightBytes(r, tex);
 		let red = 0;
-		const step = 4;
-		for (let y = 0; y < px.height; y += step) {
-			for (let x = 0; x < px.width; x += step) {
-				const i = (y * px.width + x) * 4;
-				// un-premultiply before judging hue
-				const a = px.pixels[i + 3];
-				if (a < 8) continue;
-				const rr = (px.pixels[i] * 255) / a;
-				const gg = (px.pixels[i + 1] * 255) / a;
-				const bb = (px.pixels[i + 2] * 255) / a;
-				if (rr > 180 && gg < 120 && bb < 120) red++;
+		for (let y = 0; y < sb.height; y += 4) {
+			for (let x = 0; x < sb.width; x += 4) {
+				const i = (y * sb.width + x) * 4;
+				if (sb.pixels[i + 3] < 8) continue;
+				if (sb.pixels[i] > 180 && sb.pixels[i + 1] < 120 && sb.pixels[i + 2] < 120) red++;
 			}
 		}
-		return { red };
+		return { red, isBase, fmt };
 	});
 	console.log('[5] outline renders post-restore:', JSON.stringify(renders));
 	if (!(renders.red > 0)) throw new Error('restored effect does not render');
 
 	const after = await sliceStats(page2);
 	console.log('[6] post-reload pixels:', JSON.stringify(after));
+
+	// No double-premultiplication across save/restore: per-bin straight means
+	// must agree pre/post reload. Bound is alpha-aware (same premultiplied
+	// 2D-canvas floor as the brush probe: PNG encode/decode round-trips
+	// through canvas, ~260/a worst case). True double-premultiplication
+	// would darken low-alpha bins by ~C*(1-a/255) — far above the bound.
+	{
+		const parse = (s) => {
+			const m = /rgb=\(([0-9.]+),([0-9.]+),([0-9.]+)\)/.exec(s);
+			return m ? [+m[1], +m[2], +m[3]] : null;
+		};
+		const minAlpha = (bin) => (bin === 'a<64' ? 8 : bin === 'a<160' ? 64 : 160);
+		for (const bin of Object.keys(before)) {
+			const a = parse(before[bin]);
+			const b = parse(after[bin]);
+			if (!a || !b) throw new Error(`missing bin ${bin} in reload comparison`);
+			const dev = Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+			const bound = Math.max(1.5, 260 / minAlpha(bin));
+			if (dev > bound)
+				throw new Error(`reload darkened ${bin}: ${before[bin]} vs ${after[bin]} (bound ${bound.toFixed(1)})`);
+		}
+		console.log('RELOAD-STABLE-OK: soft edges survived save/restore without darkening');
+	}
 
 	await browser.close();
 }
@@ -239,3 +264,6 @@ main().then(
 		process.exit(1);
 	}
 );
+
+
+

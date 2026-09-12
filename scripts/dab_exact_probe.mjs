@@ -159,7 +159,6 @@ async function main() {
 		const doc = window.__REGISTRY__.active;
 		const { pixels } = extractSurfaceBytes(renderer, doc.activeLayer.surfaceId);
 		const W = doc.width;
-		const pred = (C, A) => Math.round((Math.round((C * A) / 255) * 255) / A);
 		const out = [];
 		for (const { c, at } of regions) {
 			let n = 0;
@@ -172,15 +171,15 @@ async function main() {
 					const A = pixels[i + 3];
 					if (A < 8 || A > 250) continue;
 					n++;
-					const meas = [
-						Math.floor((pixels[i] * 255.001) / A + 0.5),
-						Math.floor((pixels[i + 1] * 255.001) / A + 0.5),
-						Math.floor((pixels[i + 2] * 255.001) / A + 0.5)
-					];
-					const exp = [pred(c[0], A), pred(c[1], A), pred(c[2], A)];
+					// Readback is STRAIGHT-alpha bytes now: the shader divides
+					// in float precision before the single U8 quantize, so a
+					// pure-color dab must read back as the paint color ±1
+					// (float divide + U8 double-rounding at most).
+					const meas = [pixels[i], pixels[i + 1], pixels[i + 2]];
+					const exp = [c[0], c[1], c[2]];
 					const dev = Math.max(Math.abs(meas[0] - exp[0]), Math.abs(meas[1] - exp[1]), Math.abs(meas[2] - exp[2]));
 					if (dev > maxDev) maxDev = dev;
-					if (dev !== 0) {
+					if (dev > 1) {
 						bad++;
 						if (examples.length < 6) examples.push({ x, y, a: A, meas, exp });
 					}
@@ -192,13 +191,13 @@ async function main() {
 	}, COLORS);
 	console.log(JSON.stringify(report, null, 1));
 	await browser.close();
-	// Every sampled edge pixel must match pure-quantization prediction exactly.
-	// (If maxDev > 0 somewhere, the pipeline itself shifts color systematically.)
+	// Every sampled edge pixel must read back as the paint color ±1 (float
+	// divide + U8 double-rounding). Larger deviations are systematic bugs.
 	const worst = Math.max(...report.map((r) => r.maxDev));
 	const total = report.reduce((t, r) => t + r.n, 0);
 	if (total < 1000) throw new Error(`too few edge pixels sampled (n=${total})`);
-	if (worst !== 0) throw new Error(`systematic deviation detected (maxDev=${worst})`);
-	console.log(`EXACTNESS-OK: n=${total} edge pixels, all match pure 8-bit quantization`);
+	if (worst > 1) throw new Error(`systematic deviation detected (maxDev=${worst})`);
+	console.log(`EXACTNESS-OK: n=${total} edge pixels, all within ±1 of paint color`);
 }
 main().then(
 	() => console.log('DONE'),
@@ -207,3 +206,6 @@ main().then(
 		process.exit(1);
 	}
 );
+
+
+

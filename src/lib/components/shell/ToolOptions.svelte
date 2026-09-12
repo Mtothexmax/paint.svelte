@@ -80,7 +80,7 @@
 	} from '../../state/gradients';
 	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
 	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
-	import { eyedropperCopyHex } from '../../state/eyedropper';
+	import { eyedropperCopyHex, eyedropperIncludeAlpha } from '../../state/eyedropper';
 	import { commands } from '../../services/commandRegistry';
 	import { selectionActive, activeLayerIsText } from '../../state/documents';
 	import { convertTextToRaster } from '../../services/textService';
@@ -290,6 +290,31 @@
 	});
 	$effect(() => {
 		selectionRatio.set(ratio as 'normal' | 'fixedRatio' | 'fixedSize');
+	});
+
+	// Eyedropper hex alpha: same IconSplitButton control language as the
+	// rectangle ratio button above (icon click toggles, ▾ lists both states).
+	const ALPHA_OPTIONS = [
+		{
+			id: 'exclude',
+			icon: '⬛',
+			label: 'Hex without alpha',
+			description: 'Sampled hex excludes alpha (#RRGGBB)'
+		},
+		{
+			id: 'include',
+			icon: '▦',
+			label: 'Hex with alpha',
+			description: 'Sampled hex includes alpha (#RRGGBBAA)'
+		}
+	];
+
+	let alphaMode = $state<string>('exclude');
+	$effect(() => {
+		alphaMode = get(eyedropperIncludeAlpha) ? 'include' : 'exclude';
+	});
+	$effect(() => {
+		eyedropperIncludeAlpha.set(alphaMode === 'include');
 	});
 
 	function setSizeField(
@@ -716,6 +741,13 @@
 			/>
 			Copy color to clipboard as hex
 		</label>
+		<span class="aa-label">Alpha:</span>
+		<IconSplitButton
+			options={ALPHA_OPTIONS}
+			titleInButton
+			bind:value={alphaMode}
+			title="Include alpha in sampled hex"
+		/>
 		<span class="tooloptions-placeholder" title="Left click samples the foreground slot, right click the background slot">
 			Left click → foreground, right click → background.
 		</span>

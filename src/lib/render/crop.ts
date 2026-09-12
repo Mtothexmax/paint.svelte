@@ -3,21 +3,20 @@
 // outside the selection becomes transparent. Implemented ONCE here and shared
 // by the toolbars of every selection/move tool (and the Image menu).
 
-import { Sprite } from 'pixi.js';
 import { documentRegistry } from '../core/document/registry';
 import { emptySelection } from '../core/selection/SelectionModel';
 import type { Rect } from '../core/geometry';
 import type { SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
 import { blitMaskedInto } from './selection';
+import { extractStraightBytes } from './readback';
 
 /** Bounding box (integer, clamped to the surface) of all non-zero-alpha
  * pixels of a mask surface, via a single GPU readback. */
 function maskBounds(renderer: EditorRenderer, maskId: SurfaceId, w: number, h: number): Rect | null {
-	const sprite = new Sprite(renderer.surfaces.getTexture(maskId));
-	const px = renderer.app.renderer.extract.pixels({ target: sprite, resolution: 1 });
-	sprite.destroy();
-	const data = px.pixels;
+	// Alpha bbox via the shared straight readback (alpha channel is
+	// unaffected by the un-premultiply; routes around float direct-read).
+	const { pixels: data } = extractStraightBytes(renderer, renderer.surfaces.getTexture(maskId), w, h);
 	let minX = w, minY = h, maxX = -1, maxY = -1;
 	for (let y = 0; y < h; y++) {
 		const row = y * w * 4;

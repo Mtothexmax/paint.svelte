@@ -1,7 +1,8 @@
-import { ColorMatrixFilter, Sprite } from 'pixi.js';
+import { ColorMatrixFilter } from 'pixi.js';
 import type { EffectDefinition, EffectSettings } from '../types';
 import { documentRegistry } from '../../core/document/registry';
 import { hasEditorRenderer, getEditorRenderer } from '../../render/EditorRenderer';
+import { extractStraightBytes } from '../../render/readback';
 
 // Paint.NET's Auto-Level: per-channel linear stretch to the minimum and
 // maximum non-transparent pixel value. The analysis requires a CPU readback,
@@ -29,12 +30,16 @@ function analyzeLevels(): ChannelLevels | null {
 
 	const w = doc.width;
 	const h = doc.height;
-	const sprite = new Sprite(surfaces.getTexture(layer.surfaceId));
-	const extracted = renderer.app.renderer.extract.pixels({ target: sprite, resolution: 1 });
-	sprite.destroy();
+	// Straight-alpha bytes via the float-precision un-premultiply blit, so
+	// semi-transparent pixels contribute their true hue to the histogram.
+	const { pixels: px, width: ew, height: eh } = extractStraightBytes(
+		renderer,
+		surfaces.getTexture(layer.surfaceId),
+		w,
+		h
+	);
 
-	if (extracted.width !== w || extracted.height !== h) return null;
-	const px = extracted.pixels;
+	if (ew !== w || eh !== h) return null;
 
 	let rMin = 255, gMin = 255, bMin = 255;
 	let rMax = 0, gMax = 0, bMax = 0;
@@ -42,15 +47,7 @@ function analyzeLevels(): ChannelLevels | null {
 	for (let i = 0; i < px.length; i += 4) {
 		const a = px[i + 3];
 		if (a === 0) continue;
-		// Unpremultiply for the histogram so semi-transparent pixels don't
-		// bias toward black.
-		let r = px[i], g = px[i + 1], b = px[i + 2];
-		if (a < 255) {
-			const f = 255 / a;
-			r = Math.min(255, Math.round(r * f));
-			g = Math.min(255, Math.round(g * f));
-			b = Math.min(255, Math.round(b * f));
-		}
+		const r = px[i], g = px[i + 1], b = px[i + 2];
 		if (r < rMin) rMin = r;
 		if (g < gMin) gMin = g;
 		if (b < bMin) bMin = b;

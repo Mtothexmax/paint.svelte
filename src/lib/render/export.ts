@@ -1,7 +1,8 @@
 // Layer: render (pixi). Composites a document (without checkerboard) and
 // downloads it as a PNG.
 
-import { Container, RenderTexture, Sprite } from 'pixi.js';
+import { Container, Sprite } from 'pixi.js';
+import { createSurfaceTexture, createU8Texture } from './surfaceTexture';
 import { SPRITE_BLENDS } from '../render/SurfaceStore';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { EditorRenderer } from './EditorRenderer';
@@ -42,7 +43,7 @@ export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): P
 		container.addChild(sprite);
 	}
 
-	const rt = RenderTexture.create({ width: doc.width, height: doc.height, resolution: 1 });
+	const rt = createSurfaceTexture(doc.width, doc.height);
 	renderer.app.renderer.render({ container, target: rt, clear: true });
 
 	// Straight-alpha encode (see extractStraightCanvas): extract.canvas would
@@ -65,7 +66,7 @@ export async function surfaceToPngBlob(
 	w: number,
 	h: number
 ): Promise<Blob> {
-	const rt = RenderTexture.create({ width: w, height: h, resolution: 1 });
+	const rt = createSurfaceTexture(w, h);
 	const sprite = new Sprite(renderer.surfaces.getTexture(surfaceId));
 	const holder = new Container();
 	holder.addChild(sprite);
@@ -97,7 +98,7 @@ export function surfaceToPngThumbnailUrl(
 	const scale = Math.min(1, maxSize / Math.max(w, h));
 	const tw = Math.max(1, Math.round(w * scale));
 	const th = Math.max(1, Math.round(h * scale));
-	const rt = RenderTexture.create({ width: tw, height: th, resolution: 1 });
+	const rt = createU8Texture(tw, th);
 	const sprite = new Sprite(renderer.surfaces.getTexture(surfaceId));
 	sprite.width = tw;
 	sprite.height = th;

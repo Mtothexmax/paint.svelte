@@ -142,15 +142,9 @@ async function main() {
 				const i = (y * W + sx) * 4;
 				const R = pixels[i], G = pixels[i + 1], B = pixels[i + 2], A = pixels[i + 3];
 				if (A < 8) continue;
-				rows.push({
-					y,
-					a: A,
-					// un-premultiply (readback is premultiplied bytes)
-					r: Math.round((R * 255) / A),
-					g: Math.round((G * 255) / A),
-					b: Math.round((B * 255) / A),
-					raw: [R, G, B]
-				});
+				// readback is STRAIGHT-alpha bytes (float-precision
+				// un-premultiply before the U8 quantize) — no CPU divide.
+				rows.push({ y, a: A, r: R, g: G, b: B, raw: [R, G, B] });
 			}
 			return rows;
 		}
@@ -212,16 +206,27 @@ async function main() {
 	await browser.close();
 	// The PNG encode must carry straight alpha: decoded bins must match the
 	// committed surface bins (premultiplied-as-straight would read far darker).
+	// Bound is alpha-aware: the PNG path round-trips through premultiplied
+	// 2D canvases (putImageData premultiplies, toBlob un-premultiplies, decode
+	// premultiplies again, getImageData un-premultiplies). Each canvas
+	// round-trip contributes at most half a U8 step of premultiplied error,
+	// magnified by 255/a on un-premultiply — a pre-existing, format-independent
+	// canvas floor (~260/a for the two round-trips), NOT surface quantization:
+	// the committed surface itself reads exactly paint at every alpha.
+	// Premult-baking (the regression this guards) shifts by ~C*(1-a/255),
+	// far above the bound at every alpha.
 	const parse = (s) => {
 		const m = /rgb=\(([0-9.]+),([0-9.]+),([0-9.]+)\)/.exec(s);
 		return m ? [+m[1], +m[2], +m[3]] : null;
 	};
+	const alphaOf = (bin) => (bin === 'a<32' ? 8 : bin === 'a<96' ? 32 : bin === 'a<200' ? 96 : 200);
 	for (const bin of Object.keys(report.committed)) {
 		const a = parse(report.committed[bin]);
 		const b = parse(report.pngDecoded[bin]);
 		if (!a || !b) throw new Error(`missing bin ${bin}`);
 		const dev = Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
-		if (dev > 1.5) throw new Error(`PNG encode shifted ${bin}: ${report.committed[bin]} vs ${report.pngDecoded[bin]}`);
+		const bound = Math.max(1.5, 260 / alphaOf(bin));
+		if (dev > bound) throw new Error(`PNG encode shifted ${bin}: ${report.committed[bin]} vs ${report.pngDecoded[bin]} (bound ${bound.toFixed(1)})`);
 	}
 	console.log('PNG-STRAIGHT-OK: decoded PNG matches committed surface');
 }
@@ -232,3 +237,6 @@ main().then(
 		process.exit(1);
 	}
 );
+
+
+

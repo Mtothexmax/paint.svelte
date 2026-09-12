@@ -5,7 +5,8 @@
 // tools). Modes: linear, radial, diamond, conical. Repeats: none (clamped),
 // wrapped (tiled), mirrored (triangle wave).
 
-import { CanvasSource, Container, RenderTexture, Sprite, Texture } from 'pixi.js';
+import { CanvasSource, Container, Sprite, Texture, type RenderTexture } from 'pixi.js';
+import { createSurfaceTexture } from './surfaceTexture';
 import type { RGBA } from '../core/color';
 import { documentRegistry } from '../core/document/registry';
 import type { ImageDocument } from '../core/document/ImageDocument';
@@ -149,7 +150,7 @@ export function buildGradientSurface(
 	let clippedTex: RenderTexture | null = null;
 	let comp: Sprite;
 	if (maskId && surfaces.has(maskId)) {
-		clippedTex = RenderTexture.create({ width: doc.width, height: doc.height, resolution: 1 });
+		clippedTex = createSurfaceTexture(doc.width, doc.height);
 		const holder = new Container();
 		const maskSprite = new Sprite(surfaces.getTexture(maskId));
 		maskSprite.position.set(0, 0);

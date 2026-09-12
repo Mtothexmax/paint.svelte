@@ -4,7 +4,8 @@
 // beyond the old canvas is transparent). Both record ONE undoable history
 // entry and reuse the same commit/dispose machinery as crop to selection.
 
-import { RenderTexture, Sprite } from 'pixi.js';
+import { Sprite } from 'pixi.js';
+import { createSurfaceTexture } from './surfaceTexture';
 import { documentRegistry } from '../core/document/registry';
 import { cancelFloatingMove } from '../state/moveTransform';
 import { emptySelection } from '../core/selection/SelectionModel';
@@ -32,7 +33,7 @@ interface ResizePlan {
 
 /** Scales a surface's contents into a new wNew×hNew surface. */
 function scaleSurface(renderer: EditorRenderer, srcId: SurfaceId, wNew: number, hNew: number): SurfaceId {
-	const rt = RenderTexture.create({ width: wNew, height: hNew, resolution: 1 });
+	const rt = createSurfaceTexture(wNew, hNew);
 	const sprite = new Sprite(renderer.surfaces.getTexture(srcId));
 	sprite.width = wNew;
 	sprite.height = hNew;
@@ -51,7 +52,7 @@ function placeSurface(
 	dx: number,
 	dy: number
 ): SurfaceId {
-	const rt = RenderTexture.create({ width: wNew, height: hNew, resolution: 1 });
+	const rt = createSurfaceTexture(wNew, hNew);
 	const sprite = new Sprite(renderer.surfaces.getTexture(srcId));
 	sprite.position.set(dx, dy);
 	renderer.surfaces.renderInto(rt, sprite, true);

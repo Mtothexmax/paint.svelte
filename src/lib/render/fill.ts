@@ -12,7 +12,7 @@ import type { SurfaceId } from '../core/layers/Layer';
 import type { FloodMode } from '../state/fill';
 import type { SurfaceStore } from './SurfaceStore';
 import type { EditorRenderer } from './EditorRenderer';
-import { extractStraightCanvas } from './readback';
+import { extractStraightBytes, extractStraightCanvas } from './readback';
 
 export interface FillSeed {
 	/** Seed pixel in image px (floored by the caller). */
@@ -200,17 +200,20 @@ export function maskHasContent(
 ): boolean {
 	const surfaces = renderer.surfaces;
 	if (!surfaces.has(maskId)) return false;
-	const probe = new Sprite(surfaces.getTexture(maskId));
+	// Mask is solid white where set: the RED channel survives the straight
+	// blit unchanged, so this routes around float direct-read.
 	try {
-		const extracted = renderer.app.renderer.extract.pixels({ target: probe, resolution: 1 });
-		if (!extracted || extracted.width !== width || extracted.height !== height) return false;
-		const d = extracted.pixels;
+		const { pixels: d, width: ew, height: eh } = extractStraightBytes(
+			renderer,
+			surfaces.getTexture(maskId),
+			width,
+			height
+		);
+		if (ew !== width || eh !== height) return false;
 		for (let i = 0; i < d.length; i += 4) if (d[i] > 127) return true;
 		return false;
 	} catch {
 		return false;
-	} finally {
-		probe.destroy();
 	}
 }
 

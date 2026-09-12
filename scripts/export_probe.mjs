@@ -55,7 +55,10 @@ async function main() {
 	let ready = false;
 	for (let i = 0; i < 60; i++) {
 		ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const entries = performance.getEntriesByType('resource').map((r) => r.name);
+			const hit = entries.find((u) => u.includes('/render/EditorRenderer.ts'));
+			const url = hit ? new URL(hit).pathname + new URL(hit).search : '/src/lib/render/EditorRenderer.ts';
+			const { hasEditorRenderer } = await import(url);
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -67,10 +70,15 @@ async function main() {
 
 	// --- bounded fill + red outline, then compare composite vs base -------
 	const res = await page.evaluate(async () => {
-		const { applySelectionRect, fillSelection } = await import('/src/lib/services/selectionService.ts');
-		const { addLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
-		const { sampleSurfacePixels } = await import('/src/lib/render/readback.ts');
+		const entries = performance.getEntriesByType('resource').map((r) => r.name);
+		const u = (p) => {
+			const hit = entries.find((x) => x.includes(p));
+			return hit ? new URL(hit).pathname + new URL(hit).search : p;
+		};
+		const { applySelectionRect, fillSelection } = await import(u('/src/lib/services/selectionService.ts'));
+		const { addLayerEffect } = await import(u('/src/lib/services/layerEffectsService.ts'));
+		const { getEditorRenderer } = await import(u('/src/lib/render/EditorRenderer.ts'));
+		const { sampleSurfacePixels, extractStraightBytes } = await import(u('/src/lib/render/readback.ts'));
 		const doc = window.__REGISTRY__.active;
 		const r = getEditorRenderer();
 		const layer = doc.activeLayer;
@@ -94,12 +102,14 @@ async function main() {
 		const baseSamples = sampleSurfacePixels(r, layer.surfaceId, doc.width, doc.height, pts);
 		const baseRed = baseSamples.filter(isRed).length;
 
-		// Export composite path (what exportPng now uses).
+		// Export composite path (what exportPng now uses). Straight-alpha
+		// readback: direct extract.pixels on float targets is
+		// implementation-defined (may return blank), so sample straight.
 		const tex = r.exportTextureFor(layer);
-		const px = r.app.renderer.extract.pixels({ target: tex });
+		const sb = extractStraightBytes(r, tex);
 		const at = (x, y) => {
-			const i = (y * px.width + x) * 4;
-			return [px.pixels[i], px.pixels[i + 1], px.pixels[i + 2], px.pixels[i + 3]];
+			const i = (y * sb.width + x) * 4;
+			return [sb.pixels[i], sb.pixels[i + 1], sb.pixels[i + 2], sb.pixels[i + 3]];
 		};
 		const compRed = pts.filter(({ x, y }) => isRed(at(x, y))).length;
 
@@ -113,9 +123,15 @@ async function main() {
 
 	// --- [3] feather: blur inward only + shrink cuts inward ----------------
 	const feather = await page.evaluate(async () => {
-		const { addLayerEffect, removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
-		const { fillSelection } = await import('/src/lib/services/selectionService.ts');
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+		const entries = performance.getEntriesByType('resource').map((r) => r.name);
+		const u = (p) => {
+			const hit = entries.find((x) => x.includes(p));
+			return hit ? new URL(hit).pathname + new URL(hit).search : p;
+		};
+		const { addLayerEffect, removeLayerEffect } = await import(u('/src/lib/services/layerEffectsService.ts'));
+		const { fillSelection } = await import(u('/src/lib/services/selectionService.ts'));
+		const { getEditorRenderer } = await import(u('/src/lib/render/EditorRenderer.ts'));
+		const { extractStraightBytes } = await import(u('/src/lib/render/readback.ts'));
 		const doc = window.__REGISTRY__.active;
 		const r = getEditorRenderer();
 		const layer = doc.activeLayer;
@@ -130,10 +146,10 @@ async function main() {
 
 		const read = () => {
 			const tex = r.exportTextureFor(layer);
-			const px = r.app.renderer.extract.pixels({ target: tex });
+			const sb = extractStraightBytes(r, tex);
 			return (x, y) => {
-				const i = (y * px.width + x) * 4;
-				return [px.pixels[i], px.pixels[i + 1], px.pixels[i + 2], px.pixels[i + 3]];
+				const i = (y * sb.width + x) * 4;
+				return [sb.pixels[i], sb.pixels[i + 1], sb.pixels[i + 2], sb.pixels[i + 3]];
 			};
 		};
 
@@ -170,9 +186,15 @@ async function main() {
 
 	// --- [4] noise respects "link to alpha" -------------------------------
 	const noise = await page.evaluate(async () => {
-		const { addLayerEffect, removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
-		const { fillSelection } = await import('/src/lib/services/selectionService.ts');
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+		const entries = performance.getEntriesByType('resource').map((r) => r.name);
+		const u = (p) => {
+			const hit = entries.find((x) => x.includes(p));
+			return hit ? new URL(hit).pathname + new URL(hit).search : p;
+		};
+		const { addLayerEffect, removeLayerEffect } = await import(u('/src/lib/services/layerEffectsService.ts'));
+		const { fillSelection } = await import(u('/src/lib/services/selectionService.ts'));
+		const { getEditorRenderer } = await import(u('/src/lib/render/EditorRenderer.ts'));
+		const { extractStraightBytes } = await import(u('/src/lib/render/readback.ts'));
 		const doc = window.__REGISTRY__.active;
 		const r = getEditorRenderer();
 		const layer = doc.activeLayer;
@@ -187,10 +209,10 @@ async function main() {
 		const pts = [[10, 10], [20, 30], [1500, 900], [500, 500], [1000, 100], [60, 700], [1200, 400], [800, 60]];
 		const readPts = () => {
 			const tex = r.exportTextureFor(layer);
-			const px = r.app.renderer.extract.pixels({ target: tex });
+			const sb = extractStraightBytes(r, tex);
 			return pts.map(([x, y]) => {
-				const i = (y * px.width + x) * 4;
-				return [px.pixels[i], px.pixels[i + 1], px.pixels[i + 2]];
+				const i = (y * sb.width + x) * 4;
+				return [sb.pixels[i], sb.pixels[i + 1], sb.pixels[i + 2]];
 			});
 		};
 		addLayerEffect(layer.id, 'addNoise', { amount: 100, monochrome: 0, seed: 7, linkAlpha: 1 });
@@ -221,3 +243,5 @@ main().then(
 		process.exit(1);
 	}
 );
+
+

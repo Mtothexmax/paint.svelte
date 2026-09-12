@@ -17,6 +17,7 @@ import type { Layer, SurfaceId } from '../core/layers/Layer';
 import type { EditorRenderer } from './EditorRenderer';
 import { stampDabTexture } from './CloneEngine';
 import { eraseSelectionRegion } from './selection';
+import { extractStraightRegion } from './readback';
 
 export interface RecolorSettings {
 	size: number; // dab diameter in image px
@@ -186,19 +187,14 @@ export class RecolorEngine {
 
 		const readPatch = (id: SurfaceId): Uint8ClampedArray | null => {
 			if (!surfaces.has(id)) return null;
-			const sprite = new Sprite(surfaces.getTexture(id));
 			try {
-				const out = renderer.app.renderer.extract.pixels({
-					target: sprite,
-					frame: new Rectangle(x, y, rw, rh),
-					resolution: 1
-				});
-				if (!out || out.width !== rw || out.height !== rh) return null;
+				// Straight-alpha region bytes (float divide before quantize),
+				// so soft-edge hue survives the read.
+				const out = extractStraightRegion(renderer, surfaces.getTexture(id), x, y, rw, rh);
+				if (out.width !== rw || out.height !== rh) return null;
 				return Uint8ClampedArray.from(out.pixels);
 			} catch {
 				return null;
-			} finally {
-				sprite.destroy();
 			}
 		};
 		const dst = readPatch(beforeId);
@@ -225,15 +221,10 @@ export class RecolorEngine {
 			const o = i * 4;
 			const da = dst[o + 3];
 			const k = coverage ? coverage[o + 3] / 255 : 0;
-			let dr = dst[o];
-			let dg = dst[o + 1];
-			let db = dst[o + 2];
-			if (da > 0 && da < 255) {
-				const inv = 255 / da;
-				dr = Math.min(255, dr * inv);
-				dg = Math.min(255, dg * inv);
-				db = Math.min(255, db * inv);
-			}
+			// dst is straight-alpha bytes (no CPU un-premultiply needed).
+			const dr = dst[o];
+			const dg = dst[o + 1];
+			const db = dst[o + 2];
 			out[o] = Math.round(dr + (fr - dr) * k);
 			out[o + 1] = Math.round(dg + (fg - dg) * k);
 			out[o + 2] = Math.round(db + (fb - db) * k);
