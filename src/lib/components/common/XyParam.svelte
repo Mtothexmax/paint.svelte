@@ -34,6 +34,7 @@
 	maxY={param.maxY ?? 100}
 	step={param.step ?? 1}
 	default={{ x: param.default, y: param.defaultY ?? param.default }}
+	yDown={param.yDown ?? false}
 	label={param.label}
 	oninput={sync}
 	onCommit={sync}

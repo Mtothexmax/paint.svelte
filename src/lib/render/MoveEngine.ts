@@ -169,6 +169,11 @@ export class MoveEngine {
 			const baked = this.currentQuad() ?? this.warpQuad;
 			this.rot3 = IDENTITY3;
 			this.warpQuad = baked && this.bounds ? this.safeQuad(baked, quadFromBounds(this.bounds)) : baked;
+			// `currentQuad()` folded rot3 AND the live offset into `baked`, so
+			// both must be cleared — otherwise the affine state is applied a
+			// second time on top of the quad that already contains it. (The
+			// branch above only bakes when there was no quad yet.)
+			this.bakeAffineIntoQuad();
 		}
 		this.refreshVisuals();
 	}
@@ -278,6 +283,14 @@ export class MoveEngine {
 	/** Bakes scale/rotation/skew/offset into `warpQuad` and resets the affine
 	 * state — the quad becomes the single source of truth. */
 	private bakeAffineIntoQuad(): void {
+		// The offset is now folded into `warpQuad`, so it has to leave the
+		// pivot as well: `gizmoCenter()` is pivot + offset, and `quadForRotation`
+		// revolves the corners about the pivot. Leaving the pivot behind pinned
+		// the rotate gizmo (and the axis of revolution) to the PRE-move selection
+		// while the content sat at the moved position — the rings showed up a few
+		// hundred px away from the pixels, and a drag swung them around the old
+		// centre.
+		this.pivot = { x: this.pivot.x + this.offset.x, y: this.pivot.y + this.offset.y };
 		this.offset = { x: 0, y: 0 };
 		this.rotation = 0;
 		this.scaleX = 1;

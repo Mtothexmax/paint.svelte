@@ -33,16 +33,32 @@ const definition: EffectDefinition = {
 	label: 'Twist',
 	icon: '🌀',
 	params: [
+		// Symmetric, full-circle range so the dial can be dragged all the way
+		// round: the sign is the direction of the twist. (The old -360..360
+		// span is twice what a dial can express, and the dial could only reach
+		// its positive half.)
 		{
 			key: 'angle',
 			label: 'Angle',
-			min: -360,
-			max: 360,
+			kind: 'angle',
+			min: -180,
+			max: 180,
 			step: 1,
 			default: ANGLE
 		},
-		{ key: 'centerX', label: 'Center X', min: 0, max: 100, step: 1, default: CENTER_X },
-		{ key: 'centerY', label: 'Center Y', min: 0, max: 100, step: 1, default: CENTER_Y }
+		{
+			key: 'center',
+			label: 'Center',
+			kind: 'xy',
+			minX: 0,
+			maxX: 100,
+			minY: 0,
+			maxY: 100,
+			step: 1,
+			default: CENTER_X,
+			defaultY: CENTER_Y,
+			yDown: true
+		}
 	],
 	filter: (settings: EffectSettings) =>
 		makeGlFilter(

@@ -31,6 +31,7 @@
 	let filter = $state('');
 	let searchEl: HTMLInputElement | undefined = $state();
 	let popEl: HTMLDivElement | undefined = $state();
+	let listEl: HTMLDivElement | undefined = $state();
 	/** families.length at the last auto-scroll (one-shot per list state). */
 	let scrolledCount = $state(-1);
 
@@ -49,34 +50,50 @@
 		return `${cssFamily(family)}, sans-serif`;
 	}
 
+	/** Built-in families list (so we can tell them apart from user-added
+	 * system fonts at preview time). */
+	const builtinSet = new Set<string>(TEXT_FONTS.map((f) => f.toLowerCase()));
+
 	/** Marks a family as preview-ready only when the browser confirms it can
-	 * actually render the preview in that family (activated from its font
-	 * data first — a listed name alone renders nothing). The preview shows
-	 * the first renderable sample (Latin, Greek, Cyrillic, symbols or
-	 * historic — symbol fonts often cover no Latin). As a last resort, an
-	 * installed family whose metrics are identical to the fallback (e.g.
-	 * Arial) still gets the pangram: it renders correctly either way. */
+	 * actually render the preview in that family. For BUILT-IN families the
+	 * Local Font Access API is never touched — those names resolve through
+	 * plain `document.fonts.check()` only, so opening the dropdown is silent.
+	 * User-added OS families (added via "Load system fonts") go through the
+	 * full activate-from-data path so they actually render. */
 	let previewText = $state<Record<string, string>>({});
 	async function confirmFamily(family: string): Promise<void> {
 		if (ready[family]) return;
 		if (typeof document === 'undefined' || !('fonts' in document)) return;
+		const isBuiltin = builtinSet.has(family.toLowerCase());
 		try {
 			let sample = findRenderableSample(family);
-			if (!sample) {
-				await ensureSystemFontLoaded(family);
-				sample = findRenderableSample(family);
-			}
-			if (!sample) {
-				const installed = await isInstalledFamily(family);
+			if (!sample && isBuiltin) {
+				// Built-in: only `document.fonts.check()`. NEVER query the
+				// Local Font Access API — that would pop the OS permission
+				// prompt the user hasn't opted into.
 				let available = false;
 				try {
 					available = document.fonts.check(`16px ${cssFamily(family)}`);
 				} catch {
 					/* ignore */
 				}
-				if (installed && available) sample = PANGRAM;
+				if (available) sample = PANGRAM;
+			} else if (!sample) {
+				// User-added OS family: pull the font data so CSS/canvas can
+				// actually shape with it.
+				await ensureSystemFontLoaded(family);
+				sample = findRenderableSample(family);
+				if (!sample) {
+					const installed = await isInstalledFamily(family);
+					if (installed) sample = PANGRAM;
+				}
 			}
-			console.info('[fonts]', `"${family}"`, `preview sample=${sample ? 'yes' : 'no'}`);
+			console.info(
+				'[fonts]',
+				`"${family}"`,
+				`builtin=${isBuiltin}`,
+				`preview sample=${sample ? 'yes' : 'no'}`
+			);
 			if (sample) {
 				previewText[family] = sample;
 				ready[family] = true;
@@ -99,7 +116,7 @@
 					}
 				}
 			},
-			{ root: popEl ?? undefined }
+			{ root: listEl ?? undefined }
 		);
 		io.observe(node);
 		return {
@@ -157,10 +174,10 @@
 	$effect(() => {
 		const count = families.length;
 		if (open) searchEl?.focus();
-		if (open && popEl && scrolledCount !== count) {
+		if (open && listEl && scrolledCount !== count) {
 			scrolledCount = count;
 			requestAnimationFrame(() => {
-				popEl?.querySelector('.fontdrop-row.on')?.scrollIntoView({ block: 'nearest' });
+				listEl?.querySelector('.fontdrop-row.on')?.scrollIntoView({ block: 'nearest' });
 			});
 		}
 	});
@@ -186,49 +203,53 @@
 	{#if open}
 		<div class="fontdrop-backdrop" onclick={() => (open = false)} onkeydown={onKey} role="presentation"></div>
 		<div class="fontdrop-pop" bind:this={popEl} role="listbox" aria-label="Font family">
-			<input
-				bind:this={searchEl}
-				bind:value={filter}
-				class="fontdrop-search"
-				type="text"
-				placeholder="Filter fonts…"
-				autocomplete="off"
-				spellcheck={false}
-				aria-label="Filter fonts"
-				oninput={() => {
-					if (popEl) popEl.scrollTop = 0;
-				}}
-				onkeydown={(e) => {
-					if (e.key === 'Escape') {
-						e.stopPropagation();
-						open = false;
-					}
-				}}
-			/>
-			{#each visible as family (family)}
-				<button
-					type="button"
-					role="option"
-					aria-selected={family === value}
-					class="fontdrop-row"
-					class:on={family === value}
-					use:lazyConfirm={family}
-					onclick={() => pick(family)}
-				>
-					<span class="fontdrop-name">{family}</span>
-					{#if ready[family]}
-						<span class="fontdrop-tab"></span>
-						<span class="fontdrop-pangram" style="font-family:{cssOf(family)};">{previewText[family] ?? PANGRAM}</span>
-					{/if}
-				</button>
-			{/each}
-			{#if !visible.length}
-				<div class="fontdrop-foot">No fonts match “{filter.trim()}”.</div>
-			{:else if filter.trim()}
-				<div class="fontdrop-foot">{visible.length} of {families.length}</div>
-			{:else if systemCount > 0}
-				<div class="fontdrop-foot">{systemCount} system fonts</div>
-			{/if}
+			<div class="fontdrop-search-row">
+				<input
+					bind:this={searchEl}
+					bind:value={filter}
+					class="fontdrop-search"
+					type="text"
+					placeholder="Filter fonts…"
+					autocomplete="off"
+					spellcheck={false}
+					aria-label="Filter fonts"
+					oninput={() => {
+						if (listEl) listEl.scrollTop = 0;
+					}}
+					onkeydown={(e) => {
+						if (e.key === 'Escape') {
+							e.stopPropagation();
+							open = false;
+						}
+					}}
+				/>
+			</div>
+			<div class="fontdrop-list" bind:this={listEl}>
+				{#each visible as family (family)}
+					<button
+						type="button"
+						role="option"
+						aria-selected={family === value}
+						class="fontdrop-row"
+						class:on={family === value}
+						use:lazyConfirm={family}
+						onclick={() => pick(family)}
+					>
+						<span class="fontdrop-name">{family}</span>
+						{#if ready[family]}
+							<span class="fontdrop-tab"></span>
+							<span class="fontdrop-pangram" style="font-family:{cssOf(family)};">{previewText[family] ?? PANGRAM}</span>
+						{/if}
+					</button>
+				{/each}
+				{#if !visible.length}
+					<div class="fontdrop-foot">No fonts match “{filter.trim()}”.</div>
+				{:else if filter.trim()}
+					<div class="fontdrop-foot">{visible.length} of {families.length}</div>
+				{:else if systemCount > 0}
+					<div class="fontdrop-foot">{systemCount} system fonts</div>
+				{/if}
+			</div>
 			{#if !filter.trim()}
 				<button
 					type="button"
@@ -237,15 +258,15 @@
 					onclick={loadSystemFonts}
 				>
 					{#if systemFontsLoading}
-						Laden…
+						Loading…
 					{:else if systemCount > 0}
-						System-Schriftarten geladen ({systemCount})
+						Loaded {systemCount} system font{systemCount === 1 ? '' : 's'}
 					{:else if systemFontsRequested && !systemFontsError}
-						Keine System-Schriftarten verfügbar
+						No system fonts available
 					{:else if systemFontsRequested && systemFontsError}
-						System-Schriftarten konnten nicht geladen werden
+						Could not load system fonts
 					{:else}
-						System-Schriftarten laden
+						Load system fonts…
 					{/if}
 				</button>
 			{/if}

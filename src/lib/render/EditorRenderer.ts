@@ -375,7 +375,15 @@ export class EditorRenderer {
 		};
 		const transformed = loops.map((loop) => loop.map(warp));
 		this.activeScene.showSelectionOutline(transformed, true);
-		if (this.usesGeometryTint(doc.selection)) this.activeScene.setSelectionTintFromLoops(transformed);
+		// A mask-texture veil cannot express a projective warp (sprites are
+		// affine), so the warped outline is FILLED instead — for composite
+		// (mask-derived) selections too, which is the state any selection ends
+		// up in once a rotate/distort has been committed. Gating this on
+		// usesGeometryTint() left those selections showing the pre-warp veil.
+		// An INVERTED selection is the one case the outline cannot describe:
+		// selectionOutlineLoops() appends the document border for it, so filling
+		// the loops would flood the whole canvas.
+		if (!doc.selection.inverted) this.activeScene.setSelectionTintFromLoops(transformed);
 	}
 
 	private usesGeometryTint(sel: { composite: boolean; inverted: boolean }): boolean {

@@ -82,9 +82,16 @@ const definition: EffectDefinition = {
     label: 'Motion Blur',
     icon: '🎞️',
     params: [
+        // Angle as a rotation dial. The dial reads 0 = up, clockwise (the
+        // AnglePicker convention), but the shader's own theta is measured from
+        // the +x axis with `end = (-cos t, sin t)` in UV space (y points down),
+        // so theta = 0 points LEFT and theta grows counter-clockwise on screen.
+        // `90 - angle` re-anchors it so the dial points the way the streak runs
+        // (0 -> vertical, 90 -> horizontal), instead of 0 -> horizontal.
         {
             key: 'angle',
             label: 'Angle',
+            kind: 'angle',
             min: 0,
             max: 360,
             step: 1,
@@ -120,7 +127,9 @@ const definition: EffectDefinition = {
         makeGlFilter(
             MOTION_BLUR_FRAGMENT,
             {
-                uAngle: { value: (settings.angle * Math.PI) / 180, type: 'f32' },
+                // `90 - angle`: see the param comment — maps the dial's
+                // (0 = up, clockwise) onto the shader's (-cos, +sin) theta.
+                uAngle: { value: ((90 - settings.angle) * Math.PI) / 180, type: 'f32' },
                 uDistance: { value: settings.distance, type: 'f32' },
                 uCentered: { value: settings.centered ? 1 : 0, type: 'f32' },
                 uEdgeMode: { value: settings.edgeBehavior ?? 0, type: 'f32' }

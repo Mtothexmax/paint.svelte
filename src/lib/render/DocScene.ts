@@ -79,6 +79,11 @@ export class DocScene {
 	/** Dashed ants / transient tool-draft outline (image space). */
 	private ants = new Graphics();
 	private transformHandles = new Graphics();
+	/** Group holding the translucent blue veil (either the mask sprite or the
+	 * shape graphics). Kept directly UNDER the ants and ABOVE the floating
+	 * content: the veil is a selection indicator, so it has to stay visible on
+	 * top of the lifted pixels instead of being buried by them. */
+	private veil = new Container();
 	/** Translucent blue veil showing exactly what is selected (mask texture). */
 	private tintSprite: Sprite | null = null;
 	/** Shape-based blue veil for simple rect/ellipse/lasso selections. Unlike
@@ -86,7 +91,7 @@ export class DocScene {
 	 * selection off-canvas and back restores the full region. */
 	private tintShape = new Graphics();
 	/** Floating "moved selection" content preview (image space). Rendered
-	 * between the blue tint and the ants outline while the Move tool drags the
+	 * BELOW the blue veil and the ants outline while the Move tool drags the
 	 * selected pixels around. */
 	private floating: Sprite | null = null;
 	/** Projective (4-corner) variant of the floating preview: used by the
@@ -124,7 +129,8 @@ export class DocScene {
 		this.checker.roundPixels = false;
 this.root.addChild(this.checker);
 			this.rebuildLayers(surfaces);
-		this.top.addChild(this.tintShape);
+		this.veil.addChild(this.tintShape);
+		this.top.addChild(this.veil);
 		this.top.addChild(this.ants);
 		this.top.addChild(this.transformHandles);
 		this.root.addChild(this.top);
@@ -138,6 +144,13 @@ this.root.addChild(this.checker);
 		if (this.top.parent !== this.root) this.root.addChild(this.top);
 		this.root.removeChild(this.top);
 		this.root.addChild(this.top);
+	}
+
+	/** Adds `child` directly UNDER the veil, i.e. below the selection
+	 * indicator. The floating content (plain sprite or warped mesh) goes here
+	 * so the blue veil keeps painting over it while the pixels are dragged. */
+	private addUnderVeil(child: Container): void {
+		this.top.addChildAt(child, this.top.getChildIndex(this.veil));
 	}
 
 	private rebuildLayers(surfaces: SurfaceStore): void {
@@ -654,7 +667,7 @@ this.root.addChild(this.checker);
 		this.tintShape.clear();
 		if (!texture) {
 			if (this.tintSprite) {
-				this.top.removeChild(this.tintSprite);
+				this.veil.removeChild(this.tintSprite);
 				this.tintSprite.destroy();
 				this.tintSprite = null;
 				this.raiseTop();
@@ -665,7 +678,7 @@ this.root.addChild(this.checker);
 			this.tintSprite = new Sprite(texture);
 			this.tintSprite.tint = 0x8fc7ff; // light blue veil
 			this.tintSprite.alpha = 0.32;
-			this.top.addChildAt(this.tintSprite, 0); // below the ants outline
+			this.veil.addChildAt(this.tintSprite, 0); // under the shape veil
 			this.raiseTop();
 		} else {
 			this.tintSprite.texture = texture;
@@ -682,7 +695,7 @@ this.root.addChild(this.checker);
 	 * simple shapes so the overlay is not clipped to the document-sized mask. */
 	setSelectionTintFromLoops(loops: Point[][] | null): void {
 		if (this.tintSprite) {
-			this.top.removeChild(this.tintSprite);
+			this.veil.removeChild(this.tintSprite);
 			this.tintSprite.destroy();
 			this.tintSprite = null;
 		}
@@ -741,7 +754,7 @@ this.root.addChild(this.checker);
 		}
 		if (!this.floating) {
 			this.floating = new Sprite(texture);
-			this.top.addChildAt(this.floating, this.top.getChildIndex(this.ants));
+			this.addUnderVeil(this.floating);
 			this.raiseTop();
 		}
 		this.floating.texture = texture;
@@ -791,8 +804,7 @@ this.root.addChild(this.checker);
 				verticesY: 24
 			});
 			const mesh = new Mesh({ texture, geometry: this.floatingMeshGeometry });
-			const index = this.floating ? this.top.getChildIndex(this.floating) : this.top.getChildIndex(this.ants);
-			this.top.addChildAt(mesh, index);
+			this.addUnderVeil(mesh);
 			this.floatingMesh = mesh;
 			this.raiseTop();
 		}

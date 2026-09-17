@@ -62,6 +62,8 @@
 		>
 			<span class="cs-fill" style="background-color:{rgbaToCss($backgroundColor)};"></span>
 		</button>
+		<!-- Sits between the two swatches it swaps, rather than off to the side. -->
+		<button class="cs-swap" title="Swap colours (X)" aria-label="Swap colours" onclick={swapColors}>⇄</button>
 		<button
 			class="cs cs-fg"
 			title="Foreground colour — click to edit, right-click for copy/paste"
@@ -71,6 +73,16 @@
 			<span class="cs-fill" style="background-color:{rgbaToCss($foregroundColor)};"></span>
 		</button>
 	</div>
-	<button class="mini-btn" title="Swap colours (X)" onclick={swapColors}>⇄</button>
-	<button class="mini-btn" title="Reset (D)" onclick={resetColors}>↺</button>
+	<!-- Reset. The icon IS the preview: the default colour pair (black over
+	     white), Paint.NET style — a glyph would say nothing about what it
+	     resets to. -->
+	<button
+		class="cs-reset"
+		title="Reset to black and white (D)"
+		aria-label="Reset colours to black and white"
+		onclick={resetColors}
+	>
+		<span class="cs-reset-bg" aria-hidden="true"></span>
+		<span class="cs-reset-fg" aria-hidden="true"></span>
+	</button>
 </div>

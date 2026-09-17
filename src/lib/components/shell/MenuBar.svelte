@@ -80,6 +80,18 @@
 		openMenu = openMenu === label ? null : label;
 	}
 
+	/**
+	 * A submenu header click only ever OPENS its submenu — never closes it.
+	 * Hovering the header already opens it, so a toggle made the second click
+	 * feel like it undid the first (click "Blurs" while hovering it and the
+	 * submenu you just saw appear would vanish). Setting the same key again is
+	 * a no-op, so any number of clicks leaves it open; it still switches to a
+	 * different submenu, and it lets the keyboard open one with Enter.
+	 */
+	function openSubmenu(key: string) {
+		openSub = key;
+	}
+
 	function activate(entry: MenuEntry) {
 		if (entry.type === 'command' && commands.isEnabled(entry.commandId)) {
 			commands.run(entry.commandId);
@@ -189,7 +201,7 @@
 								<button
 									class="menu-item"
 									class:open={openSub === subKey}
-									onclick={() => (openSub = openSub === subKey ? null : subKey)}
+									onclick={() => openSubmenu(subKey)}
 								>
 									<span class="menu-ic">{LABEL_ICONS[entry.label] ?? ''}</span>
 									<span class="menu-text">{entry.label}</span>

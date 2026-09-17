@@ -4,41 +4,49 @@
 	// a square pad you click / drag to place a point, plus editable X / Y number
 	// fields each with its own reset button. Bindable `value` is { x, y }.
 	//
-	// The pad maps left→minX, right→maxX and TOP→maxY (bottom→minY), so it
-	// behaves like a normal maths graph. Both axes default to -100..100.
+// The pad maps left→minX, right→maxX and TOP→maxY (bottom→minY), so it
+// behaves like a normal maths graph. Both axes default to -100..100. Pass
+// `yDown` to flip that so the top is minY — the right way round for a position
+// in image space, where Y grows downward.
 	interface Props {
 		value: { x: number; y: number };
 		minX?: number;
 		maxX?: number;
 		minY?: number;
 		maxY?: number;
-		/** quantisation step for both axes */
-		step?: number;
-		/** the per-axis value the reset buttons restore */
-		default: { x: number; y: number };
-		label?: string;
-		oninput?: () => void;
-		onCommit?: () => void;
-	}
-	let {
-		value = $bindable(),
-		minX = -100,
-		maxX = 100,
-		minY = -100,
-		maxY = 100,
-		step = 1,
-		default: dflt,
-		label,
-		oninput,
-		onCommit
-	}: Props = $props();
+	/** quantisation step for both axes */
+	step?: number;
+	/** the per-axis value the reset buttons restore */
+	default: { x: number; y: number };
+	/** Y grows downward (top = minY) instead of the maths-graph convention
+	 * (top = maxY). Set this when the pair is a position in image space. */
+	yDown?: boolean;
+	label?: string;
+	oninput?: () => void;
+	onCommit?: () => void;
+}
+let {
+	value = $bindable(),
+	minX = -100,
+	maxX = 100,
+	minY = -100,
+	maxY = 100,
+	step = 1,
+	default: dflt,
+	yDown = false,
+	label,
+	oninput,
+	onCommit
+}: Props = $props();
 
-	let padEl: HTMLDivElement;
-	let dragging = $state(false);
+let padEl: HTMLDivElement;
+let dragging = $state(false);
 
-	// Normalised 0..1 positions within the pad (y inverted: top = maxY).
-	const tx = $derived((value.x - minX) / (maxX - minX));
-	const ty = $derived(1 - (value.y - minY) / (maxY - minY));
+// Normalised 0..1 positions within the pad (y inverted unless `yDown`).
+const tx = $derived((value.x - minX) / (maxX - minX));
+const ty = $derived(
+	yDown ? (value.y - minY) / (maxY - minY) : 1 - (value.y - minY) / (maxY - minY)
+);
 
 	function clampStep(v: number, lo: number, hi: number): number {
 		const s = Math.max(1e-6, Math.abs(step));
@@ -55,7 +63,9 @@
 		const nx = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
 		const ny = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
 		const x = clampStep(minX + nx * (maxX - minX), minX, maxX);
-		const y = clampStep(maxY - ny * (maxY - minY), minY, maxY);
+		const y = yDown
+			? clampStep(minY + ny * (maxY - minY), minY, maxY)
+			: clampStep(maxY - ny * (maxY - minY), minY, maxY);
 		value = { x, y };
 		emit();
 	}

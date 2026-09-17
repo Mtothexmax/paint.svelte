@@ -64,7 +64,17 @@ for (const [path, mod] of Object.entries(modules)) {
 		id,
 		menu: entry.menu ?? (folder ? titleCase(folder.split('/').pop()!) : 'Effects'),
 		defaults: Object.fromEntries(
-			entry.params.map((p) => [p.key, p.default])
+			entry.params.flatMap((p) =>
+				// An `xy` param stores its two halves under `keyX` / `keyY`, so it
+				// has to seed BOTH of those — seeding only `key` left filters that
+				// read `settings.keyX` with `undefined`, i.e. NaN in the uniform.
+				p.kind === 'xy'
+					? [
+							[`${p.key}X`, p.default],
+							[`${p.key}Y`, p.defaultY ?? p.default]
+						]
+					: [[p.key, p.default]]
+			)
 		) as EffectSettings
 	});
 }

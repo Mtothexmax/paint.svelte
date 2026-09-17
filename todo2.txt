@@ -259,3 +259,272 @@ Behaviour:
 Svelte note: a leading space inside `{#if}` is trimmed by the compiler, so
 "{x}{#if c} · suffix{/if}" renders as "(...)·suffix". Use an entity
 (`&nbsp;·`) or an expression -- an entity is never trimmed.
+
+-- DONE (Distort: stale blue veil after a rotation, + rotate gizmo pivot) --
+Report: "i apply some rotation and then the distort tool after moving a corner
+still shows the old blueish highlighting".
+
+Two independent causes:
+ 1. The veil was drawn BELOW the floating content. `DocScene.top` was ordered
+    [tintSprite|tintShape, floating, ants, transformHandles] — the floating
+    sprite was inserted at getChildIndex(ants), i.e. above both veils — so as
+    soon as a Move/Distort session lifted the pixels the opaque content buried
+    the veil. Measured: veil pixels 63844 -> 0 after a plain distort corner drag.
+ 2. `previewWarpedSelectionOutline()` gated the veil refresh on
+    `usesGeometryTint(sel) = !composite && !inverted`, but `drop()` sets
+    `composite = true` for ANY committed warp/rotation — so after the rotation
+    the reporter applied, later distort drags left the veil on the pre-warp
+    shape. (A sprite cannot express a homography, so the warped outline fill is
+    the only option for a projective preview.)
+
+Fix:
+ - `DocScene`: new `veil` Container (tintShape + tintSprite) added directly
+   under `ants`; new `addUnderVeil(child)` puts the floating sprite AND the
+   warped floating mesh below it. Order is now
+   [floating|floatingMesh, veil, ants, transformHandles].
+ - `EditorRenderer.previewWarpedSelectionOutline`: gate is now
+   `!doc.selection.inverted` instead of `usesGeometryTint(sel)`, so composite
+   selections get the warped geometry fill too. Inverted stays excluded because
+   `selectionOutlineLoops()` appends the document border for it and filling the
+   loops would flood the whole canvas.
+
+Bonus bug found while verifying:
+ - `MoveEngine.bakeAffineIntoQuad()` zeroed `offset` without moving `pivot`.
+   `gizmoCenter()` is pivot + offset and `quadForRotation` revolves about
+   `pivot`, so after a committed move the Rotate rings sat on the PRE-move
+   selection (measured 282.8 px off) and a drag swung the content around the old
+   centre. The pivot now absorbs the offset.
+ - `setMode()`'s distort branch folds `currentQuad()` (rot3 AND offset) into
+   `warpQuad`; it now also calls `bakeAffineIntoQuad()` so the affine state is
+   not applied a second time on top of the quad that already contains it.
+
+Verified in headless Chrome (800x600, black layer so the veil composites to a
+predictable rgb(46,64,82)):
+    A/B probe — distort drag WITHOUT a prior rotation: veil 63844 -> 101440 px,
+      box follows the dragged NW corner.
+    A/B probe — distort drag WITH rotate+Apply first: veil 58406 -> 93957 px,
+      box follows the dragged NW corner.
+    5-step regression, 5/5 PASS:
+      1 marquee visible (63918 px)
+      2 move veil travels exactly +200/+200 (centre 473,356 -> 673,556)
+      3 veil visible mid-rotate (55390 px)
+      4 veil visible after Apply (54735 px)
+      5 Ctrl+D clears the veil (0 px)
+    Ring-centre probe: ring centre - veil centre = 0.0 px after a move.
+  tsc clean, svelte-check 0 errors / 52 warnings (4 below the 56 baseline),
+  zero console errors.
+
+Also re-verified, no code change needed: the Resize Image dialog is already a
+`MovableDialog` — `.m-dialog`, aria-modal="false", an "X" close button, NO
+backdrop, and drag-by-title moves it. 7/7 PASS.
+
+Files: src/lib/render/DocScene.ts, src/lib/render/EditorRenderer.ts,
+       src/lib/render/MoveEngine.ts
+Probes: .workbuddy-ai/distort-veil-ab.mjs, veil-regression.mjs, ring-centre.mjs,
+        resize-dialog.mjs
+
+-- DONE (colour picker: transparency slider, slider double-clicks, swap/reset) --
+Request:
+  "at the color picker below the lightness slider there should also be a
+   transparency slider
+   also double click left on the lightness slighter sets the color to dark,
+   double click right mouse sets it to bright
+   same double click on the transparency slider sets it to alpha 100 and right
+   mouse button double click to alpha 0
+   also the switch colors button should be between foreground and background
+   color and the reset icon should similar to paint.net have a preview of the
+   two colors, so a black and white rectangle"
+
+The picker meant is components/shell/ToolbarColorPicker.svelte (the one at the
+bottom of the left tool column). ColorPickerPanel.svelte is the full "Colour"
+mode and already had hue + alpha strips.
+
+ToolbarColorPicker.svelte:
+ - New `alpha` state (0..255), synced from $foregroundColor.a OUTSIDE the
+   existing rgb guard in the sync effect: the alpha can change on its own (full
+   picker panel, reset, eyedropper) while r/g/b stay put, and the guard would
+   have skipped it. The effect never reads `alpha`, so writing it cannot loop.
+ - commit() / applySelected() now carry alpha. The background slot keeps its own
+   alpha instead of being clobbered by the foreground slider.
+ - Transparency range input BELOW the brightness one, 0..100 in slider units
+   (0 = opaque, 100 = invisible); alpha derived as round((1 - t/100) * 255).
+   Thumb shows the colour at its real alpha.
+ - Alpha track = colour -> transparent gradient over a MID-GREY checkerboard
+   (#6a6a6a / #454545). The swatches' near-black one made an opaque BLACK left
+   end invisible.
+ - Shared isDoubleClick(e, zone) helper replaces the inline lastClick check.
+   `dblclick` only fires for the primary button, so the right-button half of
+   every gesture is tracked by hand; `zone` keeps a click on one control from
+   pairing with a click on another.
+ - Brightness: dbl-left -> l = 0 (dark), dbl-right -> l = 100 (bright).
+ - Transparency: dbl-left -> alpha 255, dbl-right -> alpha 0. The slider reads
+   TRANSPARENCY, so its ends are the alpha extremes the other way round — which
+   is what makes left/right mean the same visual direction on both sliders.
+
+ColorBar.svelte + src/routes/layout.css:
+ - Stack widened 40 -> 56px, swap button moved INSIDE it at left:25px so it sits
+   between the swatches (fg 0-25, swap 25-41, bg 41-56). Deliberately low-key:
+   transparent, dim #9a9a9a, hover brightens.
+ - Reset is no longer the "↺" glyph: a 20x18 chip showing a 12px black square
+   over a white square (the default colour pair), Paint.NET style — the icon now
+   previews what it resets to.
+
+Verified in headless Chrome (800x600):
+    color-ui.mjs — 11/11 PASS. Both sliders present, transparency one below the
+      brightness one (top 855 > 835). dbl-left brightness -> slider 0, swatch
+      rgb(0,0,0). dbl-right -> slider 100, rgb(255,255,255). dbl-right
+      transparency -> slider 100, rgba(255,255,255,0). dbl-left -> slider 0,
+      rgba(255,255,255,1). A SINGLE click still scrubs (31 / a176), so the reset
+      is not firing on ordinary clicks. Geometry fg 0-25, swap 25-41, bg 41-56.
+      Reset chip computed rgb(0,0,0) + rgb(255,255,255).
+    alpha-paint.mjs — proves the slider reaches the canvas: white layer, same red
+      stroke at alpha 255 -> sampled (249,27,6); at alpha 128 -> (252,141,130),
+      a white/red blend. (BrushEngine already multiplied by color.a/255, so the
+      alpha was always part of the model — the toolbar picker just never set it.)
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+Files: src/lib/components/shell/ToolbarColorPicker.svelte,
+       src/lib/components/shell/ColorBar.svelte, src/routes/layout.css
+Probes: .workbuddy-ai/color-ui.mjs, alpha-paint.mjs, color-zoom.mjs,
+        color-zoom2.mjs
+
+-- DONE (effects: reuse the Mandelbrot XY pad + rotation dial in the blurs/twist) --
+Request:
+  "in the mandelbrot effect there is some xy slider and some rotation slider.
+   this should be used for the zoom blur (the xy controller) and for the
+   rotatory blur and radial blur, twist"
+
+Mandelbrot's dialog is the reference: an `xy` XY-pad param and an `angle`
+rotation-dial param. Both already existed in the registry; this was a matter of
+pointing the four effects at them instead of pairs of sliders.
+
+New plumbing:
+ - types.ts: EffectParam gains `yDown?: boolean`.
+ - XYPicker.svelte: new `yDown` prop. The pad's default maps top -> maxY (a maths
+   graph); `yDown` flips it so top -> minY, which is what a POSITION in image
+   space needs (y grows downward, like the canvas).
+ - XyParam.svelte: passes yDown={param.yDown ?? false}.
+ - registry.ts: `defaults` now seeds BOTH halves of an `xy` param
+   (`keyX` and `keyY`, the latter from `defaultY`). Without this the shader got
+   `undefined` -> NaN and the preview went blank.
+
+Per effect (all four get `yDown: true` on the centre):
+ - zoomBlur.ts      — centerX/centerY sliders -> one `center` xy pad. Keeps the
+                      Amount slider; has NO angle param, so no dial.
+ - rotaryBlur.ts    — center -> xy pad; angle 0..180 slider -> `kind: 'angle'`,
+                      -180..180. isNoop `angle <= 0` -> `angle === 0` (with
+                      negatives now reachable, `<= 0` would have no-opped them).
+ - radialBlur.ts    — center -> xy pad; angle 0..360 slider -> `kind: 'angle'`
+                      0..360 (a full turn, so the dial wraps). Quality slider
+                      kept.
+ - twist.ts         — center -> xy pad; angle -360..360 slider -> `kind: 'angle'`
+                      -180..180 (symmetric full circle).
+
+Range notes (worth knowing):
+ - Rotary Blur is NOT a behaviour change: its shader averages over the arc
+   [-a/2, +a/2], the same sample set for +a and -a, so the old 0..180 and the new
+   -180..180 describe the same effect.
+ - Twist IS a reduction: the old range reached 360, the dial can only express one
+   turn so it is capped at 180. Because twist scales the angle by radius
+   (theta = angle * f(r)), 360 is not equivalent to 0 — the maximum twist is now
+   half what it was. Flagged to the user; restoring it needs a second control
+   (e.g. a slider beside the dial).
+ - Radial Blur 0..360 is exactly one turn, so the dial loses nothing.
+
+Verified in headless Chrome (1400x900):
+    fx-controls.mjs — 13/13 PASS. All four dialogs open with a pad; Rotary /
+      Radial / Twist also show a dial (Zoom Blur has no angle param, correctly no
+      dial); no "Center X/Y" slider survives anywhere. The pad really reaches its
+      range and Y points DOWN — pad is 120x120, dragging to each edge MIDPOINT
+      gives left [3,50], right [98,50], top [50,3], bottom [50,98] (so the top
+      edge is the MINIMUM y). Apply renders a real blur (109/250 scanline samples
+      changed) and no NaN appears (white stays white).
+      NB the pad is a rounded rect, so its literal corner pixels hit the wrapper,
+      not the pad — probe the edges at their midpoints, not the corners.
+    fx-shots.mjs — captured fx-zoom-blur.png, fx-rotary-blur.png,
+      fx-radial-blur.png, fx-twist.png.
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+Files: src/lib/effects/types.ts, src/lib/components/common/XYPicker.svelte,
+       src/lib/components/common/XyParam.svelte, src/lib/effects/registry.ts,
+       src/lib/effects/blurs/zoomBlur.ts, src/lib/effects/blurs/rotaryBlur.ts,
+       src/lib/effects/blurs/radialBlur.ts, src/lib/effects/distort/twist.ts
+Probes: .workbuddy-ai/fx-controls.mjs, fx-shots.mjs
+
+-- DONE (menus: a submenu header click must never close the submenu) --
+Request:
+  "was mich auch schon seit langem etwas stört, generell bei menüs aber mal am
+   beispiel des effekts menu. ich klicke auf effects, dann hovere ich auf blurs,
+   dann öffnet sich das untermenü, aber wenn ich dann nochmal auf blurs klicke
+   schließt es sich wieder. das ist unintuitiv. selbst wenn ich 10 mal auf blurs
+   klicke soll sich kein einziges mal das untermenü schließen"
+
+Cause: MenuBar.svelte's submenu header. Hovering already opens the submenu
+(onpointerenter on .sub-holder), but the click handler TOGGLED:
+  onclick={() => (openSub = openSub === subKey ? null : subKey)}
+The pointer is necessarily on the header when you click it, so the submenu was
+already open and the click closed it — it looked like the click undid the hover.
+Each further click re-opened it, hence the open/closed flicker.
+
+Fix: the click may only ever OPEN. New openSubmenu(key) sets openSub = key
+unconditionally; re-setting the same key is a no-op, so 10 clicks leave it open.
+It still switches to a different submenu, and Enter can now open one.
+
+Scope: MenuBar.svelte is the ONLY place with this pattern — ContextMenu.svelte
+is a flat list with no submenus. The top-level menubar button keeps its toggle
+on purpose (clicking "Effects" again closing the menu is standard, and was not
+the complaint).
+
+Verified in headless Chrome (1400x900):
+    submenu-click.mjs — 15/15 PASS, reproducing the reported flow verbatim:
+      hover "Blurs" -> opens -> 10 real clicks on the header -> open open open
+      open open open open open open open, with the 9 effect items still listed.
+      Plus: moving into the submenu keeps it open; clicking an item still opens
+      the effect (dialog "Frosted Glass"); hovering another header switches and
+      leaves exactly ONE header marked open; hovering away closes the submenu
+      but not the menu; clicking the menubar button closes the menu.
+      The probe was shown to CATCH the bug: restoring the old toggle printed
+      "CLOSED open CLOSED open ..." and FAILed. Note that the naive "still open
+      after the 10th click" check PASSES under the bug (click 10 is closed->open),
+      so the per-click assertion is the one that matters.
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+Files: src/lib/components/shell/MenuBar.svelte
+Probe: .workbuddy-ai/submenu-click.mjs
+
+-- DONE (Motion Blur: angle slider -> rotation dial) --
+Request:
+  "und angle picker bei motion blur"
+
+motionBlur.ts: `angle` was a plain slider (0..360) -> now `kind: 'angle'`, same
+0..360 range (a full turn, so the dial wraps).
+
+The range change ALONE would have been wrong. The dial reads 0 = up, clockwise
+(AnglePicker convention), but the shader's theta is measured from the +x axis:
+  vec2 endOffset = vec2(-uDistance * cos(uAngle), uDistance * sin(uAngle)) * texel;
+in UV space where y points DOWN. So shader theta = 0 points LEFT and grows
+counter-clockwise on screen — dial 0 would have given a HORIZONTAL blur. Fixed by
+re-anchoring in filter():
+  uAngle: { value: ((90 - settings.angle) * Math.PI) / 180, type: 'f32' }
+Derivation: the streak must run along the dial direction (sin D, -cos D). With
+centered = 0 the shader samples v + t*e, so a dot at P smears onto [P, P - e] —
+it extends along -e. Setting -e = (sin D, -cos D) with e = (-cos t, sin t) gives
+t = 90 - D. Hence 0 -> vertical, 90 -> horizontal.
+This changes how the default 25 renders (it used to mean shader theta 25,
+left-ish) — which is the point: the dial now points where the streak runs.
+
+Verified in headless Chrome (1400x900):
+    motion-angle.mjs — 11/11 PASS. Black dot on white, blurred with Centered OFF,
+      measuring the centroid shift of the darkened pixels (= the tail direction):
+        D=0   -> shift (0.0, -56.5)  dir (0.00, -1.00)  dot 1.00  streak 40x119
+        D=90  -> shift (56.0, 0.0)   dir (1.00,  0.00)  dot 1.00  streak 118x40
+        D=180 -> shift (0.0, 56.0)   dir (0.00,  1.00)  dot 1.00  streak 40x118
+        D=270 -> shift (-56.5, 0.0)  dir (-1.00, 0.00)  dot 1.00  streak 119x40
+      Dial direction and streak direction agree to dot product 1.00 at all four
+      cardinal angles; 0 deg is vertical, 90 deg is horizontal.
+    fx-controls.mjs — now 15/15 PASS (Motion Blur added): shows the dial
+      (25, 0..360), no pad, and no "Angle" slider left anywhere.
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+Files: src/lib/effects/blurs/motionBlur.ts
+Probes: .workbuddy-ai/motion-angle.mjs, fx-controls.mjs, fx-shots.mjs

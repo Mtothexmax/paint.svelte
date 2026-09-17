@@ -42,6 +42,13 @@ export interface EffectParam {
 	defaultY?: number;
 	/** (xy only) step for the Y axis (falls back to `step` if omitted) */
 	stepY?: number;
+	/**
+	 * (xy only) Makes the pad's Y axis grow DOWNWARD (top = minY) instead of the
+	 * default maths-graph convention (top = maxY). Use it whenever the pair is a
+	 * position in image space — a blur centre, a focal point — so dragging the
+	 * dot up moves it towards the TOP of the picture rather than away from it.
+	 */
+	yDown?: boolean;
 }
 
 export type EffectSettings = Record<string, number>;

@@ -60,8 +60,22 @@ const definition: EffectDefinition = {
             step: 1,
             default: AMOUNT
         },
-        { key: 'centerX', label: 'Center X', min: 0, max: 100, step: 1, default: 50 },
-        { key: 'centerY', label: 'Center Y', min: 0, max: 100, step: 1, default: 50 }
+        // Centre as a draggable point rather than two sliders — this is the
+        // "zoom from here" origin, so the pad reads far better than a pair of
+        // numbers. `yDown` because the centre is a position in IMAGE space.
+        {
+            key: 'center',
+            label: 'Center',
+            kind: 'xy',
+            minX: 0,
+            maxX: 100,
+            minY: 0,
+            maxY: 100,
+            step: 1,
+            default: 50,
+            defaultY: 50,
+            yDown: true
+        }
     ],
     filter: (settings: EffectSettings) =>
         makeGlFilter(

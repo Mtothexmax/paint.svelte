@@ -73,29 +73,29 @@ const definition: EffectDefinition = {
     label: 'Radial Blur',
     icon: '💫',
     params: [
+        // Full 0..360 circle: the dial wraps, and the shader sweeps the arc
+        // [-angle, +angle], so 360 is the strongest blur the effect offers.
         {
             key: 'angle',
             label: 'Angle',
+            kind: 'angle',
             min: 0,
             max: 360,
             step: 1,
             default: ANGLE
         },
         {
-            key: 'centerX',
-            label: 'Center X',
-            min: 0,
-            max: 100,
+            key: 'center',
+            label: 'Center',
+            kind: 'xy',
+            minX: 0,
+            maxX: 100,
+            minY: 0,
+            maxY: 100,
             step: 1,
-            default: 50
-        },
-        {
-            key: 'centerY',
-            label: 'Center Y',
-            min: 0,
-            max: 100,
-            step: 1,
-            default: 50
+            default: 50,
+            defaultY: 50,
+            yDown: true
         },
         {
             key: 'quality',

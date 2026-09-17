@@ -38,16 +38,32 @@ const definition: EffectDefinition = {
 	label: 'Rotary Blur',
 	icon: '🌀',
 	params: [
+		// The dial traverses a full circle, so the range is the symmetric one it
+		// can actually reach. This is not a behaviour change: the shader
+		// averages over the arc `[-angle/2, +angle/2]`, which is the same set of
+		// samples for +a and -a.
 		{
 			key: 'angle',
 			label: 'Angle',
-			min: 0,
+			kind: 'angle',
+			min: -180,
 			max: 180,
 			step: 1,
 			default: ANGLE
 		},
-		{ key: 'centerX', label: 'Center X', min: 0, max: 100, step: 1, default: 50 },
-		{ key: 'centerY', label: 'Center Y', min: 0, max: 100, step: 1, default: 50 }
+		{
+			key: 'center',
+			label: 'Center',
+			kind: 'xy',
+			minX: 0,
+			maxX: 100,
+			minY: 0,
+			maxY: 100,
+			step: 1,
+			default: 50,
+			defaultY: 50,
+			yDown: true
+		}
 	],
 	filter: (settings: EffectSettings) =>
 		makeGlFilter(
@@ -58,7 +74,7 @@ const definition: EffectDefinition = {
 			},
 			0
 		),
-	isNoop: (settings: EffectSettings) => settings.angle <= 0
+	isNoop: (settings: EffectSettings) => settings.angle === 0
 };
 
 export default definition;

@@ -1,0 +1,211 @@
+c:\dev\paint.svelte\[32msrc\lib\components\shell\TabBar.svelte[39m:27:4
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:74:2
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:74:2
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:75:21
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:75:21
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:76:2
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\IconSplitButton.svelte[39m:76:2
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:362:3
+[33mWarn[39m: `<div>` with a dragover or drop handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:369:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:369:5
+[33mWarn[39m: `<div>` with a click, contextmenu, dragstart, dragover, drop, dragend, pointerenter or pointerleave handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:420:9
+[33mWarn[39m: Visible, non-interactive element `<span>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\LayersPanel.svelte[39m:420:9
+[33mWarn[39m: `<span>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:2015:3
+[33mWarn[39m: `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:2060:4
+[33mWarn[39m: `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:2075:4
+[33mWarn[39m: `<div>` with a pointerdown handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\canvas\EditorCanvas.svelte[39m:109:5
+[33mWarn[39m: `host` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:72:1
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:72:1
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:73:2
+[33mWarn[39m: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\NewImageDialog.svelte[39m:73:2
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\MovableDialog.svelte[39m:56:2
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XYPicker.svelte[39m:119:3
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\AnglePicker.svelte[39m:105:3
+[33mWarn[39m: `<svg>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:15:16
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:16:16
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:18:6
+[33mWarn[39m: This reference only captures the initial value of `settings`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:18:22
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:19:6
+[33mWarn[39m: This reference only captures the initial value of `settings`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:19:23
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\XyParam.svelte[39m:19:41
+[33mWarn[39m: This reference only captures the initial value of `param`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\EffectDialog.svelte[39m:26:25
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LayerEffectDialog.svelte[39m:30:25
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LayerEffectDialog.svelte[39m:33:3
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LayerEffectDialog.svelte[39m:34:23
+[33mWarn[39m: This reference only captures the initial value of `payload`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\CurvesDialog.svelte[39m:203:3
+[33mWarn[39m: `<svg>` with a pointerdown, pointermove, pointerup or dblclick handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LevelsDialog.svelte[39m:363:5
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\dialogs\LevelsDialog.svelte[39m:377:5
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\ContextSlider.svelte[39m:14:19
+[33mWarn[39m: This reference only captures the initial value of `value`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\ContextMenu.svelte[39m:54:2
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\common\ContextMenu.svelte[39m:10:6
+[33mWarn[39m: `root` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:192:1
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:214:6
+[33mWarn[39m: Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:230:7
+[33mWarn[39m: Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\shell\ColorPickerPanel.svelte[39m:241:7
+[33mWarn[39m: Elements with the ARIA role "slider" must have the following attributes defined: "aria-valuenow"
+https://svelte.dev/e/a11y_role_has_required_aria_props (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:241:1
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:242:2
+[33mWarn[39m: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:265:6
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:265:6
+[33mWarn[39m: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:291:3
+[33mWarn[39m: `<div>` with a dragover or drop handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:293:5
+[33mWarn[39m: Visible, non-interactive element `<div>` with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\panels\EffectPanel.svelte[39m:293:5
+[33mWarn[39m: `<div>` with a click, dragstart, dragover, drop or dragend handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+c:\dev\paint.svelte\[32msrc\lib\components\App.svelte[39m:42:1
+[33mWarn[39m: `<div>` with a contextmenu handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+
+====================================
+[33msvelte-check found 0 errors and 52 warnings in 18 files
+[39m

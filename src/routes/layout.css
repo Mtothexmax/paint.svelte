@@ -243,10 +243,12 @@ body {
 }
 
 /* ---- color bar ---- */
+/* Foreground | swap | background. The stack is wide enough for the swap button
+   to sit BETWEEN the two swatches instead of beside them. */
 .color-stack {
 	position: relative;
-	width: 40px; /* foreground 25px at left; background shifted 4px further right */
-	height: 25px; /* equals bar height / foreground width */
+	width: 56px;
+	height: 25px;
 	flex: 0 0 auto;
 }
 .cs-fg,
@@ -269,20 +271,82 @@ background-size: 6px 6px;
 	inset: 0;
 	pointer-events: none;
 }
-/* background: smaller square, vertically centered, offset behind (peeks right) */
+/* background: smaller square, vertically centered, on the right */
 .cs-bg {
 	right: 0;
-	width: 14px;
-	height: 16px;
+	width: 15px;
+	height: 17px;
 	z-index: 1;
 	border-color: rgba(255, 255, 255, 0.35);
 }
-/* foreground: a square that fills the bar's vertical space, in front on the left */
+/* foreground: a square that fills the bar's vertical space, on the left */
 .cs-fg {
 	left: 0;
 	width: 25px;
 	height: 25px;
 	z-index: 2;
+}
+/* Swap: the gap between the two swatches, deliberately low-key. */
+.cs-swap {
+	position: absolute;
+	left: 25px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 16px;
+	height: 16px;
+	z-index: 3;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 13px;
+	line-height: 1;
+	color: #9a9a9a;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+.cs-swap:hover {
+	color: #e6e6e6;
+	background: rgba(255, 255, 255, 0.08);
+}
+/* Reset: a miniature of the default colour pair — white behind, black in
+   front — so the button previews what it resets to. */
+.cs-reset {
+	position: relative;
+	width: 20px;
+	height: 18px;
+	flex: 0 0 auto;
+	padding: 0;
+	background: transparent;
+	border: none;
+	cursor: pointer;
+}
+.cs-reset-bg,
+.cs-reset-fg {
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	border-radius: 2px;
+	border: 1px solid rgba(255, 255, 255, 0.55);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.cs-reset-bg {
+	right: 0;
+	bottom: 0;
+	background: #ffffff;
+	z-index: 1;
+}
+.cs-reset-fg {
+	left: 0;
+	top: 0;
+	background: #000000;
+	z-index: 2;
+}
+.cs-reset:hover .cs-reset-bg,
+.cs-reset:hover .cs-reset-fg {
+	border-color: rgba(255, 255, 255, 0.95);
 }
 .swatch-input {
 	position: absolute;
