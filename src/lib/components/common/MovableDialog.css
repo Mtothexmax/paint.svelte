@@ -1,4 +1,4 @@
-/* ---- movable dialog (filter popups, image-size, curves, levels, …) ----
+﻿/* ---- movable dialog (filter popups, image-size, curves, levels, …) ----
    Claude-style chrome panel: dark gradient shell with grain noise overlay,
    4-layer box-shadow (inset highlight on top + inset shadow at bottom +
    wide soft drop-shadow), 10px rounded corners, and a chrome-bar title
@@ -40,7 +40,7 @@
 	/* Stay just below interactive content but above the gradient bg. */
 	z-index: 0;
 }
-/.m-dialog > * {
+.m-dialog > * {
 	/* Lift content above the grain layer. */
 	position: relative;
 	z-index: 1;

@@ -1,1 +1,0 @@
-import{r as e}from"../nodes/2.TzLj9tal.js";export{e as createNewDocument};
