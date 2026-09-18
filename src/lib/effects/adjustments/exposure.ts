@@ -34,6 +34,7 @@ const definition: EffectDefinition = {
 			max: 5,
 			step: 0.1,
 			default: 0,
+			centerTick: true,
 			gradient: 'linear-gradient(90deg, #000 0%, #808080 50%, #fff 100%)'
 		}
 	],

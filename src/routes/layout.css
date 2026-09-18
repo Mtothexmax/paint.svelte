@@ -464,6 +464,43 @@ background-size: 6px 6px;
 	font-size: 16px;
 	font-weight: 600;
 	border-bottom: 1px solid var(--border);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+.dialog-close {
+	background: none;
+	border: none;
+	color: var(--text-dim);
+	font-size: 14px;
+	cursor: pointer;
+	padding: 2px 8px;
+	border-radius: 4px;
+}
+.dialog-close:hover {
+	background: rgba(255, 255, 255, 0.1);
+	color: var(--text);
+}
+/* swap-dimensions button between the Width/Height fields (⇄ like the
+   foreground/background swap in the color bar) */
+.swap-dims {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-size: 15px;
+	line-height: 1;
+	cursor: pointer;
+}
+.swap-dims:hover {
+	border-color: var(--accent);
 }
 .dialog-footer {
 	display: flex;

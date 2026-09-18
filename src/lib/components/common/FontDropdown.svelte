@@ -201,7 +201,7 @@
 		<span class="fontdrop-arrow">▾</span>
 	</button>
 	{#if open}
-		<div class="fontdrop-backdrop" onclick={() => (open = false)} onkeydown={onKey} role="presentation"></div>
+		<div class="fontdrop-backdrop" onmousedown={() => (open = false)} onkeydown={onKey} role="presentation"></div>
 		<div class="fontdrop-pop" bind:this={popEl} role="listbox" aria-label="Font family">
 			<div class="fontdrop-search-row">
 				<input

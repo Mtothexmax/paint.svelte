@@ -66,7 +66,8 @@ const definition: EffectDefinition = {
             min: -100,
             max: 100,
             step: 1,
-            default: AMOUNT
+            default: AMOUNT,
+            centerTick: true
         },
         {
             key: 'radiusPercentage',

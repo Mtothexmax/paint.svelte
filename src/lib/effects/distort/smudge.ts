@@ -34,7 +34,8 @@ const definition: EffectDefinition = {
 			min: -100,
 			max: 100,
 			step: 1,
-			default: STRENGTH
+			default: STRENGTH,
+			centerTick: true
 		},
 		// Focal point as a pad (image-space position -> Y runs downward).
 		{

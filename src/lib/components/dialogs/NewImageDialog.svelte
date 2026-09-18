@@ -32,6 +32,12 @@
 		height = h;
 	}
 
+	function swapDims() {
+		const w = width;
+		width = height;
+		height = w;
+	}
+
 	async function create() {
 		if (!validation.ok) return;
 		const bg: 'transparent' | string = background === 'transparent' ? 'transparent' : background === 'white' ? '#ffffff' : customColor;
@@ -69,17 +75,27 @@
 	});
 </script>
 
-<div class="dialog-backdrop" onclick={() => closeDialog()}>
-	<div class="dialog" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="New image">
-		<h2 class="dialog-title">New Image</h2>
+<div class="dialog-backdrop">
+	<div class="dialog" role="dialog" aria-modal="true" aria-label="New image">
+		<h2 class="dialog-title">
+			<span>New Image</span>
+			<button class="dialog-close" title="Close" aria-label="Close" onclick={() => closeDialog()}>✕</button>
+		</h2>
 
 		<div class="space-y-3 p-4">
-			<div class="grid grid-cols-2 gap-3">
-				<label class="field">
+			<div class="flex items-end gap-2">
+				<label class="field flex-1">
 					<span class="field-label">Width (px)</span>
 					<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
 				</label>
-				<label class="field">
+				<button
+					type="button"
+					class="swap-dims"
+					title="Swap width and height"
+					aria-label="Swap width and height"
+					onclick={swapDims}
+				>⇄</button>
+				<label class="field flex-1">
 					<span class="field-label">Height (px)</span>
 					<input type="number" min="1" max={MAX_DIMENSION} bind:value={height} />
 				</label>

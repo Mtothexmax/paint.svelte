@@ -115,6 +115,7 @@
 				bind:value={settings[param.key]}
 				oninput={preview}
 				gradient={param.gradient}
+				centerTick={param.centerTick}
 			/>
 		{/if}
 	{/each}

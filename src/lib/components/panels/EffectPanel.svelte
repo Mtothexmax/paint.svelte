@@ -384,6 +384,7 @@
 							bind:value={selectedEff.settings[param.key]}
 							oninput={pushSettings}
 							gradient={param.gradient}
+							centerTick={param.centerTick}
 						/>
 					{/if}
 				{/each}

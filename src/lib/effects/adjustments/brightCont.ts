@@ -65,6 +65,7 @@ const definition: EffectDefinition = {
 			max: 100,
 			step: 1,
 			default: 0,
+			centerTick: true,
 			gradient: 'linear-gradient(90deg, #000 0%, #fff 100%)'
 		},
 		{
@@ -74,6 +75,7 @@ const definition: EffectDefinition = {
 			max: 100,
 			step: 1,
 			default: 0,
+			centerTick: true,
 			gradient:
 				'linear-gradient(90deg, #808080 0%, #505050 15%, #b0b0b0 30%, #202020 45%, #e0e0e0 60%, #000000 70%, #000000 76%, #ffffff 76%, #ffffff 82%, #000000 82%, #000000 88%, #ffffff 88%, #ffffff 94%, #000000 94%, #000000 100%)'
 		}

@@ -87,7 +87,8 @@ const definition: EffectDefinition = {
             min: -100,
             max: 100,
             step: 1,
-            default: BRIGHTNESS
+            default: BRIGHTNESS,
+            centerTick: true
         },
         {
             key: 'contrast',
@@ -95,7 +96,8 @@ const definition: EffectDefinition = {
             min: -100,
             max: 100,
             step: 1,
-            default: CONTRAST
+            default: CONTRAST,
+            centerTick: true
         }
     ],
     filter: (settings: EffectSettings) =>

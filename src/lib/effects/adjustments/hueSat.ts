@@ -26,6 +26,7 @@ const definition: EffectDefinition = {
 			max: 180,
 			step: 1,
 			default: HUE,
+			centerTick: true,
 			gradient: HUE_GRADIENT
 		},
 		{

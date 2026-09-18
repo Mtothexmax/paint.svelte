@@ -22,6 +22,9 @@ export interface EffectParam {
 	default: number;
 	/** Optional CSS background painted on the slider track */
 	gradient?: string;
+	/** Opt-in center tick (range middle — 0 on symmetric ranges) on the
+	 * slider track. Explicit per param, never automatic. */
+	centerTick?: boolean;
 	/**
 	 * UI kind: 'slider' (default) renders a FilterSlider bound to
 	 * `settings[key]`; 'color' renders a foreground/background color-picker
