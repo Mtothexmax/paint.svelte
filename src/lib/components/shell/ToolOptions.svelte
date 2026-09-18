@@ -9,6 +9,7 @@
 		brushOpacity,
 		brushHardness,
 		brushSpacing,
+		foregroundColor,
 		antiAliasMode,
 		moveToolMode,
 		selectionMode,
@@ -16,6 +17,7 @@
 		selectionFixedRatio,
 		selectionFixedSize
 	} from '../../state/ui';
+	import { rgbaToCss } from '../../core/color';
 	import {
 		textFontFamily,
 		textFontSize,
@@ -326,7 +328,80 @@
 		if (store === 'ratio') selectionFixedRatio.update((o) => ({ ...o, [key]: n }));
 		else selectionFixedSize.update((o) => ({ ...o, [key]: n }));
 	}
+
+	// Brush-circle preview popup while dragging a brush slider (Size / Opacity / Hardness).
+	// Single fixed-position popup, docked under the dragged slider but never over the
+	// left toolbar: if the slider sits above the toolbar, the popup starts at its right edge.
+	let showBrushPreview = $state(false);
+	let brushPreviewPos = $state({ left: 0, top: 0 });
+	let anchorSize: HTMLElement | undefined = $state();
+	let anchorOpacity: HTMLElement | undefined = $state();
+	let anchorHardness: HTMLElement | undefined = $state();
+	function openBrushPreview(anchor: HTMLElement | undefined): void {
+		showBrushPreview = true;
+		if (!anchor) return;
+		const r = anchor.getBoundingClientRect();
+		const tb = document.querySelector('.toolbar-flex')?.getBoundingClientRect();
+		const POP_W = 152;
+		const POP_H = 170;
+		let left = r.left;
+		const minLeft = (tb ? tb.right : 0) + 8;
+		if (left < minLeft) left = minLeft;
+		left = Math.max(8, Math.min(left, window.innerWidth - POP_W - 8));
+		let top = r.bottom + 8;
+		if (top + POP_H > window.innerHeight - 8) top = Math.max(8, r.top - POP_H - 8);
+		brushPreviewPos = { left: Math.round(left), top: Math.round(top) };
+	}
+	function previewDrag(anchor: HTMLElement | undefined, dragging: boolean): void {
+		if (dragging) openBrushPreview(anchor);
+		else showBrushPreview = false;
+	}
+	/** Preview circle diameter, capped to the popup. */
+	const brushPreviewSize = $derived(Math.max(2, Math.min(120, Math.round($brushSize))));
+	/** Dab falloff mirrored from getDabAlpha (BrushEngine, read-only): solid core
+	 * to h%, then smoothstep falloff to 0 at the dab edge. `circle
+	 * closest-side` puts the 100% stop exactly on the visible rim — the default
+	 * farthest-corner would cut the fade at ~71%, leaving a hard rim. */
+	const brushPreviewBg = $derived.by(() => {
+		const fg = $foregroundColor;
+		const css = (a: number) => rgbaToCss({ r: fg.r, g: fg.g, b: fg.b, a });
+		const h = Math.max(0, Math.min(100, $brushHardness));
+		const stops = [`${css(255)} 0%`, `${css(255)} ${h}%`];
+		const falloff: Array<readonly [number, number]> = [
+			[0.25, 215],
+			[0.5, 128],
+			[0.75, 40]
+		];
+		for (const [t, a] of falloff) stops.push(`${css(a)} ${(h + (100 - h) * t).toFixed(2)}%`);
+		stops.push(`${css(0)} 100%`);
+		return `radial-gradient(circle closest-side, ${stops.join(', ')})`;
+	});
 </script>
+
+<style>
+	.brush-preview-anchor {
+		position: relative;
+		display: inline-flex;
+	}
+	.brush-preview-pop {
+		position: fixed;
+		z-index: 100;
+		width: 152px;
+		box-sizing: border-box;
+		padding: 12px;
+		background: #fff;
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+	}
+	.brush-preview-circle {
+		border-radius: 50%;
+	}
+</style>
 
 	<div class="flex h-full w-full items-center gap-4 px-2 text-xs select-none" style="color:var(--text-dim);">
 	{#if isPaint && $activeLayerIsText}
@@ -339,10 +414,52 @@
 			Render Layer to Raster Layer
 		</button>
 	{:else if isPaint && !isPencil}
-		<FilterSlider label="Size" min={1} max={300} step={1} bind:value={$brushSize} />
-		<FilterSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$brushOpacity} />
-		<FilterSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$brushHardness} />
-		<FilterSlider label="Spacing" min={1} max={300} step={1} unit="%" bind:value={$brushSpacing} />
+		<span class="brush-preview-anchor" bind:this={anchorSize}>
+			<FilterSlider
+				label="Size"
+				min={1}
+				max={300}
+				step={1}
+				bind:value={$brushSize}
+				ondragchange={(d) => previewDrag(anchorSize, d)}
+			/>
+		</span>
+		<span class="brush-preview-anchor" bind:this={anchorOpacity}>
+			<FilterSlider
+				label="Opacity"
+				min={0}
+				max={100}
+				step={1}
+				unit="%"
+				bind:value={$brushOpacity}
+				ondragchange={(d) => previewDrag(anchorOpacity, d)}
+			/>
+		</span>
+		<span class="brush-preview-anchor" bind:this={anchorHardness}>
+			<FilterSlider
+				label="Hardness"
+				min={0}
+				max={100}
+				step={1}
+				unit="%"
+				bind:value={$brushHardness}
+				ondragchange={(d) => previewDrag(anchorHardness, d)}
+			/>
+		</span>
+		{#if showBrushPreview}
+			<span
+				class="brush-preview-pop"
+				role="presentation"
+				title="Brush preview"
+				style="left:{brushPreviewPos.left}px; top:{brushPreviewPos.top}px;"
+			>
+				<span
+					class="brush-preview-circle"
+					style="width:{brushPreviewSize}px; height:{brushPreviewSize}px; background:{brushPreviewBg}; opacity:{$brushOpacity / 100};"
+				></span>
+			</span>
+		{/if}
+		<FilterSlider label="Spacing" min={1} max={300} step={1} unit="%" default={15} bind:value={$brushSpacing} />
 		<span class="aa-label">Anti-alias:</span>
 		<IconSplitButton options={AA_OPTIONS} bind:value={aa} title="Anti-aliased rendering" />
 	{:else if isPencil}

@@ -1,10 +1,9 @@
-/* ---- compact filter slider (label + value inside the track) ----
-   Single row: [-] [track with overlaid label/value] [+] [reset].
-   The overlay is click-through except for the value button / edit field. */
+/* ---- compact filter slider (sunken-well look) ----
+   Single row: [-] [grooved track with overlaid label/value] [+] [reset]. */
 .fsl {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 	min-width: 0;
 	/* Never crushed by crowded row layouts (like the old toolbar slider):
 	   the track itself shrinks down to its min-width instead. */
@@ -15,30 +14,37 @@
 }
 .fsl-step {
 	flex: 0 0 auto;
-	width: 28px;
-	height: 28px;
+	width: 20px;
+	height: 20px;
+	align-self: center;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	background: var(--bg);
-	border: 1px solid var(--border);
+	background: linear-gradient(to bottom, #3a3e45, #272a2f);
+	border: 1px solid rgba(0, 0, 0, 0.65);
 	border-radius: 5px;
 	color: var(--text);
-	font-size: 15px;
-	line-height: 1;
 	cursor: pointer;
 	padding: 0;
 	user-select: none;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.13) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5);
+	transition:
+		filter 100ms ease-out,
+		transform 100ms ease-out;
 }
 .fsl-step:hover {
-	border-color: var(--accent);
+	filter: brightness(1.18);
 }
 .fsl-step:active {
-	background: var(--accent-soft);
+	transform: translateY(1px);
+	background: linear-gradient(to bottom, #202327, #2b2f35);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) inset;
 }
 .fsl-step-ic {
-	width: 16px;
-	height: 16px;
+	width: 10px;
+	height: 10px;
 	filter: invert(0.88);
 	pointer-events: none;
 }
@@ -46,28 +52,37 @@
 	position: relative;
 	/* Definite width (not just flex-basis): all in-flow content is absolute,
 	   so the intrinsic size would collapse and drag the basis down with it.
-	   110px base like the old toolbar slider; grows in dialogs, shrinks to
-	   min-width in tight spots. */
-	width: 110px;
+	   140px base; grows in dialogs, shrinks to min-width in tight spots. */
+	width: 140px;
 	flex: 1 1 auto;
 	min-width: 48px;
 	height: 28px;
-	border-radius: 6px;
-	border: 1px solid var(--border);
-	background: var(--bg);
-	/* No pointer/hand cursor anywhere on the slider — plain arrow. */
-	cursor: default;
-	overflow: hidden;
+	border-radius: 7px;
+	/* No pointer/hand cursor anywhere on the slider — plain resize arrow. */
+	cursor: ew-resize;
 	touch-action: none;
 	user-select: none;
 	outline: none;
-	box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 .fsl-track:focus-visible {
-	border-color: var(--accent);
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 .fsl-track.dragging {
-	cursor: default;
+	cursor: ew-resize;
+}
+/* Clipped visual well: background, fill, ticks, edge/pos lines, glass. */
+.fsl-well {
+	position: absolute;
+	inset: 0;
+	border-radius: 7px;
+	border: none;
+	background: linear-gradient(to bottom, #0b0c0e, #131519);
+	overflow: hidden;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 -1px 0 rgba(255, 255, 255, 0.075),
+		0 0 0 1px rgba(0, 0, 0, 0.8);
 }
 .fsl-fill {
 	position: absolute;
@@ -75,7 +90,69 @@
 	left: 0;
 	bottom: 0;
 	width: 0;
-	background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 70%, black));
+	background: linear-gradient(
+		to bottom,
+		var(--accent),
+		color-mix(in srgb, var(--accent) 72%, black)
+	);
+	box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 35%, transparent);
+	pointer-events: none;
+}
+.fsl-fill::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 46%;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), transparent);
+	pointer-events: none;
+}
+/* Bright edge line at the fill boundary (fill tracks only), hidden flush
+   against either end. */
+.fsl-edge {
+	position: absolute;
+	top: 2px;
+	bottom: 2px;
+	width: 1.5px;
+	background: linear-gradient(180deg, transparent, rgba(223, 240, 255, 0.95), transparent);
+	pointer-events: none;
+}
+/* Knurled metal thumb at the value position (fill tracks only). Positioned
+   against the track (not the well) so it overhangs the ends at min/max. */
+.fsl-thumb {
+	position: absolute;
+	top: 2px;
+	bottom: 2px;
+	width: 11px;
+	border-radius: 3px;
+	background: linear-gradient(180deg, #f2f4f7, #b9bfc8 48%, #8e949d);
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.8),
+		0 2px 5px rgba(0, 0, 0, 0.6),
+		0 1px 0 rgba(255, 255, 255, 0.85) inset;
+	pointer-events: none;
+	transition: box-shadow 75ms ease-out;
+}
+.fsl-thumb::before {
+	content: "";
+	position: absolute;
+	inset: 3px 3px;
+	background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px);
+	border-radius: 1px;
+}
+.fsl-track.dragging .fsl-thumb {
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.85),
+		0 3px 9px rgba(0, 0, 0, 0.7),
+		0 0 12px color-mix(in srgb, var(--accent) 35%, transparent),
+		0 1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+/* Subtle glass light over the well (under the text). */
+.fsl-glass {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 45%, rgba(0, 0, 0, 0.32));
 	pointer-events: none;
 }
 /* Tick columns: one 1px tick per step across the whole track, UNDER the
@@ -118,7 +195,7 @@
 	pointer-events: none;
 }
 /* With a decorative gradient background there is no loading bar — a single
-   black line marks the position instead. */
+   black line with white outlines marks the position instead. */
 .fsl-track.has-grad .fsl-fill {
 	display: none;
 }
@@ -135,23 +212,15 @@
 		1px 0 0 #fff;
 	pointer-events: none;
 }
-/* On gradient backgrounds the label/value get a semitransparent frame so
-   they stay readable over any gradient underneath. The label frame hugs
-   only the text itself (the outer label spans the full row width). */
-.fsl-track.has-grad .fsl-label-frame,
-.fsl-track.has-grad .fsl-value {
-	background: rgba(0, 0, 0, 0.45);
-	border-radius: 4px;
-	padding: 1px 6px;
-}
 .fsl-overlay {
 	position: absolute;
 	inset: 0;
+	z-index: 3;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
-	padding: 0 10px;
+	padding: 0 7px;
 	pointer-events: none;
 }
 .fsl-overlay-label {
@@ -160,51 +229,62 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 12px;
+	font-size: 11.5px;
+	font-weight: 500;
+	color: #eef1f6;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+/* Pill frames hugging label text and value. */
+.fsl-label-frame {
+	background: rgba(0, 0, 0, 0.4);
+	border-radius: 4px;
+	padding: 1px 6px;
+}
+.fsl-valuebox {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: baseline;
+	gap: 1px;
+	background: rgba(0, 0, 0, 0.4);
+	border: 1px solid transparent;
+	border-radius: 4px;
+	padding: 1px 5px;
+	cursor: text;
+	pointer-events: auto;
+}
+.fsl-valuebox:hover {
+	border-color: rgba(255, 255, 255, 0.2);
+}
+.fsl-input {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	background: transparent;
+	color: #fff;
+	font-size: 12.5px;
 	font-weight: 600;
-	color: #fff;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-}
-.fsl-value {
-	flex: 0 0 auto;
-	pointer-events: auto;
-	background: none;
-	border: none;
-	color: #fff;
-	font-size: 12px;
-	font-weight: 700;
 	font-variant-numeric: tabular-nums;
-	padding: 1px 6px;
-	cursor: default;
-	font-family: inherit;
-	line-height: 1.4;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-}
-.fsl-value:hover {
-	background: rgba(255, 255, 255, 0.12);
-	border-radius: 4px;
-}
-.fsl-edit {
-	flex: 0 0 auto;
-	pointer-events: auto;
-	width: 64px;
-	background: rgba(0, 0, 0, 0.6);
-	border: 1px solid var(--accent);
-	border-radius: 4px;
-	color: #fff;
-	font-size: 12px;
-	font-weight: 700;
-	font-variant-numeric: tabular-nums;
-	padding: 1px 6px;
 	font-family: inherit;
 	line-height: 1.4;
 	text-align: right;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 	outline: none;
+	cursor: text;
+	pointer-events: auto;
+}
+.fsl-input:focus {
+	color: #6fd4ff;
+}
+.fsl-unit {
+	font-size: 10.5px;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.6);
 }
 .fsl-reset {
 	flex: 0 0 auto;
-	width: 28px;
-	height: 28px;
+	width: 20px;
+	height: 20px;
+	align-self: center;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -212,7 +292,7 @@
 	border: none;
 	border-radius: 5px;
 	color: var(--text-dim);
-	font-size: 15px;
+	font-size: 14px;
 	line-height: 1;
 	cursor: pointer;
 	padding: 0;

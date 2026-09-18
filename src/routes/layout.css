@@ -717,28 +717,50 @@ background-size: 6px 6px;
 }
 .seg {
 	display: inline-flex;
-	background: var(--bg);
-	border: 1px solid var(--border);
-	border-radius: 6px;
+	background: #0d0f11;
+	border-radius: 7px;
 	padding: 2px;
 	gap: 2px;
+	box-shadow:
+		0 2px 5px rgba(0, 0, 0, 0.7) inset,
+		0 0 0 1px rgba(0, 0, 0, 0.8);
 }
 .seg-btn {
-	padding: 5px 12px;
+	flex: 1 1 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 10px;
 	border: none;
-	border-radius: 4px;
+	border-radius: 6px;
 	background: transparent;
 	color: var(--text-dim);
-	font-size: 13px;
+	font-size: 12px;
+	line-height: 1.25;
+	font-weight: 500;
 	cursor: pointer;
+	transition: color 100ms;
 }
-.seg-btn.on {
-	background: var(--accent-soft);
+.seg-btn:hover {
 	color: var(--text);
 }
+.seg-btn.on {
+	background: linear-gradient(180deg, #3d434c, #2c3138);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.13) inset,
+		0 1px 3px rgba(0, 0, 0, 0.5);
+	color: #fff;
+}
+.seg-btn.on:hover {
+	color: #fff;
+}
+.seg-btn:focus-visible {
+	outline: 2px solid #6fd4ff;
+	outline-offset: 1px;
+}
 .seg-icon {
-	width: 18px;
-	height: 18px;
+	width: 16px;
+	height: 16px;
 	object-fit: contain;
 	pointer-events: none;
 }

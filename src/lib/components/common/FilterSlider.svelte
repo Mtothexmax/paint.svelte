@@ -2,14 +2,18 @@
 	import './FilterSlider.css';
 	// Layer: components. Compact single-row slider for filter dialogs: -/+
 	// step buttons around a custom drag track with the LABEL overlaid inside
-	// (left) and the value (right, click-to-edit), plus an icon-only reset
-	// button restoring the default. Same props/callback contract as the old
-	// native-range version (`oninput` live, `onCommit` discrete) so all call
-	// sites keep working.
+	// (left) and an always-editable value field (right), plus an icon-only
+	// reset button restoring the default. Same props/callback contract
+	// throughout (`oninput` live, `onCommit` discrete) so all call sites
+	// (filter popups, toolbar, panels) keep working.
+	//
+	// Look: sunken well, glowing fill, knurled thumb that overhangs the track
+	// ends at min/max, pill labels. The value field is always an input;
+	// double-click or right-click focuses + selects it for typing (a single
+	// click does nothing); typing applies live.
 	//
 	// When a `gradient` CSS string is given it paints the track background;
 	// then no fill bar is shown and a single black line marks the position.
-	import { tick } from 'svelte';
 	import MinusIcon from '@material-symbols/svg-400/rounded/remove.svg';
 	import PlusIcon from '@material-symbols/svg-400/rounded/add.svg';
 	interface Props {
@@ -33,13 +37,16 @@
 		grow?: boolean;
 		oninput?: () => void;
 		onCommit?: () => void;
+		/** Fires when a real drag starts (first move) and ends — e.g. for a
+		 * live preview popup. Plain clicks never fire it. */
+		ondragchange?: (dragging: boolean) => void;
 	}
-	let { label, value = $bindable(), min, max, step = 1, default: dflt, unit = '', gradient, centerTick = false, grow = false, oninput, onCommit }: Props = $props();
+	let { label, value = $bindable(), min, max, step = 1, default: dflt, unit = '', gradient, centerTick = false, grow = false, oninput, onCommit, ondragchange }: Props = $props();
 
 	let trackEl: HTMLDivElement | undefined = $state();
 	let dragging = false;
-	let editing = $state(false);
-	let editInput: HTMLInputElement | undefined = $state();
+	let dragNotified = false;
+	let valInput: HTMLInputElement | undefined = $state();
 	/** Timestamp of the last track press — a quick second press belongs to a
 	 * double-click (reset) and must not jump the value first. */
 	let lastDownTime = 0;
@@ -53,9 +60,15 @@
 		return Math.min(6, s.split('.')[1].replace(/0+$/, '').length || 0);
 	});
 	const displayValue = $derived(clampToRange(value).toFixed(decimals));
+	/** Input width in ch so the field hugs its content. */
+	const editCh = $derived.by(() => {
+		const ints = String(Math.floor(Math.abs(max))).length;
+		return ints + (decimals > 0 ? decimals + 1 : 0) + (min < 0 ? 1 : 0) + 1;
+	});
 
-	/** Tick columns for small discrete ranges (at most 10 intervals, steps
-	 * landing exactly on values). Gradient tracks never get ticks. */
+	/** Tick columns: small discrete ranges get one tick per step (at most 10
+	 * intervals, steps landing exactly on values). Gradient tracks never get
+	 * column ticks — only the property-driven center tick. */
 	const tickInfo = $derived.by((): { every: number; count: number } | null => {
 		if (gradient || range <= 0) return null;
 		const s = Math.max(1e-6, Math.abs(step));
@@ -65,9 +78,18 @@
 	});
 	const showTicks = $derived(tickInfo !== null);
 
+	// Mirror the live value into the field unless the user is typing in it.
+	$effect(() => {
+		const text = displayValue;
+		const el = valInput;
+		if (el && document.activeElement !== el) el.value = text;
+	});
+
 	function reset(): void {
 		if (dflt === undefined) return;
 		value = dflt;
+		// A focused field would otherwise keep showing the stale text.
+		if (valInput && document.activeElement === valInput) valInput.value = displayValue;
 		oninput?.();
 		onCommit?.();
 	}
@@ -91,8 +113,9 @@
 	}
 
 	function onTrackDown(e: PointerEvent): void {
-		// Clicks on the value button / edit field belong to them, not the drag.
-		if ((e.target as HTMLElement | null)?.closest('button, input')) return;
+		// No interactive children to exclude: presses anywhere — including on
+		// the number field (which blocks only its own focus, see below) —
+		// start a full drag, exactly like any other track position.
 		if (e.button !== 0 && e.pointerType === 'mouse') return;
 		// Second half of a double-click: skip the jump, `ondblclick` resets.
 		const now = performance.now();
@@ -110,17 +133,19 @@
 	function onTrackMove(e: PointerEvent): void {
 		if (!dragging || !trackEl?.hasPointerCapture(e.pointerId)) return;
 		setFromClientX(e.clientX, false);
+		if (!dragNotified) {
+			dragNotified = true;
+			ondragchange?.(true);
+		}
 	}
 	function onTrackUp(): void {
 		if (!dragging) return;
 		dragging = false;
+		if (dragNotified) {
+			dragNotified = false;
+			ondragchange?.(false);
+		}
 		onCommit?.();
-	}
-
-	function onTrackWheel(e: WheelEvent): void {
-		e.preventDefault();
-		const s = Math.max(1e-6, Math.abs(step));
-		setValue(value + (e.deltaY < 0 ? s : -s), true);
 	}
 
 	function stepBy(factor: number): void {
@@ -136,15 +161,16 @@
 
 	function onTrackKey(e: KeyboardEvent): void {
 		const s = Math.max(1e-6, Math.abs(step));
+		const big = e.shiftKey ? 10 * s : s;
 		let handled = true;
 		switch (e.key) {
 			case 'ArrowLeft':
 			case 'ArrowDown':
-				setValue(value - s, true);
+				setValue(value - big, true);
 				break;
 			case 'ArrowRight':
 			case 'ArrowUp':
-				setValue(value + s, true);
+				setValue(value + big, true);
 				break;
 			case 'PageDown':
 				setValue(value - 10 * s, true);
@@ -164,25 +190,36 @@
 		if (handled) e.preventDefault();
 	}
 
-	async function startEdit(): Promise<void> {
-		editing = true;
-		await tick();
-		if (editInput) {
-			editInput.value = displayValue;
-			editInput.focus();
-			editInput.select();
+	function focusValue(): void {
+		valInput?.focus();
+		valInput?.select();
+	}
+
+	function onValueInput(e: Event): void {
+		const el = e.currentTarget as HTMLInputElement;
+		const cleaned = el.value.replace(/[^0-9.\-]/g, '');
+		if (cleaned !== el.value) el.value = cleaned;
+		if (cleaned === '' || cleaned === '-' || cleaned === '.' || cleaned === '-.') return;
+		const n = parseFloat(cleaned);
+		if (Number.isFinite(n)) setValue(n, false);
+	}
+
+	function onValueKey(e: KeyboardEvent): void {
+		const el = e.currentTarget as HTMLInputElement;
+		if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+			e.preventDefault();
+			const s = Math.max(1e-6, Math.abs(step)) * (e.shiftKey ? 10 : 1);
+			setValue(value + (e.key === 'ArrowUp' ? s : -s), true);
+			el.value = displayValue;
+		} else if (e.key === 'Enter' || e.key === 'Escape') {
+			if (e.key === 'Escape') e.stopPropagation();
+			el.blur();
 		}
 	}
 
-	function commitEdit(): void {
-		if (!editing) return;
-		editing = false;
-		const n = parseFloat(editInput?.value ?? '');
-		if (Number.isFinite(n)) setValue(n, true);
-	}
-
-	function cancelEdit(): void {
-		editing = false;
+	function onValueBlur(): void {
+		if (valInput) valInput.value = displayValue;
+		onCommit?.();
 	}
 </script>
 
@@ -200,7 +237,6 @@
 		class="fsl-track"
 		class:dragging
 		class:has-grad={!!gradient}
-		style={gradient ? `background:${gradient}` : undefined}
 		role="slider"
 		tabindex="0"
 		aria-label={label}
@@ -213,76 +249,87 @@
 		onpointermove={onTrackMove}
 		onpointerup={onTrackUp}
 		onpointercancel={onTrackUp}
-		onwheel={onTrackWheel}
-		ondblclick={(e) => {
-			// Double-clicks on the value/edit controls keep their own
-			// behaviour (e.g. word-select) and must not reset.
-			if ((e.target as HTMLElement | null)?.closest('button, input')) return;
-			if (dflt === undefined) return;
-			reset();
+		onwheel={(e) => {
+			e.preventDefault();
+			const s = Math.max(1e-6, Math.abs(step));
+			setValue(value + (e.deltaY < 0 ? s : -s), true);
 		}}
 		onkeydown={onTrackKey}
 		oncontextmenu={(e) => e.preventDefault()}
+		ondblclick={(e) => {
+			// Double-clicks in the value box keep field behaviour (word
+			// select) and must not reset.
+			if ((e.target as HTMLElement | null)?.closest('.fsl-valuebox')) return;
+			if (dflt === undefined) return;
+			reset();
+		}}
 	>
-		{#if showTicks && tickInfo}
-			<div class="fsl-ticks" style="--tick:{(tickInfo.every / range) * 100}%;"></div>
-		{/if}
-		<div class="fsl-fill" style="width:{ratio * 100}%;"></div>
-		{#if showTicks && tickInfo && !gradient}
-			<div
-				class="fsl-ticks-over"
-				style="--tick:{(tickInfo.every / range) * 100}%; clip-path: inset(0 {(1 - ratio) * 100}% 0 0);"
-			></div>
-		{/if}
-		{#if centerTick}
-			<div class="fsl-tick-center"></div>
-		{/if}
-		{#if gradient}
-			<div class="fsl-pos" style="left:{ratio * 100}%;"></div>
-		{/if}
+		<div class="fsl-well" style={gradient ? `background:${gradient}` : undefined}>
+			{#if showTicks && tickInfo}
+				<div class="fsl-ticks" style="--tick:{(tickInfo.every / range) * 100}%;"></div>
+			{/if}
+			<div class="fsl-fill" style="width:{ratio * 100}%;"></div>
+			{#if showTicks && tickInfo && !gradient}
+				<div
+					class="fsl-ticks-over"
+					style="--tick:{(tickInfo.every / range) * 100}%; clip-path: inset(0 {(1 - ratio) * 100}% 0 0);"
+				></div>
+			{/if}
+			{#if centerTick}
+				<div class="fsl-tick-center"></div>
+			{/if}
+			{#if gradient}
+				<div class="fsl-pos" style="left:{ratio * 100}%;"></div>
+			{:else}
+				<div
+					class="fsl-edge"
+					style="left: calc({ratio * 100}% - 0.75px); {ratio <= 0 || ratio >= 1 ? 'opacity: 0;' : ''}"
+				></div>
+			{/if}
+			<div class="fsl-glass"></div>
+		</div>
+		<div class="fsl-thumb" style="left: calc({ratio * 100}% - 5.5px);"></div>
 		<div class="fsl-overlay">
 			<span class="fsl-overlay-label"><span class="fsl-label-frame">{label}</span></span>
-			{#if editing}
+			<span
+				class="fsl-valuebox"
+				role="button"
+				tabindex="0"
+				aria-label="{label} value — activate to type a value"
+				title="Double-click or right-click to type a value"
+				onkeydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						focusValue();
+					}
+				}}
+				oncontextmenu={(e) => {
+					e.preventDefault();
+					focusValue();
+				}}
+				ondblclick={focusValue}
+			>
 				<input
-					bind:this={editInput}
-					class="fsl-edit"
+					bind:this={valInput}
+					class="fsl-input"
 					type="text"
 					inputmode="decimal"
 					autocomplete="off"
 					spellcheck={false}
 					aria-label="{label} value"
-					onblur={commitEdit}
-					onkeydown={(e) => {
-						if (e.key === 'Enter') {
-							e.preventDefault();
-							commitEdit();
-							editInput?.blur();
-						} else if (e.key === 'Escape') {
-							e.stopPropagation();
-							e.preventDefault();
-							cancelEdit();
-						}
+					style="width:{editCh}ch;"
+					onmousedown={(e) => {
+						// Left press must not focus the field (no caret) — the
+						// pill handler above jumps like the track instead.
+						// Right button untouched so contextmenu editing works.
+						if (e.button === 0) e.preventDefault();
 					}}
+					oninput={onValueInput}
+					onkeydown={onValueKey}
+					onblur={onValueBlur}
 				/>
-			{:else}
-				<button
-					type="button"
-					class="fsl-value"
-					title="Right-click to edit value"
-					oncontextmenu={(e) => {
-						e.preventDefault();
-						void startEdit();
-					}}
-					onkeydown={(e) => {
-						if (e.key === 'Enter' || e.key === ' ') {
-							e.preventDefault();
-							void startEdit();
-						}
-					}}
-				>
-					{displayValue}{unit}
-				</button>
-			{/if}
+				{#if unit}<span class="fsl-unit">{unit}</span>{/if}
+			</span>
 		</div>
 	</div>
 	<button

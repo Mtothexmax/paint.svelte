@@ -36,6 +36,7 @@ const definition: EffectDefinition = {
 			max: 200,
 			step: 1,
 			default: SAT,
+			centerTick: true,
 			gradient: SAT_GRADIENT
 		},
 		{
@@ -45,6 +46,7 @@ const definition: EffectDefinition = {
 			max: 200,
 			step: 1,
 			default: LIGHT,
+			centerTick: true,
 			gradient: LIGHT_GRADIENT
 		}
 	],
