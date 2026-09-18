@@ -1,6 +1,11 @@
 <script lang="ts">
-	// Layer: components. New Image dialog (Slice 1).
+	// Layer: components. New Image dialog (File > New… / Ctrl+Alt+N).
+	// Uses the shared MovableDialog so it inherits the same Claude-style
+	// chrome panel as every other popup (filter popups, image size, curves,
+	// levels, …). Non-modal — the canvas stays interactive while the
+	// dialog is open, just like Paint.NET.
 	import { onMount } from 'svelte';
+	import MovableDialog from '../common/MovableDialog.svelte';
 	import { MAX_DIMENSION, MAX_PIXELS, formatBytes, surfaceBytes, validateSize } from '../../core/limits';
 	import { deviceMaxTextureSize } from '../../services/device';
 	import { createNewDocument, openFromClipboard } from '../../services/fileService';
@@ -27,6 +32,8 @@
 		background === 'transparent' ? 'Transparent' : background === 'white' ? 'White' : customColor
 	);
 
+	let widthInput: HTMLInputElement | undefined = $state();
+
 	function applyPreset(w: number, h: number) {
 		width = w;
 		height = h;
@@ -40,7 +47,8 @@
 
 	async function create() {
 		if (!validation.ok) return;
-		const bg: 'transparent' | string = background === 'transparent' ? 'transparent' : background === 'white' ? '#ffffff' : customColor;
+		const bg: 'transparent' | string =
+			background === 'transparent' ? 'transparent' : background === 'white' ? '#ffffff' : customColor;
 		const ok = await createNewDocument({ width, height, background: bg });
 		if (ok) closeDialog();
 	}
@@ -52,11 +60,6 @@
 	}
 
 	function onGlobalKey(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			e.preventDefault();
-			closeDialog();
-			return;
-		}
 		if (e.key === 'Enter') {
 			// Buttons fire their own click on Enter — don't double-create.
 			const tag = (e.target as HTMLElement)?.tagName;
@@ -67,7 +70,6 @@
 		}
 	}
 
-	let widthInput: HTMLInputElement;
 	onMount(() => {
 		widthInput?.focus();
 		window.addEventListener('keydown', onGlobalKey, true);
@@ -75,71 +77,138 @@
 	});
 </script>
 
-<div class="dialog-backdrop">
-	<div class="dialog" role="dialog" aria-modal="true" aria-label="New image">
-		<h2 class="dialog-title">
-			<span>New Image</span>
-			<button class="dialog-close" title="Close" aria-label="Close" onclick={() => closeDialog()}>✕</button>
-		</h2>
+<MovableDialog title="New Image" onClose={closeDialog} width={460}>
+	<div class="field-row">
+		<label class="field">
+			<span class="field-label">Width (px)</span>
+			<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
+		</label>
+		<button
+			type="button"
+			class="swap-dims"
+			title="Swap width and height"
+			aria-label="Swap width and height"
+			onclick={swapDims}
+		>⇄</button>
+		<label class="field">
+			<span class="field-label">Height (px)</span>
+			<input type="number" min="1" max={MAX_DIMENSION} bind:value={height} />
+		</label>
+	</div>
 
-		<div class="space-y-3 p-4">
-			<div class="flex items-end gap-2">
-				<label class="field flex-1">
-					<span class="field-label">Width (px)</span>
-					<input bind:this={widthInput} type="number" min="1" max={MAX_DIMENSION} bind:value={width} />
-				</label>
-				<button
-					type="button"
-					class="swap-dims"
-					title="Swap width and height"
-					aria-label="Swap width and height"
-					onclick={swapDims}
-				>⇄</button>
-				<label class="field flex-1">
-					<span class="field-label">Height (px)</span>
-					<input type="number" min="1" max={MAX_DIMENSION} bind:value={height} />
-				</label>
-			</div>
-
-			<div>
-				<span class="field-label">Presets</span>
-				<div class="mt-1 flex flex-wrap gap-1.5">
-					{#each presets as p (p.label)}
-						<button class="preset-chip" onclick={() => applyPreset(p.w, p.h)}>{p.label}</button>
-					{/each}
-				</div>
-			</div>
-
-			<div>
-				<span class="field-label">Background</span>
-				<div class="mt-1 flex items-center gap-4">
-					<label class="radio"><input type="radio" bind:group={background} value="transparent" /> Transparent</label>
-					<label class="radio"><input type="radio" bind:group={background} value="white" /> White</label>
-					<label class="radio">
-						<input type="radio" bind:group={background} value="custom" /> Custom
-						{#if background === 'custom'}
-							<input type="color" bind:value={customColor} class="ml-2 h-6 w-8 align-middle" />
-						{/if}
-					</label>
-				</div>
-			</div>
-
-			<div class="text-xs" style="color:#9a9a9a;">
-				~{formatBytes(bytes)} per layer &middot; background: <span style="color:#e0e0e0;">{selectedBg}</span>
-				&middot; limit: {MAX_PIXELS.toLocaleString()} px
-			</div>
-
-			{#if !validation.ok}
-				<div class="error-box">{validation.error}</div>
-			{/if}
-		</div>
-
-		<div class="dialog-footer">
-			<button class="btn-secondary" onclick={() => void fromClipboard()} title="Create a document from an image on the clipboard">
-				📋 From Clipboard…
-			</button>
-			<button class="btn-secondary" onclick={() => closeDialog()}>Cancel</button>
-			<button class="btn-primary" disabled={!validation.ok} onclick={create}>Create</button>
+	<div>
+		<span class="field-label">Presets</span>
+		<div class="presets">
+			{#each presets as p (p.label)}
+				<button type="button" class="preset-chip" onclick={() => applyPreset(p.w, p.h)}>
+					{p.label}
+				</button>
+			{/each}
 		</div>
 	</div>
-</div>
+
+	<div>
+		<span class="field-label">Background</span>
+		<div class="bg-row">
+			<label class="radio"><input type="radio" bind:group={background} value="transparent" /> Transparent</label>
+			<label class="radio"><input type="radio" bind:group={background} value="white" /> White</label>
+			<label class="radio">
+				<input type="radio" bind:group={background} value="custom" /> Custom
+				{#if background === 'custom'}
+					<input type="color" bind:value={customColor} class="color-swatch" />
+				{/if}
+			</label>
+		</div>
+	</div>
+
+	<p class="footnote">
+		~{formatBytes(bytes)} per layer &middot; background: <strong>{selectedBg}</strong>
+		&middot; limit: {MAX_PIXELS.toLocaleString()} px
+	</p>
+
+	{#if !validation.ok}
+		<div class="error-box">{validation.error}</div>
+	{/if}
+
+	{#snippet footerLeft()}
+		<button
+			type="button"
+			class="btn-secondary"
+			onclick={() => void fromClipboard()}
+			title="Create a document from an image on the clipboard"
+		>
+			📋 From Clipboard…
+		</button>
+	{/snippet}
+
+	{#snippet actions()}
+		<button type="button" class="btn-secondary" onclick={closeDialog}>Cancel</button>
+		<button type="button" class="btn-primary" disabled={!validation.ok} onclick={create}>
+			Create
+		</button>
+	{/snippet}
+</MovableDialog>
+
+<style>
+	/* Width | ⇄ | Height (swap sits flush between the two fields, same
+	   height as the number inputs so the row stays perfectly aligned). */
+	.field-row {
+		display: grid;
+		grid-template-columns: 1fr 32px 1fr;
+		gap: 10px;
+		align-items: end;
+	}
+	.swap-dims {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 30px;
+		padding: 0;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text-dim);
+		cursor: pointer;
+		font-size: 14px;
+		line-height: 1;
+	}
+	.swap-dims:hover {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+
+	.presets {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 4px;
+	}
+
+	.bg-row {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		margin-top: 4px;
+	}
+	.color-swatch {
+		display: inline-block;
+		margin-left: 8px;
+		height: 24px;
+		width: 32px;
+		vertical-align: middle;
+		padding: 0;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		cursor: pointer;
+	}
+
+	.footnote {
+		margin: 0;
+		font-size: 11.5px;
+		color: var(--text-dim);
+	}
+	.footnote strong {
+		color: var(--text);
+		font-weight: 500;
+	}
+</style>

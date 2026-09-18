@@ -87,6 +87,7 @@ export const MENUS: MenuDef[] = [
 			{ type: 'command', commandId: 'layers.add' },
 			{ type: 'command', commandId: 'layers.duplicate' },
 			{ type: 'command', commandId: 'layers.delete' },
+			{ type: 'command', commandId: 'layers.opacity' },
 			{ type: 'separator' },
 			{ type: 'disabled', label: 'Merge Down' }
 		]

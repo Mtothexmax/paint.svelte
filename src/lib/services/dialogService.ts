@@ -12,6 +12,7 @@ export type DialogKind =
 	| 'imageSize'
 	| 'selectionSize'
 	| 'paste'
+	| 'layerOpacity'
 	| null;
 
 export interface DialogState {

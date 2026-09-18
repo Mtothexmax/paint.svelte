@@ -7,6 +7,7 @@
 	import LayerEffectDialog from './LayerEffectDialog.svelte';
 	import RasterizeConfirmDialog from './RasterizeConfirmDialog.svelte';
 	import ImageSizeDialog from './ImageSizeDialog.svelte';
+	import LayerOpacityDialog from './LayerOpacityDialog.svelte';
 	import SelectionSizeDialog from './SelectionSizeDialog.svelte';
 	import CurvesDialog from './CurvesDialog.svelte';
 	import LevelsDialog from './LevelsDialog.svelte';
@@ -25,6 +26,8 @@
 	<RasterizeConfirmDialog />
 {:else if $dialog.kind === 'imageSize'}
 	<ImageSizeDialog />
+{:else if $dialog.kind === 'layerOpacity'}
+	<LayerOpacityDialog />
 {:else if $dialog.kind === 'selectionSize'}
 	<SelectionSizeDialog />
 {:else if $dialog.kind === 'curves'}

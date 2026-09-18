@@ -319,6 +319,12 @@ export function registerBuiltinCommands(): void {
 	commands.registerMany([
 		{ id: 'layers.add', label: 'Add New Layer', run: () => addLayer(), isEnabled: hasDoc },
 		{
+			id: 'layers.opacity',
+			label: 'Layer Opacity…',
+			run: () => openDialog('layerOpacity'),
+			isEnabled: () => !!documentRegistry.active?.activeLayer
+		},
+		{
 			id: 'layers.duplicate',
 			label: 'Duplicate Layer',
 			run: () => {

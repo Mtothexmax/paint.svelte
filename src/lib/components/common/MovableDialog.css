@@ -1,31 +1,66 @@
-/* ---- movable dialog (filter popups) ---- */
+/* ---- movable dialog (filter popups, image-size, curves, levels, …) ----
+   Claude-style chrome panel: dark gradient shell with grain noise overlay,
+   4-layer box-shadow (inset highlight on top + inset shadow at bottom +
+   wide soft drop-shadow), 10px rounded corners, and a chrome-bar title
+   with a grip-line pattern (matches the reference design). */
 .m-dialog {
 	position: fixed;
 	z-index: 1200;
-	background: var(--bg-elev);
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
-	/* NOTE: no `overflow: hidden` here — popups anchored in the title bar
-	   (e.g. the filter switcher menu) must be able to extend BEYOND the
-	   dialog bounds. Corners are rounded on the title/footer instead, and
-	   .m-body scrolls internally. */
+	background: linear-gradient(180deg, #2b2e34, #1a1c20 70%, #16181b);
+	border: 1px solid rgba(0, 0, 0, 0.6);
+	border-radius: 10px;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.13) inset,
+		0 -1px 0 rgba(0, 0, 0, 0.5) inset,
+		0 24px 48px -16px rgba(0, 0, 0, 0.7),
+		0 4px 12px rgba(0, 0, 0, 0.4);
 	display: flex;
 	flex-direction: column;
+	/* NOTE: no `overflow: hidden` here — popups anchored in the title bar
+	   (e.g. the filter switcher menu) must be able to extend BEYOND the
+	   dialog bounds. The grain overlay is therefore drawn via ::after with
+	   a slight inset so its rounded corners hug the panel edges without
+	   needing to clip the box itself. */
+	font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	color: #e7e9ee;
 }
+.m-dialog::after {
+	/* Grain — matches Claude's `feTurbulence` overlay. Inlined as a data
+	   URI so there's no network dependency. `mix-blend-mode: overlay`
+	   lets the chrome gradient show through subtly. */
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	opacity: 0.22;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+	mix-blend-mode: overlay;
+	/* Stay just below interactive content but above the gradient bg. */
+	z-index: 0;
+}
+/.m-dialog > * {
+	/* Lift content above the grain layer. */
+	position: relative;
+	z-index: 1;
+}
+
 .m-title {
 	display: flex;
 	align-items: center;
-	gap: 4px;
-	justify-content: space-between;
-	padding: 6px 8px 6px 12px;
-	background: #353535;
-	border-radius: 7px 7px 0 0;
+	gap: 8px;
+	padding: 9px 12px;
+	background: linear-gradient(180deg, #34383f, #22252a);
+	border-bottom: 1px solid rgba(0, 0, 0, 0.55);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.075) inset;
+	border-radius: 10px 10px 0 0;
 	cursor: move;
 	user-select: none;
-	font-size: 13px;
+	font-size: 12.5px;
 	font-weight: 600;
-	color: var(--text);
+	color: #e7e9ee;
+	letter-spacing: 0.02em;
 	touch-action: none;
 }
 .m-title-left {
@@ -33,12 +68,10 @@
 	align-items: center;
 	flex: 0 0 auto;
 }
-/* Title bars with a left button (filter switcher): pull the left padding in
-   from 12px to 6px so the button sits exactly as far from the left border
-   (6 + 1 border = 7px) as from the top border (6 + 1 border = 7px).
-   Scoped with :has so all other dialogs keep their 12px title indent. */
 .m-title:has(.m-title-left) {
-	padding-left: 6px;
+	/* Tighten the left indent when there's a leading button (filter
+	   switcher ▾), so the button hugs the rounded corner symmetrically. */
+	padding-left: 7px;
 }
 .m-title-right {
 	display: inline-flex;
@@ -46,8 +79,9 @@
 	gap: 2px;
 	flex: 0 0 auto;
 }
+
 /* Title-bar buttons (▾ triangle, ‹ › steppers, ✕ close) — all share the
-   exact same box: 22×22, centered glyph. */
+   exact same 22×22 centered glyph with subtle hover lift. */
 .m-menu-btn,
 .m-close {
 	display: inline-flex;
@@ -58,7 +92,7 @@
 	padding: 0;
 	background: none;
 	border: none;
-	color: var(--text-dim);
+	color: #e7e9ee;
 	font-size: 13px;
 	line-height: 1;
 	cursor: pointer;
@@ -66,38 +100,85 @@
 }
 .m-menu-btn:hover,
 .m-close:hover {
-	background: rgba(255, 255, 255, 0.1);
-	color: var(--text);
+	background: rgba(255, 255, 255, 0.08);
+	color: #fff;
 }
+
 /* Material icon inside title-bar buttons (dark glyphs → light UI). */
 .m-btn-ic {
-	width: 16px;
-	height: 16px;
+	width: 14px;
+	height: 14px;
 	filter: invert(0.88);
 	pointer-events: none;
 }
+
 .m-title-text {
 	flex: 1 1 auto;
 	pointer-events: none;
 }
+
 .m-body {
-	padding: 12px;
+	padding: 13px 14px 14px;
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
 	overflow: auto;
 }
+
+/* Footer sits on the chrome panel; only painted when the dialog actually
+   passes an `actions` snippet (otherwise it would be an empty band). */
 .m-footer {
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
 	gap: 8px;
-	padding: 10px 12px;
-	border-top: 1px solid var(--border);
-	border-radius: 0 0 7px 7px;
+	padding: 10px 14px;
+	border-top: 1px solid rgba(0, 0, 0, 0.55);
+	box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.04) inset;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+	border-radius: 0 0 10px 10px;
 }
 .m-footer-start {
 	margin-right: auto;
 	display: flex;
 	align-items: center;
+}
+
+/* Primary/secondary buttons in the footer — raised chrome plate look. */
+.m-footer :global(.btn-primary) {
+	border: 1px solid rgba(0, 0, 0, 0.65);
+	background: linear-gradient(180deg, #2c6fe0, #1e54b6);
+	color: #fff;
+	font-weight: 600;
+	padding: 5px 14px;
+	border-radius: 5px;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.25) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5);
+	cursor: pointer;
+}
+.m-footer :global(.btn-primary:hover:not(:disabled)) {
+	filter: brightness(1.12);
+}
+.m-footer :global(.btn-primary:disabled) {
+	opacity: 0.45;
+	cursor: default;
+}
+.m-footer :global(.btn-secondary) {
+	border: 1px solid rgba(0, 0, 0, 0.65);
+	background: linear-gradient(180deg, #3a3e45, #272a2f);
+	color: #e7e9ee;
+	font-weight: 500;
+	padding: 5px 14px;
+	border-radius: 5px;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.13) inset,
+		0 1px 2px rgba(0, 0, 0, 0.4);
+	cursor: pointer;
+}
+.m-footer :global(.btn-secondary:hover) {
+	filter: brightness(1.18);
+}
+.m-footer :global(.btn-secondary:active) {
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) inset;
 }
