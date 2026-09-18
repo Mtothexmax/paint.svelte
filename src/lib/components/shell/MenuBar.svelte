@@ -20,6 +20,7 @@
 		'file.new': '🖼️',
 		'file.open': '📂',
 		'file.save': '💾',
+		'file.copyImage': '📋',
 		'file.close': '✖️',
 		'view.zoomIn': '🔍',
 		'view.zoomOut': '🔎',

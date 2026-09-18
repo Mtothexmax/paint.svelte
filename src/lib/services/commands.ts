@@ -18,7 +18,7 @@ import { checkerTheme } from '../state/view';
 import { addLayer, deleteLayer, duplicateLayer } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
 import { cancelFloatingMove } from '../state/moveTransform';
-import { copySelection, cutSelection, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
+import { copySelection, cutSelection, copyImage, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
 import { invertColorsScoped, autoLevelScoped, blackAndWhiteScoped, sepiaScoped, invertAlphaScoped } from '../render/effects';
 import { cropToSelection } from '../render/crop';
 import { effects } from '../effects';
@@ -67,6 +67,13 @@ export function registerBuiltinCommands(): void {
 			label: 'Save As PNG…',
 			shortcut: 'Ctrl+S',
 			run: () => void exportActiveDocument(),
+			isEnabled: hasDoc
+		},
+		{
+			id: 'file.copyImage',
+			label: 'Copy Image',
+			shortcut: 'Ctrl+Shift+C',
+			run: () => void copyImage(),
 			isEnabled: hasDoc
 		},
 		{

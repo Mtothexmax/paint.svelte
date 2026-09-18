@@ -34,6 +34,8 @@ export const MENUS: MenuDef[] = [
 			{ type: 'command', commandId: 'file.open' },
 			{ type: 'separator' },
 			{ type: 'command', commandId: 'file.save' },
+			{ type: 'command', commandId: 'file.copyImage' },
+			{ type: 'separator' },
 			{ type: 'command', commandId: 'file.close' }
 		]
 	},

@@ -5,7 +5,7 @@
 	import { get } from 'svelte/store';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
 import type { Point, Rect } from '../../core/geometry';
-import { pointInPolygon, rectFromCorners, framePointsFromLoops, framePointsFromRect, type FramePoints } from '../../core/geometry';
+import { pointInPolygon, rectFromCorners, squareCornerFromDrag, framePointsFromLoops, framePointsFromRect, type FramePoints } from '../../core/geometry';
 	import { screenToImage, imageToScreen, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';
@@ -563,10 +563,23 @@ let zoomRightHeld = $state(false);
 		swap: boolean;
 	} | null>(null);
 	let shapePointerId = -1;
+	/** Last raw (unconstrained) shape pointer, so pressing/releasing Shift
+	 * mid-drag re-constrains without waiting for the next mouse move. */
+	let shapeLastRaw: Point | null = null;
+
+	/** Applies the Shift-square constraint (or clears it) to the live draft. */
+	function applyShapeSquare(square: boolean): void {
+		if (!shapeDraft || !shapeLastRaw) return;
+		const start = { x: shapeDraft.startX, y: shapeDraft.startY };
+		const cur = square ? squareCornerFromDrag(start, shapeLastRaw) : shapeLastRaw;
+		shapeDraft.curX = cur.x;
+		shapeDraft.curY = cur.y;
+	}
 
 	function cancelShapeDraft(): void {
 		shapeDraft = null;
 		shapePointerId = -1;
+		shapeLastRaw = null;
 	}
 
 	// line/curve-tool draft: the first drag draws straight (controls follow
@@ -634,6 +647,7 @@ let zoomRightHeld = $state(false);
 		const draft = shapeDraft;
 		shapeDraft = null;
 		shapePointerId = -1;
+		shapeLastRaw = null;
 		if (!draft) return;
 		const doc = documentRegistry.active;
 		if (!doc) return;
@@ -1197,6 +1211,7 @@ let zoomRightHeld = $state(false);
 		},
 		setShapeDraft: (v: ShapeDraftState | null) => {
 			shapeDraft = v;
+			shapeLastRaw = v ? { x: v.startX, y: v.startY } : null;
 		},
 		setShapePointerId: (v: number) => {
 			shapePointerId = v;
@@ -1328,9 +1343,13 @@ let zoomRightHeld = $state(false);
 
 	function onKeyDown(e: KeyboardEvent) {
 		handleKeyDown(e, canvasInput);
+		// Shift pressed mid-drag constrains the live shape to a square.
+		if (e.key === 'Shift' && !e.repeat) applyShapeSquare(true);
 	}
 	function onKeyUp(e: KeyboardEvent) {
 		handleKeyUp(e, canvasInput);
+		// Shift released mid-drag returns the live shape to free proportions.
+		if (e.key === 'Shift') applyShapeSquare(false);
 	}
 
 	function onWheel(e: WheelEvent) {
@@ -1673,11 +1692,16 @@ function onPointerDown(e: PointerEvent) {
 				syncTransformUi();
 				return;
 			}
-			if (shapeDraft && e.pointerId === shapePointerId) {
-				const img = imageFromScreen(sp);
-				shapeDraft.curX = img.x;
-				shapeDraft.curY = img.y;
-			}
+		if (shapeDraft && e.pointerId === shapePointerId) {
+			const img = imageFromScreen(sp);
+			shapeLastRaw = { x: img.x, y: img.y };
+			// Shift constrains to square proportions (Paint.NET behaviour).
+			const cur = e.shiftKey
+				? squareCornerFromDrag({ x: shapeDraft.startX, y: shapeDraft.startY }, img)
+				: img;
+			shapeDraft.curX = cur.x;
+			shapeDraft.curY = cur.y;
+		}
 			if (lineDraft?.drawing && e.pointerId === linePointerId) {
 				const img = imageFromScreen(sp);
 				lineDraft.p3 = { x: img.x, y: img.y };

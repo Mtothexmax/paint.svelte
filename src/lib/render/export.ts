@@ -1,5 +1,5 @@
-// Layer: render (pixi). Composites a document (without checkerboard) and
-// downloads it as a PNG.
+// Layer: render (pixi). Composites a document (without checkerboard) for
+// PNG download and system-clipboard copies.
 
 import { Container, Sprite } from 'pixi.js';
 import { createSurfaceTexture, createU8Texture } from './surfaceTexture';
@@ -31,6 +31,22 @@ function downloadBlob(blob: Blob, filename: string): void {
  * composited through their effect chain (same texture the canvas shows).
  */
 export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): Promise<void> {
+	const blob = await documentToPngBlob(renderer, doc);
+
+	const baseName = doc.name.replace(/\.[^.]+$/, '');
+	downloadBlob(blob, `${baseName}.png`);
+}
+
+/**
+ * Composites the whole document exactly like `exportPng` (visible layers at
+ * 100%, live effects applied, no checkerboard) and returns the canvas plus
+ * its scene graph, so callers that need the pixels (clipboard) can encode
+ * them themselves. Pair with `destroyComposite` when done.
+ */
+export function compositeDocumentToCanvas(
+	renderer: EditorRenderer,
+	doc: ImageDocument
+): { canvas: HTMLCanvasElement; container: Container; rt: ReturnType<typeof createSurfaceTexture> } {
 	const container = new Container();
 	for (const layer of doc.layers) {
 		if (!layer.visible) continue;
@@ -49,13 +65,46 @@ export async function exportPng(renderer: EditorRenderer, doc: ImageDocument): P
 	// Straight-alpha encode (see extractStraightCanvas): extract.canvas would
 	// bake premultiplied RGB into the PNG, darkening translucent edges.
 	const canvas = extractStraightCanvas(renderer, rt);
+	return { canvas, container, rt };
+}
 
-	const blob = await canvasToBlob(canvas);
-	rt.destroy(true);
-	container.destroy({ children: true });
+/** Releases the scene graph / render target from `compositeDocumentToCanvas`. */
+export function destroyComposite(composite: {
+	canvas: HTMLCanvasElement;
+	container: Container;
+	rt: ReturnType<typeof createSurfaceTexture>;
+}): void {
+	composite.rt.destroy(true);
+	composite.container.destroy({ children: true });
+}
 
-	const baseName = doc.name.replace(/\.[^.]+$/, '');
-	downloadBlob(blob, `${baseName}.png`);
+/** Encodes the whole composited document (exactly what Save As PNG writes)
+ * into a PNG blob. */
+export async function documentToPngBlob(
+	renderer: EditorRenderer,
+	doc: ImageDocument
+): Promise<Blob> {
+	const composite = compositeDocumentToCanvas(renderer, doc);
+	try {
+		return await canvasToBlob(composite.canvas);
+	} finally {
+		destroyComposite(composite);
+	}
+}
+
+/** Writes the whole composited document to the SYSTEM clipboard as PNG
+ * (readable by external image editors) — pixel-identical to Save As PNG.
+ * Rejects if the Clipboard API or a permission is unavailable. */
+export async function writeDocumentToSystemClipboard(
+	renderer: EditorRenderer,
+	doc: ImageDocument
+): Promise<Blob> {
+	if (typeof navigator === 'undefined' || !navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+		throw new Error('Clipboard API not available in this browser.');
+	}
+	const blob = await documentToPngBlob(renderer, doc);
+	await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+	return blob;
 }
 
 /** Encodes a surface's pixels at 100% into a PNG blob. The surface keeps its

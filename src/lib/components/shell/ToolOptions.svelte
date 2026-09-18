@@ -647,6 +647,7 @@
 				❚ Both
 			</button>
 		</div>
+		<span class="aa-label" title="Hold Shift while dragging to constrain to square proportions">Shift: square</span>
 	{:else if isLine}
 		<PdnSlider label="Brush Width" min={1} max={50} step={1} bind:value={$lineWidth} />
 		<IconSplitButton options={ARROW_START_OPTIONS} bind:value={startArrowState} title="Start arrow" />

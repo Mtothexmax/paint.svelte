@@ -51,6 +51,16 @@ export function rectFromCorners(a: Point, b: Point): Rect {
 	};
 }
 
+/** Square-constrained drag corner (Paint.NET Shift behaviour): the side is
+ * the larger of |dx|/|dy|, keeping the per-axis drag direction so all four
+ * drag directions still work. */
+export function squareCornerFromDrag(start: Point, cur: Point): Point {
+	const dirX = cur.x >= start.x ? 1 : -1;
+	const dirY = cur.y >= start.y ? 1 : -1;
+	const side = Math.max(Math.abs(cur.x - start.x), Math.abs(cur.y - start.y));
+	return { x: start.x + dirX * side, y: start.y + dirY * side };
+}
+
 export function rectsEqual(a: Rect, b: Rect): boolean {
 	return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }

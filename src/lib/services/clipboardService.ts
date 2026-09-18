@@ -7,7 +7,7 @@ import { createRasterLayer, type SurfaceId } from '../core/layers/Layer';
 import type { Rect } from '../core/geometry';
 import { getEditorRenderer, hasEditorRenderer } from '../render/EditorRenderer';
 import { blitMaskedInto } from '../render/selection';
-import { surfaceToPngThumbnailUrl, writeSurfaceToSystemClipboard } from '../render/export';
+import { surfaceToPngThumbnailUrl, writeSurfaceToSystemClipboard, documentToPngBlob } from '../render/export';
 import { resizeCanvas } from '../render/resize';
 import { openDialog, type PasteDialogPayload, type PasteOversizeChoice } from './dialogService';
 import { deleteSelection } from './selectionService';
@@ -102,6 +102,50 @@ export function cutSelection(): boolean {
 	cancelFloatingMove();
 	if (!copySelection()) return false;
 	return deleteSelection('Cut');
+}
+
+/**
+ * Copies the whole flattened image (all visible layers + live effects —
+ * pixel-identical to Save As PNG) to the internal clipboard AND the system
+ * clipboard, so it pastes here (new layer) and in external apps.
+ */
+export async function copyImage(): Promise<boolean> {
+	const doc = documentRegistry.active;
+	if (!doc || !hasEditorRenderer()) return false;
+	const renderer = getEditorRenderer();
+	let blob: Blob;
+	try {
+		blob = await documentToPngBlob(renderer, doc);
+	} catch (err) {
+		console.error(err);
+		showNotice('Could not copy the image.', 'error');
+		return false;
+	}
+	// Internal clipboard (same PNG the system gets) so paste-as-new-layer
+	// and Ctrl+V keep working on exactly what was copied.
+	let bitmap: ImageBitmap;
+	try {
+		bitmap = await createImageBitmap(blob);
+	} catch (err) {
+		console.error(err);
+		showNotice('Could not copy the image.', 'error');
+		return false;
+	}
+	const surfaceId = renderer.surfaces.createFromBitmap(bitmap);
+	bitmap.close();
+	dropContent();
+	content = { surfaceId, width: doc.width, height: doc.height };
+	showNotice('Copied image to clipboard.');
+	// Mirror onto the system clipboard too (same flag contract as
+	// copySelection: until this resolves, the internal copy answers Ctrl+V).
+	onSystemClipboard = false;
+	try {
+		await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+		onSystemClipboard = true;
+	} catch {
+		showNotice('Copied. System clipboard unavailable here.', 'error');
+	}
+	return true;
 }
 
 /**

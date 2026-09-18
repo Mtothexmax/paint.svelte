@@ -60,6 +60,9 @@
 	 * works) — otherwise it flashes at its wide `auto` size for a few ms
 	 * before snapping down to the fitted width. */
 	let ready = $state(false);
+	/** Live filter text (font-dropdown pattern); reset on every open. */
+	let filter = $state('');
+	let searchEl: HTMLInputElement | undefined = $state();
 	let menuEl: HTMLDivElement | undefined = $state();
 
 	/** Icons per menu category. Lower-cased label → SVG path. Unmatched
@@ -78,6 +81,31 @@
 
 	function iconForMenu(label: string): string {
 		return MENU_ICONS[label.toLowerCase()] ?? '';
+	}
+
+	/** Visible groups for the live filter. A group shows when its own label
+	 * matches (then with all its effects) or when at least one of its
+	 * effects matches. Labels go through getLabel so command labels
+	 * (e.g. with "…") match what the user sees. */
+	const visibleGroups = $derived.by(() => {
+		const q = filter.trim().toLowerCase();
+		if (!q) return effectMenusWithEntries;
+		return effectMenusWithEntries
+			.map((g) => {
+				if (g.label.toLowerCase().includes(q)) return g;
+				const effects = g.effects.filter((e) => {
+					const label = getLabel?.(e.id, e.label) ?? e.label;
+					return label.toLowerCase().includes(q);
+				});
+				return { ...g, effects };
+			})
+			.filter((g) => g.effects.length > 0);
+	});
+
+	/** Typing re-fits the width to the remaining columns and resets scroll. */
+	function onFilterInput() {
+		menuEl?.scrollTo({ top: 0, left: 0 });
+		fitWidthToColumns();
 	}
 
 	/** Recompute the menu's max width/height so it never overflows the
@@ -217,6 +245,12 @@
 		});
 	}
 
+	// Focus the filter once the menu is revealed (it is visibility:hidden
+	// until the fitted width lands, and hidden elements can't take focus).
+	$effect(() => {
+		if (ready) searchEl?.focus({ preventScroll: true });
+	});
+
 	onMount(() => {
 		// First-paint bounds from the anchor (if given), then measure the
 		// real content once mounted. Two RAFs: first waits for layout of the
@@ -252,6 +286,19 @@
 		? `width:${fittedWidth}px;`
 		: ''}{ready ? '' : 'visibility:hidden;'}"
 >
+	<div class="fx-add-search-row">
+		<input
+			bind:this={searchEl}
+			bind:value={filter}
+			class="fx-add-search"
+			type="text"
+			placeholder="Filter…"
+			autocomplete="off"
+			spellcheck={false}
+			aria-label="Filter effects"
+			oninput={onFilterInput}
+		/>
+	</div>
 	{#if repeatLabel}
 		<button class="fx-add-item" onclick={() => onRepeat?.()}>
 			<span class="fx-add-ic">🔄</span>
@@ -259,7 +306,7 @@
 		</button>
 		<div class="fx-add-sep"></div>
 	{/if}
-	{#each effectMenusWithEntries as group (group.label)}
+	{#each visibleGroups as group (group.label)}
 		<div class="fx-add-head">
 			{#if iconForMenu(group.label)}
 				<img
@@ -284,4 +331,7 @@
 			</button>
 		{/each}
 	{/each}
+	{#if !visibleGroups.length}
+		<div class="fx-add-empty">No filters match “{filter.trim()}”.</div>
+	{/if}
 </div>

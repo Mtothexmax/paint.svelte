@@ -1,20 +1,25 @@
 import type { EffectDefinition, EffectSettings } from '../types';
 import { makeGlFilter } from '../shaders';
 
-// Object: Feather — smooths ONLY the alpha channel (the mask) at the edges,
-// never the color values. This removes hard edges / white outlines from rough
-// cutouts (Bolt Pack "Feather").
+// Feather — smooths ONLY the alpha channel.
 //
-// Two inward-only operations, both clamped so the silhouette can never grow:
-//  - Shrink erodes the alpha inward (like Outline expands outward, but in
-//    reverse): any pixel within `shrink` texels of a transparent neighbour is
-//    cut away.
-//  - Feather blurs the (eroded) alpha and keeps `min(eroded, blurred)`, so
-//    the soft transition falls inward from the edge instead of bleeding out.
+// Pipeline:
 //
-// Wherever the result is fully transparent, RGB is cleared as well: invisible
-// texels must not carry spilled color, otherwise minified (zoomed-out) views
-// show a false colored fringe around the cut edge while 1:1 data stays clean.
+//   source alpha
+//       ↓
+//   shrink / erosion
+//       ↓
+//   feather / blur
+//       ↓
+//   clamp so the silhouette can never grow
+//
+// The important difference from the previous implementation is that the
+// shrink amount is applied to the edge position BEFORE the feather transition
+// is calculated. This prevents the blur from bringing the edge back outward.
+//
+// RGB is kept from the original image and scaled together with alpha so that
+// premultiplied-alpha invariants remain intact.
+
 const FEATHER_FRAGMENT = `
     in vec2 vTextureCoord;
     out vec4 finalColor;
@@ -24,80 +29,262 @@ const FEATHER_FRAGMENT = `
     uniform float uRadius;
     uniform float uShrink;
 
+    // Sample alpha.
+    float alphaAt(vec2 uv)
+    {
+        return texture(uTexture, uv).a;
+    }
+
+    // Estimate how far the current pixel is from a hard alpha boundary.
+    //
+    // This is intentionally cheap: instead of doing a complete morphological
+    // erosion for every blur sample, we determine whether the current pixel
+    // has transparent neighbours and use that information to move the feather
+    // transition inward.
+    float edgeStrength(vec2 uv, vec2 px)
+    {
+        float a = alphaAt(uv);
+
+        float left  = alphaAt(uv - vec2(px.x, 0.0));
+        float right = alphaAt(uv + vec2(px.x, 0.0));
+        float up    = alphaAt(uv - vec2(0.0, px.y));
+        float down  = alphaAt(uv + vec2(0.0, px.y));
+
+        float diagonal =
+            alphaAt(uv + vec2( px.x,  px.y)) +
+            alphaAt(uv + vec2(-px.x,  px.y)) +
+            alphaAt(uv + vec2( px.x, -px.y)) +
+            alphaAt(uv + vec2(-px.x, -px.y));
+
+        float neighbourMin = min(
+            min(left, right),
+            min(up, down)
+        );
+
+        neighbourMin = min(
+            neighbourMin,
+            min(
+                min(
+                    alphaAt(uv + vec2( px.x,  px.y)),
+                    alphaAt(uv + vec2(-px.x,  px.y))
+                ),
+                min(
+                    alphaAt(uv + vec2( px.x, -px.y)),
+                    alphaAt(uv + vec2(-px.x, -px.y))
+                )
+            )
+        );
+
+        // 1 when surrounded by opaque pixels, 0 when neighbouring pixels are
+        // transparent. This gives us an inexpensive estimate of the edge.
+        float localEdge = abs(a - neighbourMin);
+
+        return clamp(localEdge, 0.0, 1.0);
+    }
+
+    // Gaussian weight.
+    float gaussian(float distance, float sigma)
+    {
+        return exp(-(distance * distance) / (2.0 * sigma * sigma));
+    }
+
     void main()
     {
-        vec4 c = texture(uTexture, vTextureCoord);
-        vec2 px = uInputSize.zw;
-        float r = min(uRadius, 10.0);
-        float s = min(uShrink, 20.0);
+        vec4 original = texture(uTexture, vTextureCoord);
 
-        // Bound search radius to cover both shrink and feather
-        float R = max(r, s);
+        float radius = clamp(uRadius, 0.0, 10.0);
+        float shrink = clamp(uShrink, 0.0, 20.0);
 
-        if (R <= 0.001) {
-            finalColor = c;
+        if (radius <= 0.001 && shrink <= 0.001)
+        {
+            finalColor = original;
             return;
         }
 
-        float sigma = max(r * 0.5, 0.0001);
-        float emin = c.a;
-        float sum = 0.0;
-        float weightSum = 0.0;
+        vec2 px = uInputSize.zw;
 
-        for (int x = -20; x <= 20; x++) {
-            float ax = abs(float(x));
-            if (ax > R) continue;
+        // ------------------------------------------------------------------
+        // 1. Determine the alpha after shrink.
+        //
+        // For opaque/antialiased masks we use a local minimum morphology.
+        // The search radius is limited to 20 px by the UI.
+        // ------------------------------------------------------------------
 
-            for (int y = -20; y <= 20; y++) {
-                float ay = abs(float(y));
-                float d = max(ax, ay);
-                if (d > R) continue;
+        float eroded = original.a;
 
-                vec2 offset = vec2(float(x), float(y)) * px;
-                float a = texture(uTexture, vTextureCoord + offset).a;
+        if (shrink > 0.001)
+        {
+            float s = ceil(shrink);
 
-                // Shrink / erosion
-                if (d <= s) {
-                    emin = min(emin, a);
-                }
+            for (int y = -20; y <= 20; y++)
+            {
+                if (float(abs(y)) > s)
+                    continue;
 
-                // Feather weighting within user radius r
-                if (r > 0.0 && d <= r) {
-                    float w = exp(- (d * d) / (2.0 * sigma * sigma));
-                    sum += a * w;
-                    weightSum += w;
+                for (int x = -20; x <= 20; x++)
+                {
+                    if (float(abs(x)) > s)
+                        continue;
+
+                    // Chebyshev distance gives the same square morphology
+                    // used by the original implementation.
+                    float d = max(abs(float(x)), abs(float(y)));
+
+                    if (d <= s)
+                    {
+                        vec2 offset = vec2(float(x), float(y)) * px;
+                        eroded = min(
+                            eroded,
+                            alphaAt(vTextureCoord + offset)
+                        );
+                    }
                 }
             }
         }
 
-        float newAlpha = emin;
-
-        if (r > 0.0 && weightSum > 0.0) {
-            float blurred = sum / weightSum;
-            // Remap inward blur range [0.5, 1.0] -> [0.0, 1.0]
-            float feathered = smoothstep(0.5, 1.0, blurred);
-            newAlpha = min(emin, feathered);
-        }
-
-        // Clear RGB when fully transparent to prevent fringe artifacts
-        if (newAlpha <= 0.0) {
+        // If erosion removed the pixel completely there is no reason to
+        // perform the expensive feather operation.
+        if (eroded <= 0.0001)
+        {
             finalColor = vec4(0.0);
-        } else {
-            // PixiJS textures and filter outputs use premultiplied alpha.
-            // c.rgb is already premultiplied by c.a.  When we reduce alpha we
-            // must scale RGB by the same ratio so the premultiplied invariant
-            // (rgb = straight_rgb * alpha) is preserved.  Without this, the
-            // compositor sees colour values that are too bright for the new
-            // alpha and blends them against white — giving the light-grey fringe.
-            float ratio = (c.a > 0.0) ? (newAlpha / c.a) : 0.0;
-            finalColor = vec4(c.rgb * ratio, newAlpha);
+            return;
         }
+
+        // ------------------------------------------------------------------
+        // 2. Feather the SHRUNken edge.
+        //
+        // We cannot literally feed "eroded" into another GPU pass from a
+        // single fragment shader, so instead we approximate the sequential
+        // morphology+blur operation by shifting the blur transition inward.
+        //
+        // The eroded mask above establishes the new edge. The Gaussian below
+        // only operates around that edge.
+        // ------------------------------------------------------------------
+
+        if (radius <= 0.001)
+        {
+            float ratio =
+                original.a > 0.0001
+                    ? eroded / original.a
+                    : 0.0;
+
+            finalColor = vec4(
+                original.rgb * ratio,
+                eroded
+            );
+
+            return;
+        }
+
+        float sigma = max(radius * 0.5, 0.0001);
+
+        float sum = 0.0;
+        float weightSum = 0.0;
+
+        float R = ceil(radius);
+
+        for (int y = -10; y <= 10; y++)
+        {
+            if (float(abs(y)) > R)
+                continue;
+
+            for (int x = -10; x <= 10; x++)
+            {
+                if (float(abs(x)) > R)
+                    continue;
+
+                float d = max(abs(float(x)), abs(float(y)));
+
+                if (d > R)
+                    continue;
+
+                vec2 offset = vec2(float(x), float(y)) * px;
+
+                // Sample the original mask.
+                float a = alphaAt(vTextureCoord + offset);
+
+                // The erosion distance is represented by reducing the
+                // contribution of samples which are close to the old edge.
+                //
+                // This keeps the feather transition on the inside of the
+                // shrunken silhouette instead of allowing the Gaussian to
+                // recreate the old outer edge.
+                float shrinkFactor = 1.0;
+
+                if (shrink > 0.0)
+                {
+                    float distanceFromCenter = length(vec2(
+                        float(x),
+                        float(y)
+                    ));
+
+                    float inner =
+                        smoothstep(
+                            shrink,
+                            max(shrink + radius, shrink + 0.001),
+                            distanceFromCenter
+                        );
+
+                    shrinkFactor = inner;
+                }
+
+                float w = gaussian(d, sigma);
+
+                sum += a * w * shrinkFactor;
+                weightSum += w * shrinkFactor;
+            }
+        }
+
+        float blurred =
+            weightSum > 0.0
+                ? sum / weightSum
+                : eroded;
+
+        // ------------------------------------------------------------------
+        // 3. Convert the blur into a soft edge.
+        //
+        // Using smoothstep rather than simply returning the Gaussian average
+        // produces a more "Feather Object" style transition.
+        // ------------------------------------------------------------------
+
+        float feathered = smoothstep(
+            0.5,
+            1.0,
+            blurred
+        );
+
+        // The silhouette must NEVER become larger than the eroded mask.
+        float newAlpha = min(eroded, feathered);
+
+        // Preserve the original alpha when the feather operation is not
+        // actually reducing it.
+        newAlpha = min(newAlpha, original.a);
+
+        if (newAlpha <= 0.0001)
+        {
+            finalColor = vec4(0.0);
+            return;
+        }
+
+        // PixiJS filter textures are premultiplied-alpha.
+        //
+        // If alpha goes from A → B, RGB must be multiplied by B/A.
+        float ratio =
+            original.a > 0.0001
+                ? newAlpha / original.a
+                : 0.0;
+
+        finalColor = vec4(
+            original.rgb * ratio,
+            newAlpha
+        );
     }
 `;
 
 const definition: EffectDefinition = {
     label: 'Feather',
     icon: '🪶',
+
     params: [
         {
             key: 'radius',
@@ -116,12 +303,23 @@ const definition: EffectDefinition = {
             default: 0
         }
     ],
+
     filter: (settings: EffectSettings) =>
         makeGlFilter(FEATHER_FRAGMENT, {
-            uRadius: { value: settings.radius ?? 0, type: 'f32' },
-            uShrink: { value: settings.shrink ?? 0, type: 'f32' }
+            uRadius: {
+                value: settings.radius ?? 0,
+                type: 'f32'
+            },
+            uShrink: {
+                value: settings.shrink ?? 0,
+                type: 'f32'
+            }
         }),
-    isNoop: (settings: EffectSettings) => (settings.radius ?? 0) <= 0 && (settings.shrink ?? 0) <= 0
+
+    isNoop: (settings: EffectSettings) =>
+        (settings.radius ?? 0) <= 0 &&
+        (settings.shrink ?? 0) <= 0
 };
 
 export default definition;
+
