@@ -5,7 +5,9 @@
 import { documentRegistry } from '../core/document/registry';
 import { createRasterLayer, isLayerBlendMode, LAYER_BLEND_MODES, type Layer } from '../core/layers/Layer';
 import { getEditorRenderer } from '../render/EditorRenderer';
+import { documentToPngBlob } from '../render/export';
 import { cancelFloatingMove } from '../state/moveTransform';
+import { showNotice } from '../state/ui';
 
 function touch(doc: import('../core/document/ImageDocument').ImageDocument) {
 	doc.setDirty(true);
@@ -305,6 +307,69 @@ export function mergeDown(): void {
 				surfaces.dispose(active.surfaceId);
 			} else {
 				surfaces.dispose(merged);
+			}
+		}
+	});
+}
+
+/** Flattens the image: composites all visible layers (opacity + blend modes
+ * + live effects — pixel-identical to Save As PNG) into a single layer,
+ * replacing the whole stack. Hidden layers are dropped. Undoable. No-op
+ * when there is only one layer. */
+export async function flattenImage(): Promise<void> {
+	const doc = activeDoc();
+	if (!doc || doc.layers.length <= 1) return;
+	cancelFloatingMove();
+	const renderer = getEditorRenderer();
+	const surfaces = renderer.surfaces;
+	let blob: Blob;
+	try {
+		blob = await documentToPngBlob(renderer, doc);
+	} catch (err) {
+		console.error(err);
+		showNotice('Could not flatten the image.', 'error');
+		return;
+	}
+	let bitmap: ImageBitmap;
+	try {
+		bitmap = await createImageBitmap(blob);
+	} catch (err) {
+		console.error(err);
+		showNotice('Could not flatten the image.', 'error');
+		return;
+	}
+	const surfaceId = surfaces.createFromBitmap(bitmap);
+	bitmap.close();
+
+	const before = [...doc.layers];
+	const beforeActive = doc.activeLayerId;
+	const flat = createRasterLayer(surfaceId, 'Background');
+
+	doc.layers.splice(0, doc.layers.length, flat);
+	doc.setActiveLayer(flat.id);
+	rebuild();
+	touch(doc);
+
+	doc.history.push({
+		label: 'Flatten Image',
+		undo: () => {
+			doc.layers.splice(0, doc.layers.length, ...before);
+			doc.setActiveLayer(beforeActive);
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		redo: () => {
+			doc.layers.splice(0, doc.layers.length, flat);
+			doc.setActiveLayer(flat.id);
+			rebuild();
+			documentRegistry.notifyChange(doc);
+		},
+		dispose: () => {
+			if (doc.layers.includes(flat)) {
+				// Flattened state is current — the originals are obsolete.
+				for (const l of before) surfaces.dispose(l.surfaceId);
+			} else {
+				surfaces.dispose(surfaceId);
 			}
 		}
 	});

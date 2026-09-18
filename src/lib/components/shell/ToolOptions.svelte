@@ -80,7 +80,7 @@
 	} from '../../state/gradients';
 	import { cloneSize, cloneOpacity, cloneHardness } from '../../state/clone';
 	import { recolorSize, recolorOpacity, recolorHardness } from '../../state/recolor';
-	import { eyedropperCopyHex, eyedropperIncludeAlpha } from '../../state/eyedropper';
+	import { eyedropperCopyHex, eyedropperIncludeAlpha, eyedropperSampleMode } from '../../state/eyedropper';
 	import { commands } from '../../services/commandRegistry';
 	import { selectionActive, activeLayerIsText } from '../../state/documents';
 	import { convertTextToRaster } from '../../services/textService';
@@ -423,6 +423,9 @@
 				/>
 			{/if}
 		{/if}
+		{#if $activeToolId === 'select-rect' || $activeToolId === 'select-ellipse'}
+			<span class="aa-label" title="Hold Shift while dragging to constrain to square proportions">Shift: square</span>
+		{/if}
 		{#if isLasso}
 			<span class="aa-label">Tool:</span>
 			<div class="seg">
@@ -742,6 +745,25 @@
 			/>
 			Copy color to clipboard as hex
 		</label>
+		<span class="aa-label">Sample:</span>
+		<div class="seg" role="group" aria-label="Eyedropper sample source">
+			<button
+				class="seg-btn"
+				class:on={$eyedropperSampleMode === 'merged'}
+				title="Sample the merged composite — the colour you see under the pointer (WYSIWYG)"
+				onclick={() => eyedropperSampleMode.set('merged')}
+			>
+				▦ Merged
+			</button>
+			<button
+				class="seg-btn"
+				class:on={$eyedropperSampleMode === 'layer'}
+				title="Sample the active layer alone at that position (live effects included)"
+				onclick={() => eyedropperSampleMode.set('layer')}
+			>
+				▤ Layer
+			</button>
+		</div>
 		<span class="aa-label">Alpha:</span>
 		<IconSplitButton
 			options={ALPHA_OPTIONS}

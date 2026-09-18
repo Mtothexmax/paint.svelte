@@ -108,6 +108,20 @@
 		fitWidthToColumns();
 	}
 
+	/** Enter picks the first ENABLED match (only when filtering — with an
+	 * empty field Enter does nothing). */
+	function pickFirstMatch() {
+		if (!filter.trim()) return;
+		for (const g of visibleGroups) {
+			for (const eff of g.effects) {
+				if (isEnabled?.(eff.id) ?? true) {
+					onPick(eff.id);
+					return;
+				}
+			}
+		}
+	}
+
 	/** Recompute the menu's max width/height so it never overflows the
 	 * viewport. The width budget subtracts the menu's own viewport X offset
 	 * — the menu is absolutely positioned at `left: 0` inside its anchor
@@ -297,6 +311,12 @@
 			spellcheck={false}
 			aria-label="Filter effects"
 			oninput={onFilterInput}
+			onkeydown={(e) => {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					pickFirstMatch();
+				}
+			}}
 		/>
 	</div>
 	{#if repeatLabel}

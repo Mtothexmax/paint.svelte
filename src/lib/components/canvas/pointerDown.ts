@@ -10,7 +10,7 @@ import type { ImageDocument } from '../../core/document/ImageDocument';
 import { getEditorRenderer } from '../../render/EditorRenderer';
 import { zoomBy } from '../../render/Viewport';
 import { logTransformDebug } from '../../render/transformDebug';
-import { sampleCompositeColorAt } from '../../render/eyedropper';
+import { sampleCompositeColorAt, sampleLayerColorAt } from '../../render/eyedropper';
 import { MoveEngine } from '../../render/MoveEngine';
 import type { TransformHandle } from '../../render/MoveEngine';
 import { MoveSelectionEngine } from '../../render/MoveSelectionEngine';
@@ -33,7 +33,7 @@ import {
 } from '../../state/ui';
 import { cloneHardness, cloneOpacity, cloneSize } from '../../state/clone';
 import { recolorHardness, recolorOpacity, recolorSize } from '../../state/recolor';
-import { eyedropperCopyHex, eyedropperIncludeAlpha } from '../../state/eyedropper';
+import { eyedropperCopyHex, eyedropperIncludeAlpha, eyedropperSampleMode } from '../../state/eyedropper';
 import { applyFill } from '../../services/fillService';
 import { applyWandSelection } from '../../services/wandService';
 import { deselect } from '../../services/selectionService';
@@ -296,7 +296,10 @@ export function handlePointerDown(e: PointerEvent, a: PointerDownApi): void {
 			showNotice('Outside canvas.');
 			return;
 		}
-		const sampled = sampleCompositeColorAt(getEditorRenderer(), doc, img.x, img.y);
+		const sampled =
+			get(eyedropperSampleMode) === 'layer' && doc.activeLayer
+				? sampleLayerColorAt(getEditorRenderer(), doc, doc.activeLayer, img.x, img.y)
+				: sampleCompositeColorAt(getEditorRenderer(), doc, img.x, img.y);
 		if (!sampled) {
 			showNotice('Could not sample colour.', 'error');
 			return;

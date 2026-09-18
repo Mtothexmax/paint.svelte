@@ -6,6 +6,7 @@ import { ImageDocument, type ViewState } from '../core/document/ImageDocument';
 import { documentRegistry } from '../core/document/registry';
 import { MAX_DIMENSION, validateSize } from '../core/limits';
 import { exportPng } from '../render/export';
+import { decodeClipboardImageBlob } from './clipboardService';
 import { rendererReady } from '../render/EditorRenderer';
 import { fitView } from '../render/Viewport';
 import { deviceMaxTextureSize } from './device';
@@ -77,7 +78,8 @@ export async function openFiles(fileList: FileList | File[]): Promise<void> {
 	const limit = deviceMaxTextureSize();
 	for (const file of files) {
 		try {
-			const bitmap = await createImageBitmap(file);
+			// DIB-tolerant: clipboard managers (Ditto) serve bare CF_DIB.
+			const bitmap = await decodeClipboardImageBlob(file);
 			if (bitmap.width > MAX_DIMENSION || bitmap.height > MAX_DIMENSION || bitmap.width * bitmap.height > 2 ** 26) {
 				bitmap.close();
 				failed++;
@@ -137,7 +139,8 @@ export async function openFromClipboard(): Promise<void> {
 			const type = item.types.find((t) => t.startsWith('image/'));
 			if (!type) continue;
 			const blob = await item.getType(type);
-			const bitmap = await createImageBitmap(blob);
+			// DIB-tolerant (see decodeClipboardImageBlob).
+			const bitmap = await decodeClipboardImageBlob(blob);
 			const tooBig = bitmap.width > MAX_DIMENSION || bitmap.height > MAX_DIMENSION || bitmap.width * bitmap.height > 2 ** 26;
 			const v = validateSize(bitmap.width, bitmap.height, deviceMaxTextureSize() ?? undefined);
 			if (tooBig || !v.ok) {

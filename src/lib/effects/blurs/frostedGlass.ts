@@ -5,12 +5,14 @@ const DEFAULT_AMOUNT = 3;
 
 // Organic per-pixel random displacement frosted glass matching Rick Brewster's Paint.NET behavior
 const FROST_FRAGMENT = `
+    precision highp float;
     in vec2 vTextureCoord;
     uniform highp vec4 uInputSize;
     uniform sampler2D uTexture;
     out vec4 finalColor;
 
     uniform float uAmount;
+    uniform float uPadding;
 
     float hash(vec2 p)
     {
@@ -29,6 +31,13 @@ const FROST_FRAGMENT = `
         
         vec2 offset = (vec2(r1, r2) * 2.0 - 1.0) * uAmount;
         vec2 destPx = px + offset;
+        
+        // Clamp strictly to the inner sprite boundaries so padding pixels 
+        // sample the valid edge pixels of the image instead of turning black.
+        vec2 minBound = vec2(uPadding);
+        vec2 maxBound = uInputSize.xy - vec2(uPadding) - 1.0;
+        destPx = clamp(destPx, minBound, maxBound);
+        
         vec2 destUv = destPx * uInputSize.zw;
         
         finalColor = texture(uTexture, destUv);
@@ -48,13 +57,19 @@ const definition: EffectDefinition = {
             default: DEFAULT_AMOUNT
         }
     ],
-    filter: (settings: EffectSettings) =>
-        makeGlFilter(
+    filter: (settings: EffectSettings) => {
+        const amount = settings.amount ?? DEFAULT_AMOUNT;
+        const padding = Math.ceil(amount);
+        return makeGlFilter(
             FROST_FRAGMENT,
-            { uAmount: { value: settings.amount, type: 'f32' } },
-            Math.ceil(settings.amount)
-        ),
-    isNoop: (settings: EffectSettings) => settings.amount <= 0
+            { 
+                uAmount: { value: amount, type: 'f32' },
+                uPadding: { value: padding, type: 'f32' }
+            },
+            padding
+        );
+    },
+    isNoop: (settings: EffectSettings) => (settings.amount ?? DEFAULT_AMOUNT) <= 0
 };
 
 export default definition;

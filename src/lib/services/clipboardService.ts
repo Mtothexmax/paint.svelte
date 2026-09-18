@@ -48,6 +48,64 @@ function dropContent(): void {
 	content = null;
 }
 
+// --- pasting foreign images (DIB tolerance) -------------------------------
+// Clipboard managers like Ditto serve CF_DIB: BMP pixels WITHOUT the 14-byte
+// file header (which native apps like Paint.NET read directly). Browsers may
+// expose those bytes as image/bmp — or with no usable MIME type at all — and
+// the image decoder then chokes on the missing header. Sniffing for a bare
+// DIB and wrapping it in a file header makes those pastes work.
+
+/** BITMAPINFOHEADER sizes (v3 + v4 + v5) a bare DIB can start with. */
+const DIB_HEADER_SIZES = new Set([40, 52, 56, 108, 124]);
+
+/** True when bytes look like a bare CF_DIB rather than a BMP file ('BM'). */
+function isBareDib(bytes: Uint8Array): boolean {
+	if (bytes.length < 4) return false;
+	if (bytes[0] === 0x42 && bytes[1] === 0x4d) return false;
+	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	return DIB_HEADER_SIZES.has(view.getUint32(0, true));
+}
+
+/** Wraps bare DIB bytes in a BMP file header so image decoders accept them.
+ * Palette/bitfield handling covers 1/4/8-bit paletted and BI_BITFIELDS
+ * data; anything truncated throws. */
+function dibToBmpBlob(dib: Uint8Array): Blob {
+	const view = new DataView(dib.buffer, dib.byteOffset, dib.byteLength);
+	const infoSize = view.getUint32(0, true);
+	const bitCount = view.getUint16(14, true);
+	const compression = view.getUint32(16, true);
+	const colorsUsed = view.getUint32(32, true);
+	let paletteBytes: number;
+	if (compression === 3) {
+		paletteBytes = 12; // BI_BITFIELDS color masks
+	} else if (bitCount <= 8) {
+		paletteBytes = (colorsUsed || 1 << bitCount) * 4;
+	} else {
+		paletteBytes = 0;
+	}
+	if (14 + infoSize + paletteBytes > dib.length) throw new Error('Truncated DIB.');
+	const header = new DataView(new ArrayBuffer(14));
+	header.setUint16(0, 0x4d42, true); // 'BM'
+	header.setUint32(2, 14 + dib.length, true);
+	header.setUint32(6, 0, true); // reserved
+	header.setUint32(10, 14 + infoSize + paletteBytes, true); // bfOffBits
+	// Exact copy: BlobPart requires ArrayBufferView<ArrayBuffer>.
+	return new Blob([header.buffer, new Uint8Array(dib)], { type: 'image/bmp' });
+}
+
+/** Decodes an image blob from the clipboard, tolerating bare CF_DIB bytes
+ * (Ditto & co). Throws when the bytes are no decodable image. */
+export async function decodeClipboardImageBlob(blob: Blob): Promise<ImageBitmap> {
+	try {
+		return await createImageBitmap(blob);
+	} catch {
+		// Fall through to the DIB sniff below.
+	}
+	const bytes = new Uint8Array(await blob.arrayBuffer());
+	if (!isBareDib(bytes)) throw new Error('Not a decodable image.');
+	return await createImageBitmap(dibToBmpBlob(bytes));
+}
+
 /**
  * Copies the selected pixels of the active layer into the internal clipboard
  * (the whole layer when nothing is selected). The selection mask is the

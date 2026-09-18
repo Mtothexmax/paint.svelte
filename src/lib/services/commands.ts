@@ -15,7 +15,7 @@ import {
 import type { ViewState } from '../core/document/ImageDocument';
 import { get } from 'svelte/store';
 import { checkerTheme } from '../state/view';
-import { addLayer, deleteLayer, duplicateLayer } from './layersService';
+import { addLayer, deleteLayer, duplicateLayer, flattenImage } from './layersService';
 import { deleteSelection, deselect, invertSelection, selectAll } from './selectionService';
 import { cancelFloatingMove } from '../state/moveTransform';
 import { copySelection, cutSelection, copyImage, hasClipboardImage, pasteAsNewLayer } from './clipboardService';
@@ -221,6 +221,12 @@ export function registerBuiltinCommands(): void {
 			label: 'Canvas Size…',
 			run: () => openDialog('imageSize', { mode: 'canvas' }),
 			isEnabled: hasDoc
+		},
+		{
+			id: 'image.flatten',
+			label: 'Flatten',
+			run: () => void flattenImage(),
+			isEnabled: () => (documentRegistry.active?.layers.length ?? 0) > 1
 		}
 	]);
 

@@ -23,7 +23,8 @@ import { pointInPolygon, rectFromCorners, squareCornerFromDrag, framePointsFromL
 	import { selectionOutlinePoints } from '../../render/selection';
 	import { openFiles } from '../../services/fileService';
 	import {
-		pasteBitmapAsLayer
+		pasteBitmapAsLayer,
+		decodeClipboardImageBlob
 	} from '../../services/clipboardService';
 	import {
 		clearPasteCatcher,
@@ -47,6 +48,7 @@ import { pointInPolygon, rectFromCorners, squareCornerFromDrag, framePointsFromL
 		showNotice
 	} from '../../state/ui';
 	import { polygonAction } from '../../state/polygon';
+	import { eyedropperSampleMode } from '../../state/eyedropper';
 	import { commitTextDraft as persistTextDraft } from '../../services/textService';
 	import type { TextContent } from '../../core/layers/Layer';
 	import { cloneSize } from '../../state/clone';
@@ -79,7 +81,7 @@ import { pointInPolygon, rectFromCorners, squareCornerFromDrag, framePointsFromL
 		PAINT_TOOLS,
 		SELECT_TOOLS
 	} from './tools';
-	import { sampleCompositeColorAt } from '../../render/eyedropper';
+	import { sampleCompositeColorAt, sampleLayerColorAt } from '../../render/eyedropper';
 	import ColorProbeHud from './ColorProbeHud.svelte';
 	import ShapePreview from './ShapePreview.svelte';
 	import LinePreview from './LinePreview.svelte';
@@ -414,6 +416,9 @@ let zoomRightHeld = $state(false);
 	let dragMode: 'replace' | 'add' | 'subtract' = 'replace'; // mode for the current drag
 	let selStart: Point | null = null; // image px
 	let lassoPts: Point[] = [];
+	/** Last raw (unconstrained) selection pointer, so pressing/releasing
+	 * Shift mid-drag re-constrains without waiting for the next mouse move. */
+	let selLastRaw: Point | null = null;
 
 	// polygon-lasso state (click to place vertices)
 	let polyPts: Point[] = [];
@@ -1053,7 +1058,10 @@ let zoomRightHeld = $state(false);
 		}
 		probeAt = { x: px, y: py };
 		probeTime = performance.now();
-		probeColor = sampleCompositeColorAt(getEditorRenderer(), doc, img.x, img.y);
+		probeColor =
+			get(eyedropperSampleMode) === 'layer' && doc.activeLayer
+				? sampleLayerColorAt(getEditorRenderer(), doc, doc.activeLayer, img.x, img.y)
+				: sampleCompositeColorAt(getEditorRenderer(), doc, img.x, img.y);
 	}
 
 	function clearProbe(): void {
@@ -1181,6 +1189,7 @@ let zoomRightHeld = $state(false);
 		selStart: () => selStart,
 		setSelStart: (v: Point | null) => {
 			selStart = v;
+			if (v === null) selLastRaw = null;
 		},
 		lassoPts: () => lassoPts,
 		setLassoPts: (v: Point[]) => {
@@ -1343,13 +1352,19 @@ let zoomRightHeld = $state(false);
 
 	function onKeyDown(e: KeyboardEvent) {
 		handleKeyDown(e, canvasInput);
-		// Shift pressed mid-drag constrains the live shape to a square.
-		if (e.key === 'Shift' && !e.repeat) applyShapeSquare(true);
+		// Shift pressed mid-drag constrains the live shape/selection to a square.
+		if (e.key === 'Shift' && !e.repeat) {
+			applyShapeSquare(true);
+			if (selecting && selLastRaw) showSelectDraft(selLastRaw, true);
+		}
 	}
 	function onKeyUp(e: KeyboardEvent) {
 		handleKeyUp(e, canvasInput);
-		// Shift released mid-drag returns the live shape to free proportions.
-		if (e.key === 'Shift') applyShapeSquare(false);
+		// Shift released mid-drag returns live shape/selection to free proportions.
+		if (e.key === 'Shift') {
+			applyShapeSquare(false);
+			if (selecting && selLastRaw) showSelectDraft(selLastRaw, false);
+		}
 	}
 
 	function onWheel(e: WheelEvent) {
@@ -1385,8 +1400,9 @@ let zoomRightHeld = $state(false);
 	// --- selection tools (rect / ellipse / lasso) -------------------------
 
 	/** Live draft outline (solid) for the drag in progress. `cur` is the
-	 * current pointer position in image px. */
-	function showSelectDraft(cur: Point): void {
+	 * current pointer position in image px; `square` (Shift) constrains
+	 * rect/ellipse drags to square proportions. */
+	function showSelectDraft(cur: Point, square = false): void {
 		if (!ready) return;
 		const kind = selectionToolKind();
 		const start = selStart ? clampSelectionPoint(selStart) : null;
@@ -1411,12 +1427,14 @@ let zoomRightHeld = $state(false);
 		}
 		// rect/ellipse: outline follows the current pointer position (rectangle
 		// tool honours the Free/Fixed-Ratio/Fixed-Size mode; Fixed Size moves a
-		// free-floating box with its top-left under the pointer).
+		// free-floating box with its top-left under the pointer). Shift forces
+		// square proportions on top (except Fixed Size).
 		let rect: Rect;
 		if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {
 			rect = fixedRectAt(boundedCur);
 		} else {
-			const eff = kind === 'rect' ? constrainRectCorner(start, boundedCur) : boundedCur;
+			const base = kind === 'rect' ? constrainRectCorner(start, boundedCur) : boundedCur;
+			const eff = square ? squareCornerFromDrag(start, base) : base;
 			rect = {
 				x: Math.min(start.x, eff.x),
 				y: Math.min(start.y, eff.y),
@@ -1434,6 +1452,7 @@ let zoomRightHeld = $state(false);
 		selecting = false;
 		selectPointerId = -1;
 		selStart = null;
+		selLastRaw = null;
 		lassoPts = [];
 		statusBar.update((s) => ({ ...s, selW: null, selH: null }));
 		if (ready) getEditorRenderer().refreshActiveSelection();
@@ -1750,16 +1769,17 @@ function onPointerDown(e: PointerEvent) {
 				else moveSelEngine.moveTo(imageFromScreen(sp));
 				syncTransformUi();
 			}
-			if (selecting && e.pointerId === selectPointerId && selStart) {
-				const img = imageFromScreen(sp);
-				if (get(activeToolId) === 'lasso') {
-					const last = lassoPts[lassoPts.length - 1];
-					if (!last || Math.hypot(img.x - last.x, img.y - last.y) >= 1) {
-						lassoPts.push(img);
-					}
+		if (selecting && e.pointerId === selectPointerId && selStart) {
+			const img = imageFromScreen(sp);
+			if (get(activeToolId) === 'lasso') {
+				const last = lassoPts[lassoPts.length - 1];
+				if (!last || Math.hypot(img.x - last.x, img.y - last.y) >= 1) {
+					lassoPts.push(img);
 				}
-				showSelectDraft(img);
 			}
+			selLastRaw = { x: img.x, y: img.y };
+			showSelectDraft(img, e.shiftKey);
+		}
 		}
 		movePointer(sp);
 		// After movePointer, so the HUD samples the pixel under the fresh
@@ -1801,23 +1821,39 @@ function onPointerDown(e: PointerEvent) {
 		if (isTextTarget(e.target) || get(dialog).kind) return;
 		const items = e.clipboardData?.items;
 		if (!items) return;
-		for (const item of Array.from(items)) {
+		const list = Array.from(items);
+		// 1) Anything the browser already labels as an image (PNG from
+		//    browsers, screenshots, image files, translated DIBs).
+		for (const item of list) {
 			if (!item.type.startsWith('image/')) continue;
 			const file = item.getAsFile();
 			if (!file) continue;
 			e.preventDefault();
-			void (async () => {
-				if (!documentRegistry.active) {
-					await openFiles([file]);
-					return;
-				}
-				try {
-					pasteBitmapAsLayer(await createImageBitmap(file));
-				} catch {
-					showNotice('Could not paste the clipboard image.', 'error');
-				}
-			})();
+			void pasteClipboardFile(file);
 			return;
+		}
+		// 2) No image and no text: some clipboard managers (Ditto) expose raw
+		//    bytes without a usable MIME type. Try decoding those files.
+		if (list.some((item) => item.type.startsWith('text/') || item.kind === 'string')) return;
+		for (const item of list) {
+			if (item.kind !== 'file') continue;
+			const file = item.getAsFile();
+			if (!file) continue;
+			e.preventDefault();
+			void pasteClipboardFile(file);
+			return;
+		}
+	}
+
+	async function pasteClipboardFile(file: File): Promise<void> {
+		if (!documentRegistry.active) {
+			await openFiles([file]);
+			return;
+		}
+		try {
+			pasteBitmapAsLayer(await decodeClipboardImageBlob(file));
+		} catch {
+			showNotice('Could not paste the clipboard image.', 'error');
 		}
 	}
 

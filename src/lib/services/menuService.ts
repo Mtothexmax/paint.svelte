@@ -76,7 +76,8 @@ export const MENUS: MenuDef[] = [
 			{ type: 'command', commandId: 'image.resize' },
 			{ type: 'command', commandId: 'image.canvasSize' },
 			{ type: 'disabled', label: 'Rotate 90°' },
-			{ type: 'command', commandId: 'image.cropToSelection' }
+			{ type: 'command', commandId: 'image.cropToSelection' },
+			{ type: 'command', commandId: 'image.flatten' }
 		]
 	},
 	{

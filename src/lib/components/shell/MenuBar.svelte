@@ -38,6 +38,7 @@
 		'layers.delete': '🗑️',
 		'image.resize': '📐',
 		'image.canvasSize': '⬜',
+		'image.flatten': '▤',
 		'adjustments.hueSat': '🌈',
 		'adjustments.invertColors': '🔁',
 		...Object.fromEntries(effects.map((e) => [`effects.${e.id}`, e.icon ?? '✨'])),

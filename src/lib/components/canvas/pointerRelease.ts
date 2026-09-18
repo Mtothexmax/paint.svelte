@@ -4,6 +4,7 @@
 // are passed through get/set closures; engines expose their methods directly.
 import { get } from 'svelte/store';
 import type { Point, Rect } from '../../core/geometry';
+import { squareCornerFromDrag } from '../../core/geometry';
 import { documentRegistry } from '../../core/document/registry';
 import { getEditorRenderer } from '../../render/EditorRenderer';
 import { logTransformDebug } from '../../render/transformDebug';
@@ -152,8 +153,14 @@ export function commitSelect(e: PointerEvent, a: PointerApi): void {
 		return;
 	}
 	const upRaw = clampSelectionPoint(a.toImage(e));
-	const up =
+	// Shift constrains rect/ellipse drags to square proportions (Paint.NET
+	// behaviour) — on top of the rectangle tool's Ratio mode, except Fixed
+	// Size (an explicit pixel size stays untouched). Lasso is unaffected.
+	const shiftSquare =
+		e.shiftKey && kind !== 'lasso' && !(kind === 'rect' && get(selectionRatio) === 'fixedSize');
+	const upBase =
 		kind === 'rect' && get(selectionRatio) !== 'fixedSize' ? constrainRectCorner(start, upRaw) : upRaw;
+	const up = shiftSquare ? squareCornerFromDrag(start, upBase) : upBase;
 	if (kind === 'rect' && get(selectionRatio) === 'fixedSize') {
 		// Fixed Size: freely place the fixed box at the release point.
 		applySelectionRect(a.dragMode(), 'rect', fixedRectAt(upRaw));
