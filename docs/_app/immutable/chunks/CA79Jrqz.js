@@ -1,0 +1,1 @@
+import{r as e}from"../nodes/2.BFinU7Lf.js";export{e as createNewDocument};
