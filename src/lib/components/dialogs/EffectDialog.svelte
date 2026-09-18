@@ -56,6 +56,7 @@
 			rememberLastApplied({
 				menu: 'effects',
 				name: def.label,
+				effectId: def.id,
 				apply: () => applyEffect(getEditorRenderer(), def, settings)
 			});
 			closeDialog();

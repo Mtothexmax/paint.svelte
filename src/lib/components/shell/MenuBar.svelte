@@ -114,9 +114,17 @@
 	}
 
 	function repeatApplied() {
-		$lastApplied?.apply();
+		const last = $lastApplied;
 		openMenu = null;
 		openSub = null;
+		if (!last) return;
+		// Effects repeat re-opens the filter dialog with the last-used
+		// settings (restored from persisted defaults) instead of instantly
+		// re-applying. Routing through the registered command also honours
+		// custom-dialog overrides. Falls back to instant apply when the
+		// command is gone/disabled.
+		const cid = last.menu === 'effects' && last.effectId ? `effects.${last.effectId}` : null;
+		if (!cid || !commands.run(cid)) last.apply();
 	}
 
 	function iconOf(entry: MenuEntry): string {

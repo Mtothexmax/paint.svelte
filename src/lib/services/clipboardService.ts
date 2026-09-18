@@ -11,7 +11,8 @@ import { surfaceToPngThumbnailUrl, writeSurfaceToSystemClipboard, documentToPngB
 import { resizeCanvas } from '../render/resize';
 import { openDialog, type PasteDialogPayload, type PasteOversizeChoice } from './dialogService';
 import { deleteSelection } from './selectionService';
-import { showNotice } from '../state/ui';
+import { showNotice, statusBar } from '../state/ui';
+import { fitView } from '../render/Viewport';
 import { cancelFloatingMove } from '../state/moveTransform';
 
 interface ClipboardContent {
@@ -304,8 +305,15 @@ function askOversize(srcId: SurfaceId, w: number, h: number, ownsSource: boolean
 		// A copy while the dialog was open may have dropped the surface.
 		const alive = renderer.surfaces.has(srcId);
 		if (alive && choice !== 'cancel') {
-			if (choice === 'expand') growCanvasFor(w, h);
-			pasteAt(srcId);
+			if (choice === 'expand') {
+				growCanvasFor(w, h);
+				pasteAt(srcId);
+				// The canvas just outgrew the viewport — frame it all
+				// (same as View > Fit to Window).
+				fitActiveView();
+			} else {
+				pasteAt(srcId);
+			}
 		}
 		if (ownsSource) disposeSource(srcId);
 	};
@@ -330,6 +338,16 @@ function growCanvasFor(w: number, h: number): boolean {
 	const newH = Math.max(doc.height, h);
 	if (newW === doc.width && newH === doc.height) return false;
 	return resizeCanvas(getEditorRenderer(), newW, newH, -1, -1);
+}
+
+/** Frames the whole canvas in the viewport (mirrors View > Fit to Window). */
+function fitActiveView(): void {
+	const doc = documentRegistry.active;
+	if (!doc || !hasEditorRenderer()) return;
+	const renderer = getEditorRenderer();
+	doc.view = fitView(doc.width, doc.height, renderer.viewWidth, renderer.viewHeight);
+	renderer.refreshActiveView();
+	statusBar.update((s) => ({ ...s, zoomPct: Math.round(doc.view.zoom * 100) }));
 }
 
 /** Shared tail of both paste paths: wraps `surfaceId` (doc-sized, content

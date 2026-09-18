@@ -108,6 +108,10 @@
 		fitWidthToColumns();
 	}
 
+	/** The repeat row shows above the categories — but never inside search
+	 * results. */
+	const showRepeat = $derived(!!repeatLabel && !filter.trim());
+
 	/** Enter picks the first ENABLED match (only when filtering — with an
 	 * empty field Enter does nothing). */
 	function pickFirstMatch() {
@@ -319,7 +323,7 @@
 			}}
 		/>
 	</div>
-	{#if repeatLabel}
+	{#if showRepeat}
 		<button class="fx-add-item" onclick={() => onRepeat?.()}>
 			<span class="fx-add-ic">🔄</span>
 			<span class="fx-add-item-label">{repeatLabel}</span>

@@ -8,6 +8,10 @@ export interface LastApplied {
 	menu: 'effects' | 'adjustments';
 	name: string;
 	apply: () => void;
+	/** Effect id for 'effects' entries: the browser repeat row re-opens the
+	 * filter DIALOG (last settings are restored from persisted defaults)
+	 * instead of instantly re-applying. */
+	effectId?: string;
 }
 
 export const lastApplied = writable<LastApplied | null>(null);
