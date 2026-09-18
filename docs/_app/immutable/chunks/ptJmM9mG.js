@@ -1,0 +1,1 @@
+import{r as e}from"../nodes/2.DNa8y3B0.js";export{e as createNewDocument};
