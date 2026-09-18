@@ -37,7 +37,7 @@
 		requestMoveTransformApply,
 		requestMoveTransformCancel
 	} from '../../state/moveTransform';
-	import PdnSlider from '../common/PdnSlider.svelte';
+	import FilterSlider from '../common/FilterSlider.svelte';
 	import IconSplitButton from '../common/IconSplitButton.svelte';
 	import FontDropdown from '../common/FontDropdown.svelte';
 	import AlignLeftIcon from '../../assets/FormatAlignLeft.svg';
@@ -339,10 +339,10 @@
 			Render Layer to Raster Layer
 		</button>
 	{:else if isPaint && !isPencil}
-		<PdnSlider label="Size" min={1} max={300} step={1} bind:value={$brushSize} />
-		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$brushOpacity} />
-		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$brushHardness} />
-		<PdnSlider label="Spacing" min={1} max={300} step={1} unit="%" bind:value={$brushSpacing} />
+		<FilterSlider label="Size" min={1} max={300} step={1} bind:value={$brushSize} />
+		<FilterSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$brushOpacity} />
+		<FilterSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$brushHardness} />
+		<FilterSlider label="Spacing" min={1} max={300} step={1} unit="%" bind:value={$brushSpacing} />
 		<span class="aa-label">Anti-alias:</span>
 		<IconSplitButton options={AA_OPTIONS} bind:value={aa} title="Anti-aliased rendering" />
 	{:else if isPencil}
@@ -543,7 +543,7 @@
 		<button class="mini-btn" onclick={requestTextCommit} title="Render the text into the layer"> ✓ Finish </button>
 		<button class="mini-btn" onclick={requestTextCancel} title="Discard the text draft"> ✕ </button>
 	{:else if isFill}
-		<PdnSlider label="Tolerance" min={0} max={100} step={1} unit="%" bind:value={$fillTolerance} />
+		<FilterSlider label="Tolerance" min={0} max={100} step={1} unit="%" bind:value={$fillTolerance} />
 		<span class="aa-label">Flood Mode:</span>
 		<div class="seg" role="group" aria-label="Flood mode">
 			<button
@@ -567,7 +567,7 @@
 			Tolerance edits re-apply the last fill.
 		</span>
 	{:else if isWand}
-		<PdnSlider
+		<FilterSlider
 			label="Tolerance"
 			min={0}
 			max={100}
@@ -621,7 +621,7 @@
 				</button>
 			{/each}
 		</div>
-		<PdnSlider label="Brush Width" min={1} max={50} step={1} bind:value={$shapeWidth} />
+		<FilterSlider label="Brush Width" min={1} max={50} step={1} bind:value={$shapeWidth} />
 		<span class="aa-label">Line Style:</span>
 		<IconSplitButton options={LINE_STYLE_OPTIONS} bind:value={lineStyle} title="Line style" />
 		<div class="seg" role="group" aria-label="Draw style">
@@ -652,7 +652,7 @@
 		</div>
 		<span class="aa-label" title="Hold Shift while dragging to constrain to square proportions">Shift: square</span>
 	{:else if isLine}
-		<PdnSlider label="Brush Width" min={1} max={50} step={1} bind:value={$lineWidth} />
+		<FilterSlider label="Brush Width" min={1} max={50} step={1} bind:value={$lineWidth} />
 		<IconSplitButton options={ARROW_START_OPTIONS} bind:value={startArrowState} title="Start arrow" />
 		<IconSplitButton options={LINE_STYLE_OPTIONS} bind:value={curveStyle} title="Line style" />
 		<IconSplitButton options={ARROW_END_OPTIONS} bind:value={endArrowState} title="End arrow" />
@@ -724,16 +724,16 @@
 		<button class="mini-btn" onclick={requestGradientCommit} title="Render the gradient into the layer"> ✓ Finish </button>
 		<button class="mini-btn" onclick={requestGradientCancel} title="Discard the gradient draft"> ✕ </button>
 	{:else if isClone}
-		<PdnSlider label="Size" min={1} max={400} step={1} bind:value={$cloneSize} />
-		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$cloneOpacity} />
-		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$cloneHardness} />
+		<FilterSlider label="Size" min={1} max={400} step={1} bind:value={$cloneSize} />
+		<FilterSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$cloneOpacity} />
+		<FilterSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$cloneHardness} />
 		<span class="tooloptions-placeholder" title="Hold Alt and click to set the clone source">
 			Alt+click sets the source.
 		</span>
 	{:else if isRecolor}
-		<PdnSlider label="Size" min={1} max={400} step={1} bind:value={$recolorSize} />
-		<PdnSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$recolorOpacity} />
-		<PdnSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$recolorHardness} />
+		<FilterSlider label="Size" min={1} max={400} step={1} bind:value={$recolorSize} />
+		<FilterSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$recolorOpacity} />
+		<FilterSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$recolorHardness} />
 		<span class="tooloptions-placeholder" title="Paints the foreground colour, destination alpha is preserved">
 			Alpha is preserved.
 		</span>

@@ -6,6 +6,12 @@
 	align-items: center;
 	gap: 6px;
 	min-width: 0;
+	/* Never crushed by crowded row layouts (like the old toolbar slider):
+	   the track itself shrinks down to its min-width instead. */
+	flex: 0 0 auto;
+}
+.fsl.grow {
+	flex: 1 1 auto;
 }
 .fsl-step {
 	flex: 0 0 auto;
@@ -38,8 +44,13 @@
 }
 .fsl-track {
 	position: relative;
+	/* Definite width (not just flex-basis): all in-flow content is absolute,
+	   so the intrinsic size would collapse and drag the basis down with it.
+	   110px base like the old toolbar slider; grows in dialogs, shrinks to
+	   min-width in tight spots. */
+	width: 110px;
 	flex: 1 1 auto;
-	min-width: 0;
+	min-width: 48px;
 	height: 28px;
 	border-radius: 6px;
 	border: 1px solid var(--border);

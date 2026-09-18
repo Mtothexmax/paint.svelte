@@ -5,7 +5,7 @@
 	// (which records undoable history).
 	import { onMount } from 'svelte';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
-	import PdnSlider from '../common/PdnSlider.svelte';
+	import FilterSlider from '../common/FilterSlider.svelte';
 	import {
 		addLayer,
 		deleteLayer,
@@ -464,13 +464,13 @@
 	{/if}
 
 	<div class="layer-opacity">
-		<PdnSlider
+		<FilterSlider
 			label="Opacity"
 			min={0}
 			max={100}
 			step={1}
 			unit="%"
-			fit
+			grow
 			bind:value={opacityVal}
 			onCommit={onOpacityCommit}
 		/>

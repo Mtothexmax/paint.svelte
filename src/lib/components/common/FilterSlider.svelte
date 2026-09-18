@@ -18,16 +18,23 @@
 		min: number;
 		max: number;
 		step?: number;
-		/** the value the reset button restores the slider to */
-		default: number;
+		/** the value the reset button restores the slider to; when omitted
+		 * (e.g. toolbar sliders) no reset button is shown and double-click
+		 * does nothing */
+		default?: number;
+		/** display suffix for the value (e.g. "%") — never parsed on edit */
+		unit?: string;
 		/** CSS background value (gradient or colour) painted on the track */
 		gradient?: string;
 		/** Opt-in center tick (range middle) — explicit per effect param. */
 		centerTick?: boolean;
+		/** Fill the available width (e.g. layers-panel opacity row) instead
+		 * of sizing to content. */
+		grow?: boolean;
 		oninput?: () => void;
 		onCommit?: () => void;
 	}
-	let { label, value = $bindable(), min, max, step = 1, default: dflt, gradient, centerTick = false, oninput, onCommit }: Props = $props();
+	let { label, value = $bindable(), min, max, step = 1, default: dflt, unit = '', gradient, centerTick = false, grow = false, oninput, onCommit }: Props = $props();
 
 	let trackEl: HTMLDivElement | undefined = $state();
 	let dragging = false;
@@ -59,6 +66,7 @@
 	const showTicks = $derived(tickInfo !== null);
 
 	function reset(): void {
+		if (dflt === undefined) return;
 		value = dflt;
 		oninput?.();
 		onCommit?.();
@@ -107,6 +115,12 @@
 		if (!dragging) return;
 		dragging = false;
 		onCommit?.();
+	}
+
+	function onTrackWheel(e: WheelEvent): void {
+		e.preventDefault();
+		const s = Math.max(1e-6, Math.abs(step));
+		setValue(value + (e.deltaY < 0 ? s : -s), true);
 	}
 
 	function stepBy(factor: number): void {
@@ -172,7 +186,7 @@
 	}
 </script>
 
-<div class="fsl">
+<div class="fsl" class:grow={grow}>
 	<button
 		type="button"
 		class="fsl-step"
@@ -193,16 +207,18 @@
 		aria-valuemin={min}
 		aria-valuemax={max}
 		aria-valuenow={clampToRange(value)}
-		aria-valuetext={displayValue}
+		aria-valuetext="{displayValue}{unit}"
 		title="{label} — drag or click to set, double-click to reset"
 		onpointerdown={onTrackDown}
 		onpointermove={onTrackMove}
 		onpointerup={onTrackUp}
 		onpointercancel={onTrackUp}
+		onwheel={onTrackWheel}
 		ondblclick={(e) => {
 			// Double-clicks on the value/edit controls keep their own
 			// behaviour (e.g. word-select) and must not reset.
 			if ((e.target as HTMLElement | null)?.closest('button, input')) return;
+			if (dflt === undefined) return;
 			reset();
 		}}
 		onkeydown={onTrackKey}
@@ -264,7 +280,7 @@
 						}
 					}}
 				>
-					{displayValue}
+					{displayValue}{unit}
 				</button>
 			{/if}
 		</div>
@@ -277,12 +293,14 @@
 		onmousedown={(e) => onStepDown(1, e)}
 		oncontextmenu={(e) => e.preventDefault()}
 	><img src={PlusIcon} class="fsl-step-ic" alt="" draggable="false" /></button>
-	<button
-		class="fsl-reset"
-		type="button"
-		title="Reset to default"
-		aria-label="Reset to default"
-		disabled={value === dflt}
-		onclick={reset}
-	>↺</button>
+	{#if dflt !== undefined}
+		<button
+			class="fsl-reset"
+			type="button"
+			title="Reset to default"
+			aria-label="Reset to default"
+			disabled={value === dflt}
+			onclick={reset}
+		>↺</button>
+	{/if}
 </div>

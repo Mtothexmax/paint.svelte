@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layer opacity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+        colors: {
+          chrome: { hi:'#2b2e34', lo:'#1a1c20', bar1:'#34383f', bar2:'#22252a' },
+          well: '#0b0c0e',
+          ink: { DEFAULT:'#e7e9ee', dim:'#8d929c', faint:'#5d626c' },
+          accent: { DEFAULT:'#2c6fe0', glow:'#3c82ff', ring:'#6fd4ff' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  /*
+    Effects below stay as scoped CSS because they're either
+    multi-layer (several inset shadows / gradients stacked on one
+    element), a repeating/pattern background, or a JS-driven value
+    (mix-blend-mode, live width/left) — things Tailwind's utility
+    classes don't express cleanly. Everything else on this page
+    (layout, spacing, type, color, radius, single shadows,
+    transitions) is Tailwind utility classes on the elements.
+  */
+  ::selection{ background:#2c6fe0; color:#fff; }
+
+  .panel-shadow{
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.13) inset,
+      0 -1px 0 rgba(0,0,0,.5) inset,
+      0 24px 48px -16px rgba(0,0,0,.7),
+      0 4px 12px rgba(0,0,0,.4);
+  }
+  .grain::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.22;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+  .checker{
+    background-color:#15171a;
+    background-image:
+      linear-gradient(45deg,#232629 25%,transparent 25%),
+      linear-gradient(-45deg,#232629 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#232629 75%),
+      linear-gradient(-45deg,transparent 75%,#232629 75%);
+    background-size:14px 14px;
+    background-position:0 0,0 7px,7px -7px,-7px 0;
+  }
+  .stage-shadow{ box-shadow:0 0 0 1px rgba(0,0,0,.7), 0 2px 10px rgba(0,0,0,.45) inset; }
+  .vignette{ background:radial-gradient(130% 100% at 50% 0%,transparent 55%,rgba(0,0,0,.45)); }
+
+  .well-shadow{
+    box-shadow:
+      0 3px 7px rgba(0,0,0,.85) inset,
+      0 -1px 0 rgba(255,255,255,.075),
+      0 0 0 1px rgba(0,0,0,.8);
+  }
+  .well-shadow:focus-visible{ box-shadow:0 3px 7px rgba(0,0,0,.85) inset, 0 0 0 2px #6fd4ff; }
+  .fill-sheen::after{
+    content:"";position:absolute;left:0;right:0;top:0;height:46%;
+    background:linear-gradient(180deg,rgba(255,255,255,.26),transparent);
+  }
+  .fill-glow{ box-shadow:0 0 12px rgba(60,130,255,.35); }
+  .ruling{
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.13) 0 1px,transparent 1px 10%);
+    mix-blend-mode:overlay;
+  }
+  .glass{ background:linear-gradient(180deg,rgba(255,255,255,.06),transparent 45%,rgba(0,0,0,.32)); }
+  .thumb-body{
+    background:linear-gradient(180deg,#f2f4f7,#b9bfc8 48%,#8e949d);
+    box-shadow:0 0 0 1px rgba(0,0,0,.8), 0 2px 5px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.85) inset;
+  }
+  .thumb-knurl::before{
+    content:"";position:absolute;inset:3px 3px;
+    background:repeating-linear-gradient(90deg,rgba(0,0,0,.42) 0 1px,transparent 1px 3px);
+    border-radius:1px;
+  }
+  .slider.live .thumb-body{
+    box-shadow:0 0 0 1px rgba(0,0,0,.85), 0 3px 9px rgba(0,0,0,.7), 0 0 12px rgba(60,130,255,.35), 0 1px 0 rgba(255,255,255,.9) inset;
+  }
+  .grip-lines{ background:repeating-linear-gradient(180deg,rgba(255,255,255,.16) 0 1px,transparent 1px 4px); }
+  .step-shadow{ box-shadow:0 1px 0 rgba(255,255,255,.13) inset, 0 1px 2px rgba(0,0,0,.5); }
+  .step-shadow:active, .step-shadow.push{ box-shadow:0 2px 6px rgba(0,0,0,.6) inset; }
+  .mode-well{ box-shadow:0 2px 5px rgba(0,0,0,.7) inset, 0 0 0 1px rgba(0,0,0,.8); }
+  .mode-btn[aria-pressed="true"]{
+    background:linear-gradient(180deg,#3d434c,#2c3138);
+    box-shadow:0 1px 0 rgba(255,255,255,.13) inset, 0 1px 3px rgba(0,0,0,.5);
+    color:#fff;
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body class="min-h-screen m-0 flex items-center justify-center p-6 font-sans text-ink select-none
+             bg-[radial-gradient(120%_100%_at_50%_0%,#111214,#050506)] antialiased">
+
+<div class="w-full max-w-[392px] relative overflow-hidden rounded-[10px] border border-black/60 grain panel-shadow
+            bg-gradient-to-b from-chrome-hi via-chrome-lo to-[#16181b]">
+
+  <!-- title bar -->
+  <div class="flex items-center gap-2 px-3 py-[9px] border-b border-black/55 shadow-[0_1px_0_rgba(255,255,255,.075)_inset]
+              bg-gradient-to-b from-chrome-bar1 to-chrome-bar2">
+    <h1 class="text-[12.5px] font-semibold m-0 tracking-wide">Layer opacity</h1>
+    <span class="text-[11px] text-ink-faint">Ebenendeckkraft</span>
+    <span class="grip-lines ml-auto w-[22px] h-[14px] rounded-[3px] opacity-60" aria-hidden="true"></span>
+  </div>
+
+  <div class="p-[13px] pb-[14px] flex flex-col gap-3">
+
+    <!-- composite preview -->
+    <div class="relative h-[148px] max-[400px]:h-[126px] rounded-[7px] overflow-hidden checker stage-shadow">
+      <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 360 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2d3a52"/><stop offset="1" stop-color="#6d5a63"/>
+          </linearGradient>
+        </defs>
+        <rect width="360" height="150" fill="url(#sky)"/>
+        <circle cx="286" cy="44" r="17" fill="#f0c98a" opacity=".9"/>
+        <path d="M0 112 L74 66 L128 104 L186 60 L252 112 L360 74 L360 150 L0 150Z" fill="#26303f"/>
+        <path d="M0 132 L96 96 L168 128 L246 98 L360 134 L360 150 L0 150Z" fill="#171d27"/>
+      </svg>
+
+      <svg id="topLayer" class="absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-[60ms] ease-linear"
+           viewBox="0 0 360 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="wash" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff5d8f"/><stop offset=".55" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/>
+          </linearGradient>
+        </defs>
+        <rect width="360" height="150" fill="url(#wash)"/>
+        <g fill="none" stroke="#0b0c10" stroke-opacity=".5">
+          <circle cx="96" cy="62" r="46" stroke-width="10"/>
+          <circle cx="232" cy="96" r="62" stroke-width="10"/>
+        </g>
+        <rect x="140" y="20" width="86" height="86" fill="#0b0c10" opacity=".22"/>
+      </svg>
+      <div class="absolute inset-0 pointer-events-none vignette"></div>
+    </div>
+
+    <!-- slider row -->
+    <div class="flex items-center gap-2">
+      <button id="minus" title="-1 / right-click -10" aria-label="Decrease opacity"
+              class="step-shadow w-[20px] h-[20px] flex-none rounded self-center border border-black/65 text-ink cursor-pointer
+                     flex items-center justify-center transition-[filter,transform] duration-100 ease-out
+                     bg-gradient-to-b from-[#3a3e45] to-[#272a2f] hover:brightness-[1.18]
+                     active:translate-y-px active:bg-gradient-to-b active:from-[#202327] active:to-[#2b2f35]">
+        <svg class="w-[8px] h-[8px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>
+      </button>
+
+      <div id="slider" class="relative flex-1 h-[34px]">
+        <div id="track" role="slider" tabindex="0"
+             aria-label="Layer opacity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="85" aria-valuetext="85 percent"
+             class="well-shadow absolute inset-0 rounded-[7px] bg-gradient-to-b from-well to-[#131519]
+                    cursor-ew-resize [touch-action:none] overflow-hidden outline-none">
+          <div id="fill" class="fill-sheen fill-glow absolute left-0 top-0 bottom-0 bg-accent" style="width:50%"></div>
+          <div id="edgeline" class="absolute top-[2px] bottom-[2px] w-[1.5px] pointer-events-none
+                      bg-[linear-gradient(180deg,transparent,rgba(223,240,255,.95),transparent)]"></div>
+          <div class="ruling absolute inset-0 pointer-events-none"></div>
+          <div class="glass absolute inset-0 pointer-events-none"></div>
+
+          <div class="absolute inset-0 z-[3] pointer-events-none flex items-center justify-between px-[7px]">
+            <span class="text-[11.5px] font-medium text-[#eef1f6] px-1.5 py-0.5 rounded bg-black/40">Opacity</span>
+            <span id="valueBox" title="Click or right-click to type a value"
+                  class="pointer-events-auto cursor-text flex items-baseline gap-px px-[5px] py-[2px] rounded
+                         bg-black/40 border border-transparent hover:border-white/20
+                         focus-within:border-accent-ring focus-within:bg-black/70 [font-variant-numeric:tabular-nums]">
+              <input id="num" type="text" inputmode="numeric" maxlength="3" value="85" aria-label="Opacity percent"
+                     class="w-[3.1ch] border-0 p-0 m-0 bg-transparent text-right cursor-text outline-none
+                            text-[12.5px] font-semibold text-white [font-variant-numeric:tabular-nums] focus:text-accent-ring">
+              <span class="text-[10.5px] font-semibold text-white/60">%</span>
+            </span>
+          </div>
+        </div>
+
+        <div id="thumb" class="thumb-body thumb-knurl absolute top-[2px] bottom-[2px] w-[11px] rounded z-[1]
+                    pointer-events-none transition-transform duration-75 ease-out"></div>
+      </div>
+
+      <button id="plus" title="+1 / right-click +10" aria-label="Increase opacity"
+              class="step-shadow w-[20px] h-[20px] flex-none rounded self-center border border-black/65 text-ink cursor-pointer
+                     flex items-center justify-center transition-[filter,transform] duration-100 ease-out
+                     bg-gradient-to-b from-[#3a3e45] to-[#272a2f] hover:brightness-[1.18]
+                     active:translate-y-px active:bg-gradient-to-b active:from-[#202327] active:to-[#2b2f35]">
+        <svg class="w-[8px] h-[8px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+
+    <p class="m-0 text-[10.5px] text-ink-faint text-center">Drag the groove &middot; buttons step 1, right-click 10 &middot; arrows &plusmn;1, Shift &plusmn;10</p>
+
+    <!-- blend modes -->
+    <div id="modes" role="group" aria-label="Blend mode" class="mode-well flex gap-0.5 p-0.5 rounded-[7px] bg-[#0d0f11]">
+      <button data-mode="normal" aria-pressed="true"
+              class="mode-btn flex-1 py-1.5 px-1 rounded-md border-0 cursor-pointer text-[11.5px] font-medium
+                     text-ink-dim hover:text-ink transition-colors duration-100">Normal</button>
+      <button data-mode="multiply" aria-pressed="false"
+              class="mode-btn flex-1 py-1.5 px-1 rounded-md border-0 cursor-pointer text-[11.5px] font-medium
+                     text-ink-dim hover:text-ink transition-colors duration-100">Multiply</button>
+      <button data-mode="screen" aria-pressed="false"
+              class="mode-btn flex-1 py-1.5 px-1 rounded-md border-0 cursor-pointer text-[11.5px] font-medium
+                     text-ink-dim hover:text-ink transition-colors duration-100">Screen</button>
+      <button data-mode="overlay" aria-pressed="false"
+              class="mode-btn flex-1 py-1.5 px-1 rounded-md border-0 cursor-pointer text-[11.5px] font-medium
+                     text-ink-dim hover:text-ink transition-colors duration-100">Overlay</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var slider = document.getElementById('slider');
+  var track = document.getElementById('track');
+  var fill  = document.getElementById('fill');
+  var thumb = document.getElementById('thumb');
+  var edge  = document.getElementById('edgeline');
+  var num   = document.getElementById('num');
+  var box   = document.getElementById('valueBox');
+  var layer = document.getElementById('topLayer');
+  var THUMB = 11;
+
+  var value = 85;
+  var dragging = false;
+  var dragId = null;
+
+  function render(){
+    var w = track.clientWidth;
+    var centre = (value/100) * w;          /* 0% = left edge, 100% = right edge */
+    thumb.style.left = (centre - THUMB/2) + 'px';
+    fill.style.width = centre + 'px';
+    edge.style.left  = (centre - 0.75) + 'px';
+    edge.style.opacity = (value === 0 || value === 100) ? 0 : 1;
+    layer.style.opacity = value/100;
+    track.setAttribute('aria-valuenow', value);
+    track.setAttribute('aria-valuetext', value + ' percent');
+    if(document.activeElement !== num) num.value = value;
+  }
+
+  function set(v){
+    v = Math.round(v);
+    value = v < 0 ? 0 : v > 100 ? 100 : v;
+    render();
+  }
+
+  /* ---- dragging -------------------------------------------------
+     Listeners live on window, so the drag survives the pointer
+     leaving the track, crossing an iframe edge, or losing capture. */
+  function fromClientX(clientX, fine){
+    var r = track.getBoundingClientRect();
+    var pct = ((clientX - r.left) / Math.max(1, r.width)) * 100;
+    if(!fine){
+      var stops = [0,25,50,75,100];
+      for(var i=0;i<stops.length;i++){ if(Math.abs(pct-stops[i]) < 1.3) pct = stops[i]; }
+    }
+    set(pct);
+  }
+
+  function startDrag(e){
+    if(e.target === num || box.contains(e.target)) return;
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    dragging = true;
+    dragId = e.pointerId;
+    slider.classList.add('live');
+    track.focus();
+    if(track.setPointerCapture && e.pointerId !== undefined){
+      try{ track.setPointerCapture(e.pointerId); }catch(err){}
+    }
+    fromClientX(e.clientX, e.altKey);
+  }
+  function moveDrag(e){
+    if(!dragging) return;
+    if(dragId !== null && e.pointerId !== undefined && e.pointerId !== dragId) return;
+    e.preventDefault();
+    fromClientX(e.clientX, e.altKey);
+  }
+  function endDrag(){
+    if(!dragging) return;
+    dragging = false;
+    dragId = null;
+    slider.classList.remove('live');
+  }
+
+  track.addEventListener('pointerdown', startDrag);
+  window.addEventListener('pointermove', moveDrag, {passive:false});
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  window.addEventListener('blur', endDrag);
+  window.addEventListener('mousemove', function(e){
+    if(dragging && e.buttons === 0) endDrag();
+  });
+  document.addEventListener('dragstart', function(e){ e.preventDefault(); });
+  track.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  /* ---- keyboard ------------------------------------------------ */
+  track.addEventListener('keydown', function(e){
+    var big = e.shiftKey ? 10 : 1;
+    var k = e.key;
+    if(k === 'ArrowRight' || k === 'ArrowUp') set(value + big);
+    else if(k === 'ArrowLeft' || k === 'ArrowDown') set(value - big);
+    else if(k === 'PageUp') set(value + 10);
+    else if(k === 'PageDown') set(value - 10);
+    else if(k === 'Home') set(0);
+    else if(k === 'End') set(100);
+    else return;
+    e.preventDefault();
+  });
+
+  /* ---- step buttons ---------------------------------------------- */
+  function wire(btn, dir){
+    var timer, repeat, stepSize = 1;
+    function stop(){
+      btn.classList.remove('push');
+      clearTimeout(timer); clearInterval(repeat);
+    }
+    btn.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      stepSize = (e.button === 2) ? 10 : 1;
+      btn.classList.add('push');
+      set(value + dir * stepSize);
+      timer = setTimeout(function(){
+        repeat = setInterval(function(){ set(value + dir * stepSize); }, 45);
+      }, 380);
+    });
+    btn.addEventListener('pointerup', stop);
+    btn.addEventListener('pointerleave', stop);
+    btn.addEventListener('pointercancel', stop);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('blur', stop);
+    btn.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  }
+  wire(document.getElementById('minus'), -1);
+  wire(document.getElementById('plus'),   1);
+
+  /* ---- typed value (click or right-click) ---------------------- */
+  function edit(e){
+    e.preventDefault();
+    e.stopPropagation();
+    num.focus();
+    num.select();
+  }
+  box.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+  box.addEventListener('click', edit);
+  box.addEventListener('contextmenu', edit);
+
+  num.addEventListener('focus', function(){ num.select(); });
+  num.addEventListener('input', function(){
+    num.value = num.value.replace(/[^0-9]/g,'').slice(0,3);
+    var v = parseInt(num.value, 10);
+    if(!isNaN(v)) set(Math.min(v, 100));
+  });
+  num.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowUp'){ set(value + (e.shiftKey?10:1)); num.value = value; e.preventDefault(); }
+    if(e.key === 'ArrowDown'){ set(value - (e.shiftKey?10:1)); num.value = value; e.preventDefault(); }
+    if(e.key === 'Enter' || e.key === 'Escape'){ num.blur(); }
+  });
+  num.addEventListener('blur', function(){ num.value = value; });
+
+  /* ---- blend modes --------------------------------------------- */
+  document.getElementById('modes').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var kids = e.currentTarget.children;
+    for(var i=0;i<kids.length;i++) kids[i].setAttribute('aria-pressed', String(kids[i] === b));
+    layer.style.mixBlendMode = b.dataset.mode;
+  });
+
+  window.addEventListener('resize', render);
+  render();
+})();
+</script>
+</body>
+</html>
