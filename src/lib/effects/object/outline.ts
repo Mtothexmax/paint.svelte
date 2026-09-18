@@ -42,7 +42,11 @@ const OUTLINE_FRAGMENT = `
 		}
 
 		if (found > 0.5)
-			finalColor = vec4(uColor, uIntensity);
+			// Premultiplied, like every other effect here: scale rgb by the
+			// alpha we emit. At the default intensity 1.0 this is identical to
+			// the previous form, but at lower intensities that form rendered
+			// the stroke over-bright instead of translucent.
+			finalColor = vec4(uColor * uIntensity, uIntensity);
 		else
 			finalColor = original;
 	}

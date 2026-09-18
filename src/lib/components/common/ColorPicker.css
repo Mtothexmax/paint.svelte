@@ -1,0 +1,211 @@
+/* ---- shared colour picker (dark mode) ----
+   Core of the fullscreen ColorPickerPanel, usable anywhere. `layout="full"`
+   is the viewport-driven fullscreen arrangement; `layout="compact"` stacks
+   everything for embedding in narrow popups (e.g. effect color rows). */
+.cp-body {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 18px;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	padding: 12px;
+	max-width: 860px;
+	margin: 0 auto;
+}
+.cp-sv {
+	position: relative;
+	touch-action: none;
+	user-select: none;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	cursor: crosshair;
+	background-color: var(--hue-css, #f00);
+	background-image:
+		linear-gradient(to right, #fff, rgba(255, 255, 255, 0)),
+		linear-gradient(to top, #000, rgba(0, 0, 0, 0));
+	min-height: 0;
+	height: 100%;
+	width: auto;
+	aspect-ratio: 1 / 1;
+	flex: 0 0 auto;
+	max-height: 100%;
+	margin: 0;
+}
+.cp-strips {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: 30px;
+	flex: 0 0 auto;
+	align-self: stretch;
+}
+.cp-strip {
+	position: relative;
+	flex: 1 1 auto;
+	min-height: 0;
+	touch-action: none;
+	user-select: none;
+	cursor: pointer;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+}
+.cp-hue {
+	background: linear-gradient(to top,
+		#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.cp-alpha {
+	background-image:
+		linear-gradient(to top, rgba(0, 0, 0, 0), var(--opaque, #fff)),
+		repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+	background-size: 100% 100%, 10px 10px;
+}
+.cp-handle {
+	position: absolute;
+	width: 14px;
+	height: 16px;
+	border-radius: 50%;
+	border: 2px solid #fff;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+}
+.cp-strip-handle {
+	position: absolute;
+	left: -3px;
+	right: -3px;
+	height: 8px;
+	border-radius: 4px;
+	border: 2px solid #fff;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+	transform: translateY(-50%);
+	pointer-events: none;
+}
+.cp-fields {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	min-width: 0;
+	width: 250px;
+	flex: 0 0 auto;
+	align-self: center;
+	max-height: 100%;
+	overflow: hidden;
+}
+.cp-stage {
+	display: flex;
+	align-items: stretch;
+	gap: 12px;
+	flex: 0 0 auto;
+	/* height-driven square: fits the available viewport, never overflows */
+	height: min(52vh, calc(100vh - 260px), calc(42vw - 60px), 430px);
+}
+.cp-preview {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.cp-preview-swatch {
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background-image: repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+	background-size: 10px 10px;
+	position: relative;
+	overflow: hidden;
+}
+.cp-preview-swatch::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-color: var(--swatch, #000);
+}
+.cp-hex {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 15px;
+	color: var(--text);
+}
+.cp-alpha-pct {
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.cp-num-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 6px;
+}
+.cp-num {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 11px;
+	color: var(--text-dim);
+}
+.cp-num input {
+	width: 100%;
+	padding: 5px 4px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-size: 12px;
+}
+.cp-hexfield {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.cp-hexfield input {
+	flex: 1;
+	padding: 5px 8px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.cp-quick {
+	display: grid;
+	grid-template-columns: repeat(8, 1fr);
+	gap: 5px;
+}
+.cp-chip {
+	aspect-ratio: 1;
+	border-radius: 5px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	cursor: pointer;
+	padding: 0;
+}
+.cp-chip:hover {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+/* ---- compact: stacked, fixed-height stage for narrow popup embeds ---- */
+.cp-body.compact {
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	height: auto;
+	max-width: none;
+	margin: 0;
+	padding: 8px 0 2px;
+	gap: 10px;
+	overflow: visible;
+}
+.cp-body.compact .cp-stage {
+	height: 190px;
+	align-self: center;
+}
+.cp-body.compact .cp-fields {
+	width: auto;
+	align-self: stretch;
+	max-height: none;
+	overflow: visible;
+}

@@ -7,6 +7,7 @@
 	import FilterSlider from '../common/FilterSlider.svelte';
 	import EffectColorRow from '../common/EffectColorRow.svelte';
 	import EffectCheckbox from '../common/EffectCheckbox.svelte';
+	import EffectSelect from '../common/EffectSelect.svelte';
 	import XYPicker from '../common/XYPicker.svelte';
 	import AnglePicker from '../common/AnglePicker.svelte';
 	import XyParam from '../common/XyParam.svelte';
@@ -116,6 +117,14 @@
 				/>
 			{:else if param.kind === 'checkbox'}
 				<EffectCheckbox label={param.label} bind:value={settings[param.key]} oninput={preview} />
+			{:else if param.kind === 'select'}
+				<EffectSelect
+					label={param.label}
+					bind:value={settings[param.key]}
+					options={param.options ?? []}
+					default={param.default}
+					oninput={preview}
+				/>
 			{:else if param.kind === 'xy'}
 				<XyParam {param} {settings} onChange={preview} />
 			{:else if param.kind === 'angle'}

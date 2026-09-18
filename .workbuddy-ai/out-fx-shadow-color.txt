@@ -1,0 +1,19 @@
+--- Drop Shadow colour row ---
+colorRows=1 label=Color buttons=[Use the current foreground color | Use the current background color]
+sliders=[Blur Radius, Opacity]  swatch=rgb(0, 0, 0)
+shadow band luminance: black=8.1  white=136.1
+
+PASS  Drop Shadow dialog opened  [["Blur Radius","Opacity"]]
+PASS  exactly one colour row  [count=1]
+PASS  the row is labelled "Color"  [label=Color]
+PASS  row offers foreground + background buttons  [buttons=[Use the current foreground color | Use the current background color]]
+PASS  no Red/Green/Blue sliders remain  [sliders=[Blur Radius, Opacity]]
+PASS  stored swatch shows the default black  [swatch=rgb(0, 0, 0)]
+PASS  offset pad reaches the bottom-right  [xy=[48,48]]
+PASS  "Choose background color" button exists  [title=Use the current background color]
+PASS  clicking it repaints the stored swatch white  [swatch=rgb(255, 255, 255)]
+PASS  the shadow band brightens when the colour turns white  [black=8.1 white=136.1 delta=128.0]
+PASS  the white shadow stays translucent (premultiplied alpha)  [white=136.1 (expected ~136; 255 == opaque, non-premultiplied)]
+PASS  no console errors
+
+12/12 passed   errors : none

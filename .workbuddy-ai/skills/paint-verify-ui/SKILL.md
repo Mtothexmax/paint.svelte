@@ -208,8 +208,8 @@ within a few px.
 
 **Read an effect dialog's shape.** Effects are registered from
 `src/lib/effects/<menu>/<id>.ts`; `EffectParam.kind` is
-`'slider' | 'color' | 'checkbox' | 'xy' | 'angle'`. Open one via the menubar and
-read the control types straight off the DOM:
+`'slider' | 'color' | 'checkbox' | 'xy' | 'angle' | 'select'`. Open one via the
+menubar and read the control types straight off the DOM:
 ```js
 const dialogShape = () => page.evaluate(() => {
   const d = document.querySelector('.m-dialog');
@@ -225,7 +225,12 @@ const dialogShape = () => page.evaluate(() => {
 });
 ```
 Drive the pad with `page.mouse` at `pad.x + dx`, `pad.y + dy` and read `xyFields`
-back. The `.m-dialog` is non-modal, so close it with `.m-dialog .m-close`.
+back. An `xy` param writes `settings[keyX]` / `settings[keyY]`, so replacing a
+`centerX`/`centerY` (or `offsetX`/`offsetY`) slider pair with one pad is a
+**param-definition-only** edit — `filter()` keeps reading `settings.centerX` etc.
+The `.m-dialog` is non-modal; to *dismiss* it for the next case
+`document.querySelector('.m-dialog .m-close').click()` is fine — but never use
+that to prove the close button works (see the pointer-capture gotcha below).
 
 ## Gotchas that have cost real debugging time
 
@@ -283,12 +288,78 @@ back. The `.m-dialog` is non-modal, so close it with `.m-dialog .m-close`.
   at their default (a probe drag to `pad.x + 1` silently did nothing). Probe each
   edge at its **midpoint** (`pad.x + 3, pad.y + pad.h / 2`, etc.); that also
   isolates one axis per drag, which is the clean way to prove the Y direction.
+- **NEVER use `el.click()` to verify a click target — it bypasses pointer
+  events.** `HTMLElement.click()` dispatches a `click` with no pointerdown/up,
+  so it cannot reproduce anything caused by pointer handling. `MovableDialog`
+  used to capture the pointer on `.m-title` (which contains the X button);
+  capture **retargets the follow-up `click` to the capture element**, so a real
+  user click on the X landed on `DIV.m-title` and the button never fired — while
+  Cancel (in the footer, outside the capture) worked. Every probe that used
+  `.click()` passed, hiding it for the whole session. For any button that shares
+  an ancestor with a pointer handler, drive it with `page.mouse.click(x, y)` and
+  assert the capture-phase click target:
+  ```js
+  await page.evaluate(() => {
+    window.__clicks = [];
+    document.addEventListener('click', (e) => window.__clicks.push(e.target.className), true);
+  });
+  await page.mouse.click(x, y);
+  // assert window.__clicks includes the button's class, not the container's
+  ```
+  Fix pattern (already used in `EffectPanel.svelte`, added to `MovableDialog`):
+  bail out of the drag when the gesture starts on a control —
+  `if (e.target.closest('button, a, input, select, textarea')) return;`
 - **A shader's angle convention rarely matches a UI dial's.** Before wiring an
   `angle` param to `AnglePicker` (0 = up, clockwise), check the shader's own
   vector maths — e.g. Motion Blur uses `(-cos t, sin t)` in a y-down UV space, so
   its `t = 0` points LEFT. Re-anchor inside `filter()` (Motion Blur uses
   `90 - angle`) and then *prove the direction on pixels*, because the sign is
-  easy to get backwards.
+  easy to get backwards. The mappings are NOT uniform across the codebase:
+  Motion Blur is `90 - D`, Emboss/Bevel are `90 + D`, Relief is `D - 90` — they
+  differ because some shaders use the vector as the light-travel direction and
+  others as the direction *to* the light.
+- **Measure a lighting direction with a square against a contrasting ground.**
+  The lit edge is the brightest. Two traps: (1) the response is centred **ON**
+  the boundary, so a band a few px *inside* the shape reads the flat output and
+  reports no direction at all — straddle the edge (`off = -2, w = 5`);
+  (2) effects differ wildly in contrast (Emboss saturates to 0/255, Bevel moves
+  ~7 levels), so assert the margin **relative to the effect's own range**
+  (`margin > 0.15 * (max - min)`) rather than an absolute threshold.
+- **Bevel (and anything alpha-based) needs an ALPHA edge and a source that can be
+  brightened.** An opaque ground makes it a no-op; on a *white* source the
+  highlight clamps to nothing. Use a BLACK shape on a TRANSPARENT ground — then
+  only the lit edge lights up and the signal is unambiguous.
+- **`EffectDialog` persists last-used settings** (`effects.<id>`, localStorage
+  key `paint.svelte.settings.v1`), so a probe cannot observe the *shipped*
+  default after it has touched that dialog — it reads whatever the previous
+  section set. `delete store['effects.<id>']` first.
+- **...and in a multi-case loop that means you must PIN EVERY control, not just
+  the one under test.** The dialog reopens with the previous case's values, so
+  setting only the slider you care about silently stacks the leftover from the
+  case before. My `fx-hlsh-assert.mjs` first read `Shadows +90` as *darker*
+  (160 → 117.4) purely because Highlights was still `+90`; the real cause only
+  became visible after logging the values on open (`opened at [-90, 0] -> set
+  [0, 90]`). Read every control back after setting it and print that line — it
+  turns a wrong verdict into an obvious one.
+- **A DARK test image makes every highlight-side effect look broken.** Effects
+  that mask by luminance (`highMask = pow(luma, 3)` in Highlights/Shadows) are
+  genuine near-no-ops on a dark base: at mean 60 the mask is `pow(0.24,3) ≈
+  0.014`, while the shadow mask is `≈ 0.44`. `Highlights +90` reported diff 0 on
+  a dark Julia base and looked like a dead slider — it was fine. **Pick the base
+  to suit the effect**: bright (Clouds, mean ~160) to exercise highlights, dark
+  to exercise shadows, and test both directions rather than only the positive
+  one — the bug in `highlightsShadows.ts` (negative Highlights *brightened*) was
+  only visible as `-90` out-brightening `+90`.
+- **Let Vite settle before starting a suite run, and capture per-probe output
+  files.** A run launched immediately after a source edit reported a phantom
+  `FAIL  Bevel shows a rotation dial` (that assertion is
+  `!!byLeaf['Bevel']?.hasDial`, so it fails when the dialog never opened — i.e.
+  the reload landed mid-run) and five probes appeared to print nothing. Both
+  vanished on a clean re-run. Redirect each probe to its own file
+  (`> out-<probe>.txt`) rather than piping through `grep`: these probes print
+  `errors : none` *with a space* and a per-file summary format, so a naive
+  pattern matches nothing and looks exactly like "the probe produced no output".
+  Count with `grep -cE '^PASS'` / `'^FAIL'` on the file.
 - **To measure a blur's direction, smear an isolated dot.** Put a black dot on a
   white layer, blur it with the directional control OFF-centre, and take the
   centroid shift of the darkened pixels — that shift is the streak direction.
@@ -309,6 +380,77 @@ back. The `.m-dialog` is non-modal, so close it with `.m-dialog .m-close`.
   `{x}{#if c} · suffix{/if}` renders as `(...)·suffix`. Use an entity (`&nbsp;·`)
   or an expression — entities are never trimmed. Worth checking in the probe's
   reported text, which is exactly how this surfaced.
+
+- **A backtick inside a shader template literal breaks the build.** The GLSL
+  sources are JS template strings, so a backtick in a comment *inside* one closes
+  the string early and Vite fails to parse the module (`[PARSE_ERROR] Expected a
+  semicolon or an implicit semicolon after a statement`). Keep shader comments
+  backtick-free — write the GLSL identifier bare, not in ticks. Guard:
+  `.workbuddy-ai/scan-shader-backticks.mjs` scans every effect module for a tick
+  inside a template (45 templates in 54 modules).
+- **A Vite 500 on ONE effect module takes down the ENTIRE app.** Because the
+  effects are auto-registered with `import.meta.glob`, one unparseable module
+  makes the client entry throw (`Failed to fetch dynamically imported module`),
+  and the symptom is a blank page with an empty body — every probe then times out
+  waiting for `.menubar-btn` and it looks like a random flake. When a probe
+  suddenly cannot find the app shell at all, `curl` the module you just edited:
+  a Vite error page comes back as HTML with the real message.
+- **Wait for the shell, not a fixed delay.** After a source edit Vite is still
+  rebuilding; a click that lands too early is silently swallowed. Use
+  `page.waitForFunction(() => !!document.querySelector('.menubar-btn'))` before
+  driving the UI, and poll for `.m-dialog` after opening an effect (the effect
+  bundle is lazy). Fixed `setTimeout` waits turn a slow build into a fake bug.
+- **Pixi blends PREMULTIPLIED alpha, and the effect shaders must too.** The
+  convention here is `vec4(colour * alpha, alpha)` — see `noisyColor * c.a, c.a`
+  (addNoise), `c.rgb * ratio, newAlpha` (feather), `screenRGB * src.a, src.a`
+  (glow). Emitting `vec4(uColor, alpha)` is wrong: with `rgb = 1.0` at
+  `alpha = 0.5` the composite is `1.0 + dst*0.5`, which clamps to opaque white.
+  The bug hides when the constant colour is black (0 stays 0) and when alpha is
+  1.0, so it only shows for a *light colour at partial opacity* — test exactly
+  that combination. To verify, predict the value rather than eyeballing it: a
+  50%-opacity white over a backdrop of ~17 must read `0.502*255 + 0.498*17 ≈ 136`;
+  a reading of 255 means un-premultiplied output. For a constant colour with a
+  variable alpha, comparing the whole-canvas mean across two alpha settings is
+  geometry-free and robust.
+- **The colour row for `kind: 'color'` is `.fcol`** (`.fcol-label`,
+  `.fcol-stored`, `.fcol-btn`), not `.ecr-row`. The stored value is packed
+  `0xRRGGBB`, and the two buttons copy the current foreground / background
+  colour — the background button is a convenient way to inject a *known* colour
+  (white by default) without touching the picker.
+
+- **A blur CONSERVES THE MEAN.** It is a local average, so the mean luminance of
+  the whole canvas is *identical* before and after — a global mean can never
+  detect a blur, and my first Motion Blur test read the same 18.36 for the
+  baseline and for every mode. Measure a LOCAL region, or diff two frames.
+- **Diff two frames to prove a subtle effect.** Far more convincing than a small
+  change in a global mean: Clamp vs Mirror = **0** differing pixels, while Clamp
+  vs Wrap / Clamp vs Transparent = 33639 px each. Report the count *and* the
+  x-range of the differences — the range is what shows the effect is local.
+- **An "edge mode" can only differ where the samples leave the image, and the
+  image's border must contain content.** A block placed 4px *inside* the edge
+  clamps to the *empty* border column, so Clamp matches Transparent exactly.
+  Content has to touch the boundary. Simplest robust setup: flood the whole
+  layer with the Paint Bucket (no selection, no coordinates) and streak
+  horizontally.
+- **A Rectangle Select drag started exactly on the canvas corner is REJECTED** by
+  the app, so nothing is drawn and the probe silently measures bare canvas (a
+  strip read a constant 30.00 — the app background — in every case). Inset the
+  drag, or avoid geometry entirely.
+- **The document does not start at the canvas host's x=0.** The host is
+  1078x811 at (92,64), but the document's left edge sits at host x≈137 with the
+  app background (grey, luminance ~30) to its left. Derive the edge from the
+  frame (first mostly-dark column) rather than assuming it. `diag-canvas-bounds.mjs`
+  prints the layout and `diag-transparent.png` shows the letterbox.
+- **Vite queues a full-reload after source edits, and it lands MID-RUN.** The
+  symptom is `Execution context was destroyed, most likely because of a
+  navigation` partway through a probe — never at the start, which makes it look
+  random. Log `framenavigated` (it revealed two queued reloads), and absorb them
+  before the real work: wait for `.menubar-btn`, sleep ~2.5s, then do an explicit
+  `page.reload()` and wait for `.menubar-btn` again. Every probe does this now.
+- **Adding a param `kind` means editing BOTH dialogs.** `EffectDialog.svelte` and
+  `LayerEffectDialog.svelte` each render params with their own copy of the same
+  `{#if param.kind === ...}` chain. Miss one and the docked layer-effect dialog
+  silently falls through to a plain slider.
 
 ## Definition of done
 

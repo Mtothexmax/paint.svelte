@@ -57,8 +57,22 @@ const definition: EffectDefinition = {
 			step: 1,
 			default: ZOOM
 		},
-		{ key: 'centerX', label: 'Center X', min: -100, max: 100, step: 1, default: CENTER_X },
-		{ key: 'centerY', label: 'Center Y', min: -100, max: 100, step: 1, default: CENTER_Y }
+		// The centre is a point in the COMPLEX PLANE, not a position in the
+		// image — so no `yDown`, exactly like Mandelbrot's `offset` pad. That
+		// keeps the two fractal dialogs' pads behaving the same way (drag up ->
+		// the content moves up).
+		{
+			key: 'center',
+			label: 'Center',
+			kind: 'xy',
+			minX: -100,
+			maxX: 100,
+			minY: -100,
+			maxY: 100,
+			step: 1,
+			default: CENTER_X,
+			defaultY: CENTER_Y
+		}
 	],
 	filter: (settings: EffectSettings) =>
 		makeGlFilter(

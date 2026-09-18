@@ -1,0 +1,70 @@
+discovered 50 candidate entries
+  (no dialog appeared for Adjustments ▸ Auto-Level)
+  (no dialog appeared for Adjustments ▸ Black and White)
+  (no dialog appeared for Adjustments ▸ Invert Alpha)
+  (no dialog appeared for Adjustments ▸ Invert Colors Ctrl+Shift+I)
+  (no dialog appeared for Adjustments ▸ Sepia)
+
+45 of 50 entries opened a dialog
+
+group        effect                pad   dial  colors  controls
+Blurs        Frosted Glass         false false 0       slider:Cell size
+Blurs        Gaussian Blur         false false 0       slider:Blur strength
+Blurs        Motion Blur           false true  0       slider:Distance, dial
+Blurs        Radial Blur           true  true  0       slider:Quality, pad:Center, dial
+Blurs        Rotary Blur           true  true  0       pad:Center, dial
+Blurs        Smart Blur            false false 0       slider:Radius, slider:Threshold
+Blurs        Surface Blur          false false 0       slider:Radius, slider:Threshold
+Blurs        Unfocus               false false 0       slider:Radius
+Blurs        Zoom Blur             true  false 0       slider:Amount, pad:Center
+Distort      Bulge                 true  false 0       slider:Bulge, pad:Center
+Distort      Crystalize            false false 0       slider:Cell size
+Distort      Pixelate              false false 0       slider:Cell size
+Distort      Polar Inversion       true  false 0       pad:Center
+Distort      Smudge                true  false 0       slider:Strength, pad:Center
+Distort      Tile Reflection       false false 0       slider:Tiles
+Distort      Twist                 true  true  0       pad:Center, dial
+Distort      Warp                  true  false 0       slider:Strength, pad:Center
+Noise        Add Noise             false false 0       slider:Amount, slider:Monochrome, slider:Seed
+Noise        Median                false false 0       slider:Radius, slider:Percentile, slider:Quality
+Noise        Reduce Noise          false false 0       slider:Amount, slider:Threshold
+Photo        Glow                  false false 0       slider:Radius, slider:Brightness, slider:Contrast
+Photo        Red Eye Removal       false false 0       slider:Strength
+Photo        Sharpen               false false 0       slider:Amount
+Photo        Soften Portrait       false false 0       slider:Strength
+Render       Clouds                false false 0       slider:Scale, slider:Power, slider:Seed
+Render       Flames                false false 0       slider:Scale, slider:Seed
+Render       Julia Fractal         true  false 0       slider:Iterations, slider:Zoom, pad:Center
+Render       Mandelbrot Fractal    true  true  0       slider:Zoom, slider:Factor, slider:Quality, pad:Offset, dial
+Render       Turbulence            false false 0       slider:Scale, slider:Seed
+Stylize      Edge Detect           false false 0       slider:Strength
+Stylize      Emboss                false true  0       slider:Strength, dial
+Stylize      Outline               false false 1       slider:Width, slider:Intensity, color:Color
+Stylize      Relief                false true  0       slider:Strength, dial
+Object       Bevel                 false true  0       slider:Depth, dial
+Object       Drop Shadow           true  false 1       slider:Blur Radius, slider:Opacity, pad:Offset, color:Color
+Object       Feather               false false 0       slider:Feather, slider:Shrink
+Object       Outline               false false 1       slider:Width, slider:Intensity, color:Color
+Adjustments  Brightness / Contrast false false 0       slider:Brightness, slider:Contrast
+Adjustments  Curves                false false 0       
+Adjustments  Exposure              false false 0       slider:Exposure
+Adjustments  Highlights / Shadows  false false 0       slider:Highlights, slider:Shadows
+Adjustments  Hue / Saturation      false false 0       slider:Hue, slider:Saturation, slider:Lightness
+Adjustments  Levels Adjustment     false false 0       
+Adjustments  Posterize             false false 0       slider:Colors per channel
+Adjustments  Threshold             false false 0       slider:Threshold
+
+entries that opened no dialog (instant effects, expected): 5
+
+leftover sliders: none
+
+Polar Inversion: opened=Polar Inversion pad=true defaultXY=[50,50] movedTo=[3,3] default-apply-changed=true move-changes-render=true
+
+PASS  every enumerated entry opened a dialog or is instant
+PASS  no leftover coordinate/angle slider anywhere
+PASS  Polar Inversion now has a Centre pad
+PASS  Polar Inversion defaults to the frame centre (50, 50)
+PASS  applying Polar Inversion changes the canvas
+PASS  Polar Inversion pad top-left reaches (0, 0)  [Y down]
+PASS  moving the Polar Inversion centre changes the render
+errors : none

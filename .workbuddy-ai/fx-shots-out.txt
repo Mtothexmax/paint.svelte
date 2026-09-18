@@ -1,0 +1,16 @@
+shot  Zoom Blur    -> fx-zoom-blur.png  396x364
+file:///C:/dev/paint.svelte/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:468
+        throw new Error('Execution context was destroyed, most likely because of a navigation.');
+              ^
+
+Error: Execution context was destroyed, most likely because of a navigation.
+    at rewriteError (file:///C:/dev/paint.svelte/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:468:15)
+    at async #evaluate (file:///C:/dev/paint.svelte/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:400:60)
+    at async ExecutionContext.evaluate (file:///C:/dev/paint.svelte/node_modules/puppeteer-core/lib/puppeteer/cdp/ExecutionContext.js:288:16)
+    at async IsolatedWorld.evaluate (file:///C:/dev/paint.svelte/node_modules/puppeteer-core/lib/puppeteer/cdp/IsolatedWorld.js:104:16)
+    at async CdpFrame.evaluate (file:///C:/dev/paint.svelte/node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:364:20)
+    at async CdpPage.evaluate (file:///C:/dev/paint.svelte/node_modules/puppeteer-core/lib/puppeteer/api/Page.js:832:20)
+    at async openEffect (file:///C:/dev/paint.svelte/.workbuddy-ai/fx-shots.mjs:31:2)
+    at async file:///C:/dev/paint.svelte/.workbuddy-ai/fx-shots.mjs:72:2
+
+Node.js v22.22.2

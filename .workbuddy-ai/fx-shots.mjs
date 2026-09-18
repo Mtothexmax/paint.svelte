@@ -13,8 +13,20 @@ const browser = await puppeteer.launch({
 });
 const page = await browser.newPage();
 await page.setViewport({ width: 1400, height: 900, deviceScaleFactor: 2 });
+// A Vite full-reload destroys the execution context mid-run, which surfaces as
+// "Execution context was destroyed, most likely because of a navigation". Log
+// navigations so the cause is visible rather than mysterious.
+page.on('framenavigated', (f) => console.log(`  [nav] ${f.url()}`));
 await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+// Wait for the shell instead of a fixed delay: a cold Vite build can be slow.
+await page.waitForFunction(() => !!document.querySelector('.menubar-btn'), { timeout: 60000 });
+// Absorb any full-reload Vite has queued from recent source edits. Without this
+// the reload lands in the middle of the loop and kills the execution context
+// ("Execution context was destroyed, most likely because of a navigation").
 await new Promise((r) => setTimeout(r, 2500));
+await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => !!document.querySelector('.menubar-btn'), { timeout: 60000 });
+await new Promise((r) => setTimeout(r, 1200));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clickByText = async (t) => {
@@ -37,7 +49,11 @@ const openEffect = async (sub, leaf) => {
 	await page.evaluate((l) => {
 		[...document.querySelectorAll('.sub-panel .menu-item')].find((x) => x.textContent.includes(l))?.click();
 	}, leaf);
-	await sleep(800);
+	for (let i = 0; i < 40; i++) {
+		if (await page.evaluate(() => !!document.querySelector('.m-dialog'))) break;
+		await sleep(150);
+	}
+	await sleep(400);
 };
 
 // a document is needed before the effects menu will do anything useful
@@ -51,7 +67,17 @@ for (const [sub, leaf] of [
 	['Blurs', 'Rotary Blur'],
 	['Blurs', 'Radial Blur'],
 	['Blurs', 'Motion Blur'],
-	['Distort', 'Twist']
+	['Distort', 'Twist'],
+	['Distort', 'Polar Inversion'],
+	['Distort', 'Bulge'],
+	['Distort', 'Warp'],
+	['Distort', 'Smudge'],
+	['Render', 'Julia Fractal'],
+	['Object', 'Drop Shadow'],
+	['Object', 'Outline'],
+	['Stylize', 'Emboss'],
+	['Stylize', 'Relief'],
+	['Object', 'Bevel']
 ]) {
 	await openEffect(sub, leaf);
 	const box = await page.evaluate(() => {

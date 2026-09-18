@@ -15,6 +15,17 @@ const HLSH_FRAGMENT = `
 
 ${ADJUST_GLSL}
 
+	// Push rgb toward white (amount > 0) or toward black (amount < 0),
+	// scaled by mask. Highlights and shadows are mirror images of each
+	// other, so they share this one rule: the negative branch must move
+	// toward black for BOTH. (It previously used minus-rgb for highlights,
+	// which made a negative Highlights value brighten the image instead of
+	// darkening it: rgb * (1 + mask * abs(h)) overshoots to white.)
+	vec3 pushLuminance(vec3 rgb, float mask, float amount)
+	{
+		return rgb + mask * amount * (amount > 0.0 ? (1.0 - rgb) : rgb);
+	}
+
 	void main()
 	{
 		vec4 c = adjustSample(uTexture, vTextureCoord);
@@ -30,10 +41,8 @@ ${ADJUST_GLSL}
 		float highMask = pow(l, 3.0);
 
 		// u* > 0 lifts toward white, u* < 0 pushes toward black.
-		float s = uShadows;
-		float h = uHighlights;
-		rgb += shadowMask * s * (s > 0.0 ? (1.0 - rgb) : rgb);
-		rgb += highMask * h * (h > 0.0 ? (1.0 - rgb) : -rgb);
+		rgb = pushLuminance(rgb, shadowMask, uShadows);
+		rgb = pushLuminance(rgb, highMask, uHighlights);
 
 		finalColor = adjustOutput(rgb, c.a);
 	}

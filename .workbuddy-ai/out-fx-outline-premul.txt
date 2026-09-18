@@ -1,0 +1,11 @@
+--- Object > Outline premultiplied alpha ---
+slider labels     : [Width,Intensity]
+canvas mean @255  : 27.71
+canvas mean @128  : 21.91
+
+PASS  Outline dialog has the expected sliders  [labels=[Width,Intensity]]
+PASS  intensity slider reached 255 then 128  [values=[20,128] (was [20,255])]
+PASS  half intensity darkens the stroke (premultiplied)  [mean@255=27.71 mean@128=21.91 drop=5.80]
+PASS  no console errors
+
+4/4 passed   errors : none

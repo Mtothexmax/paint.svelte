@@ -1,0 +1,71 @@
+--- dialog shapes ---
+Bulge          opened=🔍 Bulge…          pad=true dial=false padLabel=Center xy=[50,50] sliders=[Bulge]
+Warp           opened=🌊 Warp…           pad=true dial=false padLabel=Center xy=[50,50] sliders=[Strength]
+Smudge         opened=🖱 Smudge…         pad=true dial=false padLabel=Center xy=[50,50] sliders=[Strength]
+Julia Fractal  opened=🌀 Julia Fractal…  pad=true dial=false padLabel=Center xy=[50,50] sliders=[Iterations, Zoom]
+Drop Shadow    opened=⬛ Drop Shadow…     pad=true dial=false padLabel=Offset xy=[4,4] sliders=[Blur Radius, Opacity]
+Emboss         opened=🏔 Emboss…         pad=false dial=true padLabel=null xy=[] sliders=[Strength]
+Relief         opened=🗿 Relief…         pad=false dial=true padLabel=null xy=[] sliders=[Strength]
+Bevel          opened=🔲 Bevel…          pad=false dial=true padLabel=null xy=[] sliders=[Depth]
+
+--- pad edges (left / right / top / bottom) ---
+Bulge               L=[3,50] R=[98,50] T=[50,3] B=[50,98]
+Warp                L=[3,50] R=[98,50] T=[50,3] B=[50,98]
+Smudge              L=[3,50] R=[98,50] T=[50,3] B=[50,98]
+Julia Fractal       L=[-95,0] R=[95,0] T=[0,95] B=[0,-95]
+Mandelbrot Fractal  L=[-1.9000000000000001,0] R=[1.9000000000000001,0] T=[0,1.9000000000000001] B=[0,-1.9000000000000001]
+Drop Shadow         L=[-47,0] R=[48,0] T=[0,-47] B=[0,48]
+
+--- lighting direction ---
+Bevel   dial   0  top=  17.1 right=   6.7 bottom=   6.4 left=   6.7  -> lit edge: top
+Bevel   dial  90  top=   6.9 right=  16.9 bottom=   6.4 left=   6.7  -> lit edge: right
+Bevel   dial 180  top=   6.9 right=   6.7 bottom=  26.8 left=   6.7  -> lit edge: bottom
+Bevel   dial 270  top=   6.9 right=   6.7 bottom=   6.4 left=  27.1  -> lit edge: left
+Emboss  dial   0  top= 204.2 right= 128.0 bottom=  51.2 left= 128.0  -> lit edge: top
+Emboss  dial  90  top= 128.0 right= 204.2 bottom= 128.0 left=  51.2  -> lit edge: right
+Emboss  dial 180  top=  51.2 right= 128.0 bottom= 204.2 left= 128.0  -> lit edge: bottom
+Emboss  dial 270  top= 128.0 right=  51.2 bottom= 128.0 left= 204.2  -> lit edge: left
+Relief  dial   0  top= 168.7 right= 150.3 bottom= 131.7 left= 150.3  -> lit edge: top
+Relief  dial  90  top= 150.3 right= 168.7 bottom= 150.3 left= 131.7  -> lit edge: right
+Relief  dial 180  top= 131.7 right= 150.3 bottom= 168.7 left= 150.3  -> lit edge: bottom
+Relief  dial 270  top= 150.3 right= 131.7 bottom= 150.3 left= 168.7  -> lit edge: left
+
+--- defaults (dial value as opened, and which quadrant is lit) ---
+Bevel   dial= 45  lit(top+right)=14.0  unlit(bottom+left)=6.6  margin=7.4 of range 7.6  -> light from the top-right
+Emboss  dial=315  lit(top+left)=204.2  unlit(right+bottom)=51.2  margin=153.0 of range 153.0  -> light from the top-left
+Relief  dial=135  lit(bottom+right)=163.3  unlit(top+left)=137.1  margin=26.2 of range 26.2  -> light from the bottom-right
+
+PASS  Bulge uses an XY pad, no Center X/Y sliders
+PASS  Warp uses an XY pad, no Center X/Y sliders
+PASS  Smudge uses an XY pad, no Center X/Y sliders
+PASS  Julia Fractal uses an XY pad, no Center X/Y sliders
+PASS  Drop Shadow uses an XY pad, no Offset X/Y sliders
+PASS  Emboss shows a rotation dial
+PASS  Relief shows a rotation dial
+PASS  Bevel shows a rotation dial
+PASS  no Angle slider left in Emboss/Relief
+PASS  Bulge pad: top edge = minY, bottom = maxY
+PASS  Warp pad: top edge = minY, bottom = maxY
+PASS  Smudge pad: top edge = minY, bottom = maxY
+PASS  Drop Shadow pad: top edge = minY, bottom = maxY
+PASS  Bulge pad X spans 0..100
+PASS  Julia pad: top edge = maxY (no yDown)
+PASS  Mandelbrot pad: top edge = maxY (reference)
+PASS  Julia + Mandelbrot pads agree on the Y direction
+PASS  Bevel dial   0 -> lit edge = top
+PASS  Bevel dial  90 -> lit edge = right
+PASS  Bevel dial 180 -> lit edge = bottom
+PASS  Bevel dial 270 -> lit edge = left
+PASS  Emboss dial   0 -> lit edge = top
+PASS  Emboss dial  90 -> lit edge = right
+PASS  Emboss dial 180 -> lit edge = bottom
+PASS  Emboss dial 270 -> lit edge = left
+PASS  Relief dial   0 -> lit edge = top
+PASS  Relief dial  90 -> lit edge = right
+PASS  Relief dial 180 -> lit edge = bottom
+PASS  Relief dial 270 -> lit edge = left
+PASS  Bevel default (45) still lights from the top-right
+PASS  Emboss default (315) still lights from the top-left
+PASS  Relief default (135) still lights from the bottom-right
+
+errors : none

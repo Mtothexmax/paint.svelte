@@ -528,3 +528,329 @@ Verified in headless Chrome (1400x900):
 
 Files: src/lib/effects/blurs/motionBlur.ts
 Probes: .workbuddy-ai/motion-angle.mjs, fx-controls.mjs, fx-shots.mjs
+
+-- DONE (dialogs: the X close button did nothing — pointer capture ate the click) --
+Report:
+  "the x button for the zoom blur and probably also other blurs does not work,
+   for cancel the close works"
+
+Cause: common/MovableDialog.svelte. `.m-close` lives INSIDE `.m-title`, and
+`.m-title`'s onpointerdown={beginDrag} called setPointerCapture on itself.
+Capturing the pointer RETARGETS the follow-up `click` to the capture element, so a
+real click on the X was delivered to DIV.m-title and the button's onclick never
+fired. Cancel sits in .m-footer, outside the capture — hence "cancel works".
+Proven with the capture-phase click target:
+  real click on X           : closed=false  targets=["DIV.m-title"]
+  programmatic .click() on X: closed=true            <-- the trap
+  real click on Cancel      : closed=true
+
+Fix: bail out of the drag when the gesture starts on a control:
+  if ((e.target as HTMLElement | null)?.closest('button, a, input, select, textarea')) return;
+EffectPanel.svelte already had this exact guard ("interactive children (the close
+button) keep their own behavior") — MovableDialog was the one place missed. One
+change fixes every dialog: Curves, Effect, ImageSize, LayerEffect, Levels, Paste,
+RasterizeConfirm, SelectionSize.
+
+Why it hid so long: every earlier probe closed dialogs with `.click()`.
+HTMLElement.click() dispatches a click with NO pointerdown/up, so it can never
+reproduce a pointer-capture bug — the probes were green while the button was dead
+for real users.
+
+Verified in headless Chrome (1400x900):
+    dialog-close-x.mjs — 11/11 PASS: a real page.mouse.click on the X closes Zoom
+      Blur and the click target is now BUTTON.m-close; Motion Blur, Rotary Blur,
+      Radial Blur, Twist, Image>Resize... and Adjustments>Levels... all close the
+      same way; programmatic .click() and real-click-on-Cancel still work as
+      controls; the title bar still drags (delta 120,60).
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+Files: src/lib/components/common/MovableDialog.svelte
+Probe: .workbuddy-ai/dialog-close-x.mjs
+
+-- DONE (effects round 2: Emboss, Julia, Drop Shadow, Bulge, Warp + Relief/Bevel/Smudge) --
+Request:
+  "for emboss, julia fraktal, drop shadow, buldge and wrap also use angle picker /
+   xy controller wherever possible"
+
+XY PADS — no filter() change needed: an `xy` param writes settings[keyX]/[keyY],
+so converting a centerX/centerY or offsetX/offsetY pair is a param-definition-only
+edit.
+  - Bulge, Warp, Smudge : centerX/centerY sliders -> `center` xy pad, yDown: true
+  - Julia Fractal       : centerX/centerY (-100..100) -> `center` xy pad, NO yDown
+  - Drop Shadow         : offsetX/offsetY (+-50 px) -> `offset` xy pad, yDown: true
+yDown where the value is a POSITION in image space (focal point; the shadow's
+offset, since the shader samples `uv - offset` so +offset moves the shadow down).
+Julia's centre is a point in the COMPLEX PLANE, not the image, so it deliberately
+has NO yDown — matching Mandelbrot's `offset` pad exactly (verified: both pads
+have their top at maxY).
+
+ANGLE DIALS — each shader has its OWN convention and none was "0 = up, clockwise":
+  Motion Blur  e = (-cos t, sin t)                      -> t = 90 - D
+  Emboss       d = (cos t, sin t)   light-TRAVEL dir     -> t = 90 + D
+  Bevel        (lx,ly) = (cos t, sin t) light-TRAVEL dir -> t = 90 + D
+  Relief       lightDir = (cos t, sin t, 0.6)  TO the light -> t = D - 90
+The sign flips between Emboss/Bevel and Relief because their shaders disagree on
+whether the vector points at the light or away from it. Deriving this is
+error-prone — every mapping was confirmed ON PIXELS.
+
+DEFAULTS re-picked so the default LOOK is unchanged (old shader angles were
+emboss 45, relief 45, bevel 135):
+  emboss ANGLE 45 -> 315   (90 + 315 = 405 = 45)
+  relief ANGLE 45 -> 135   (135 - 90 = 45)
+  bevel  ANGLE 135 -> 45   (90 + 45 = 135)
+A fresh install renders exactly as before; only the number the dial shows moved,
+and it now points at the light. Anyone with a STORED custom angle still sees that
+angle reinterpreted — unavoidable, the meaning of the number changed.
+
+EXTRA (same pattern, not in the list — say the word and I'll revert): Relief and
+Bevel (Emboss's siblings) and Smudge (same Center X/Y leftover as Bulge/Warp).
+
+Verified in headless Chrome (1400x900):
+    fx-controls2.mjs — 32/32 PASS. Lighting measured with a square against a
+      contrasting ground; the response sits ON the boundary so the band straddles
+      it and the brightest edge is the lit one:
+        Bevel  dial   0  top=17.1 right=6.7 bottom=6.4 left=6.7  -> top
+        Bevel  dial  90  top= 6.9 right=16.9 bottom=6.4 left=6.7  -> right
+        Bevel  dial 180  top= 6.9 right= 6.7 bottom=26.8 left=6.7  -> bottom
+        Bevel  dial 270  top= 6.9 right= 6.7 bottom= 6.4 left=27.1 -> left
+        Emboss dial   0  top=204.2 right=128.0 bottom=51.2 left=128.0 -> top
+        Emboss dial  90  top=128.0 right=204.2 bottom=128.0 left=51.2 -> right
+        Relief dial   0  top=168.7 right=150.3 bottom=131.7 left=150.3 -> top
+        Relief dial 270  top=150.3 right=131.7 bottom=150.3 left=168.7 -> left
+      The lit edge follows the dial at all four cardinal angles for all three.
+      Defaults: Emboss 315 -> light from the upper-left, Relief 135 -> lower-right,
+      Bevel 45 -> upper-right (each the same look as before the change).
+      Pads at their edges: Bulge/Warp/Smudge T=[50,3] B=[50,98] (top = minY),
+      Drop Shadow T=[0,-47] B=[0,48], Julia T=[0,95] vs Mandelbrot T=[0,1.9]
+      (both top = maxY).
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+Files: src/lib/effects/distort/{bulge,warp,smudge}.ts,
+       src/lib/effects/render/juliaFractal.ts,
+       src/lib/effects/object/{shadow,bevel}.ts,
+       src/lib/effects/stylize/{emboss,relief}.ts
+Probes: .workbuddy-ai/fx-controls2.mjs, fx-shots.mjs
+
+
+-- DONE (effects round 3: full audit + Polar Inversion, Drop Shadow colour row, premultiplied-alpha bug) --
+Request:
+  "for emboss, julia fraktal, drop shadow, buldge and wrap also use angle picker /
+   xy controller wherever possible"  (continuing the "wherever possible" cleanup)
+
+AUDIT — wrote .workbuddy-ai/fx-audit.mjs, which hovers every Effects submenu and
+opens every leaf, then dumps each dialog's controls.
+  50 menu entries; 45 open a dialog; 5 are instant effects.
+  "leftover sliders: none" — no coordinate-pair or angle slider is left anywhere.
+
+POLAR INVERSION was the one gap: `params: []`, its centre hard-wired to vec2(0.5)
+— the only radial effect with no centre control. Added a `center` xy pad
+(0..100, default 50/50, yDown) and threaded uCenter through the shader. The
+default is bit-for-bit the old behaviour (50,50 == vec2(0.5)).
+
+DROP SHADOW had the last remaining R/G/B slider triple where `kind: 'color'`
+exists (both Outlines already used the row). Replaced with one colour row stored
+packed 0xRRGGBB. `settings.color ?? 0` keeps old persisted settings working —
+they resolve to black, the old default.
+
+BUG FOUND AND FIXED — non-premultiplied colour output.
+  Adding the colour row made this reachable, and measuring it (rather than
+  eyeballing) caught it: a WHITE shadow at the default Opacity (128/255 = 0.502)
+  rendered as an opaque slab — the band read 255 where a translucent shadow must
+  read 0.502*255 + 0.498*backdrop(~16.7) ~= 136.
+  Cause: `vec4(uColor, alpha)` emits UN-premultiplied rgb, but Pixi blends
+  premultiplied (src.rgb + dst.rgb*(1-src.a)), so rgb=1.0 at alpha=0.5 composites
+  to 1.0 + dst*0.5 and clamps to white. Invisible while the colour was black
+  (0 stays 0), glaring for anything lighter.
+  The codebase convention IS premultiplied and every other effect follows it —
+  `noisyColor * c.a, c.a` (addNoise), `c.rgb * ratio, newAlpha` (feather),
+  `screenRGB * src.a, src.a` (glow). Two effects broke it by emitting a CONSTANT
+  colour with a VARIABLE alpha:
+    object/shadow.ts   -> vec4(uColor * shadowA, shadowA)
+    object/outline.ts  -> vec4(uColor * uIntensity, uIntensity)
+  Both are exact no-ops at their defaults (shadow black, outline intensity 255),
+  which is why nobody noticed.
+  Measured after the fix: white shadow reads 136.1 (predicted ~136).
+  Outline: canvas mean 27.71 -> 21.91 when Intensity goes 255 -> 128; before the
+  fix both runs rendered opaque white and the drop would have been ~0.
+
+REVIEWED AND LEFT ALONE (deliberately):
+  - photo/redEyeRemoval.ts  `mix(c.rgb, target, uStrength), c.a` — both inputs
+    are already premultiplied, so the mix stays premultiplied. Fine.
+  - stylize/outline.ts      `ink` is a near-black constant (0.04), so the
+    over-brightening is imperceptible. Fine.
+  - Add Noise "Monochrome"  is a 0..100 slider and SHOULD stay one:
+    `mix(straight, vec3(gray), uMonochrome)` blends colour noise <-> grey base,
+    and a checkbox would destroy the intermediate.
+  - Bevel works on ALPHA, so on an opaque layer it is a silent no-op. Not a bug,
+    just worth knowing when testing.
+
+Verified in headless Chrome (1400x900):
+    fx-audit.mjs         — 7/7 PASS, errors: none
+      Polar Inversion: pad=true defaultXY=[50,50] movedTo=[3,3]
+                       default-apply-changed=true move-changes-render=true
+    fx-shadow-color.mjs  — 12/12 PASS
+      colourRows=1 label=Color, sliders=[Blur Radius, Opacity]
+      shadow band luminance: black=8.1  white=136.1
+      "the white shadow stays translucent (premultiplied alpha)"
+    fx-outline-premul.mjs — 4/4 PASS
+    scan-shader-backticks.mjs — 45 templates in 54 modules, no stray tick
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+GOTCHA discovered the hard way: a BACKTICK inside a shader template literal
+breaks the build. The GLSL sources are JS template strings, so a backtick in a
+comment there closes the string early and Vite 500s on the module — and a Vite
+500 on ONE effect module takes down the ENTIRE app (empty body, every probe times
+out waiting for .menubar-btn). I hit this writing a comment that quoted
+`vec4(uColor, uIntensity)` in object/outline.ts. Guard:
+.workbuddy-ai/scan-shader-backticks.mjs.
+
+Files: src/lib/effects/distort/polarInversion.ts,
+       src/lib/effects/object/{shadow,outline}.ts
+Probes: .workbuddy-ai/fx-audit.mjs, fx-shadow-color.mjs, fx-outline-premul.mjs,
+        scan-shader-backticks.mjs, fx-shots.mjs
+Shots:  .workbuddy-ai/fx-polar-inversion.png, fx-drop-shadow.png, fx-outline.png
+
+
+-- DONE (new param kind `select`: Motion Blur's Edge Behavior was a slider spelling out its own options) --
+Request: continuing the "wherever possible" cleanup after the full audit.
+
+The audit's control dump left one wart: Motion Blur's "Edge Behavior" was a
+SLIDER whose label had to spell its options out —
+  `Edge Behavior (0:Clamp, 1:Wrap, 2:Mirror, 3:Transparent)`
+because a range track cannot show four named choices. It was the ONLY such case
+in the project (checked every effect file).
+
+Added a real `select` kind:
+  - types.ts            `kind?: ... | 'select'` + `options?: { value, label }[]`
+  - EffectSelect.svelte/.css  a labelled native <select> over `options` with an
+                        icon reset button, matching FilterSlider's look.
+                        `bind:value` on a <select> keeps the option's real type,
+                        so the value round-trips into settings as a NUMBER.
+  - wired into BOTH EffectDialog.svelte AND LayerEffectDialog.svelte — they each
+    render params with their own copy of the same `{#if param.kind === ...}`
+    chain, so a new kind must be added to both or the docked layer-effect dialog
+    silently falls through to a slider.
+  - motionBlur.ts       `edgeBehavior` migrated; label is now plain
+                        "Edge Behavior".
+
+Verified in headless Chrome (1400x900):
+    fx-select.mjs — 20/20 PASS
+      select label "Edge Behavior", options [Clamp, Wrap, Mirror, Transparent]
+      no slider left spelling its options out (sliders=[Distance])
+      default Clamp, reset disabled at default, reset restores it
+      persists as a NUMBER (edgeBehavior=3, type=number)
+      Clamp vs Mirror      : 0 differing pixels (repeatable)
+      Clamp vs Wrap        : 33639 px, band x137..222
+      Clamp vs Transparent : 33639 px, band x137..222
+      band starts at x=137 = the document's left edge (derived from the frame)
+      band width 85px of 1078 -> a border band, not a global change
+  tsc clean, svelte-check 0 errors / 52 warnings (baseline), zero console errors.
+
+THREE PROBE MISTAKES worth remembering (all fixed, documented in the skill):
+  1. A BLUR CONSERVES THE MEAN. It is a local average, so the whole-canvas mean
+     is identical before and after — my first attempt read 18.36 for the
+     baseline AND for every mode. A global mean can never detect a blur; measure
+     a local region or diff two frames.
+  2. An edge mode only differs where the streak LEAVES the image, and the image's
+     border must contain content. A block 4px inside the edge clamps to the
+     EMPTY border column, so Clamp matched Transparent exactly. Flooding the
+     whole layer with the Paint Bucket (no selection, no coordinates) is the
+     robust setup.
+  3. A Rectangle Select drag started exactly on the canvas corner is REJECTED by
+     the app, so nothing is drawn and the probe silently measures bare canvas (a
+     strip read a constant 30.00 — the app background — in every case).
+  Also: the document does NOT start at the canvas host's x=0. The host is
+  1078x811 at (92,64) but the document's left edge is at host x~137, with grey
+  app background to its left. Derive the edge from the frame, don't assume it.
+
+PROBE INFRASTRUCTURE: Vite queues a full-reload after source edits and it lands
+  MID-RUN, killing the execution context ("Execution context was destroyed, most
+  likely because of a navigation") — never at the start, which makes it look
+  random. Log `framenavigated` (it showed two queued reloads) and absorb them
+  before the real work: wait for .menubar-btn, sleep ~2.5s, explicit page.reload(),
+  wait for .menubar-btn again. Every probe does this now; fx-audit.mjs also polls
+  for .m-dialog instead of a fixed sleep (a fixed 700ms was flaky right after a
+  previous dialog closed).
+
+Files: src/lib/effects/types.ts,
+       src/lib/components/common/EffectSelect.{svelte,css},
+       src/lib/components/dialogs/{EffectDialog,LayerEffectDialog}.svelte,
+       src/lib/effects/blurs/motionBlur.ts
+Probes: .workbuddy-ai/fx-select.mjs (+ diag-canvas-bounds.mjs, harden-probes.mjs)
+Shot:  .workbuddy-ai/fx-motion-blur.png
+
+============================================================
+-- DONE -- Smoke test of ALL 50 effects  (2026-09-18, cont.)
+============================================================
+Goal: for every menu entry, does applying it actually change the canvas?
+
+NEW PROBES
+  fx-smoke-all.mjs       all 50 entries: perturb a param -> Apply -> diff frames
+  fx-smoke-suspect.mjs   the 14 "unchanged" suspects on a colourful Julia base
+  fx-suspect2.mjs        isolated Median / Reduce Noise + strong-value tests
+  fx-highlights.mjs      Highlights / Shadows on a BRIGHT base (Clouds, mean 160)
+  fx-hlsh-assert.mjs     asserts the DIRECTION of each slider  -> 5/5 PASS
+
+RESULTS
+  38/50 changed on a black+white scene. Most "unchanged" were scene-dependent:
+  Sepia / Hue / Glow are no-ops on black+white, Sharpen is a no-op on
+  already-maximal edges. Median and Reduce Noise DO open dialogs (my first
+  reading was a probe menu-race). 12 of 14 suspects changed on a Julia base.
+
+BUG FOUND + FIXED: negative Highlights brightened instead of darkening
+  File: src/lib/effects/adjustments/highlightsShadows.ts
+  Two lines that must be mirror images had opposite negative branches:
+    rgb += shadowMask * s * (s > 0.0 ? (1.0 - rgb) :  rgb);   // correct
+    rgb += highMask   * h * (h > 0.0 ? (1.0 - rgb) : -rgb);   // WRONG
+  With h < 0 that is rgb * (1 + highMask*|h|) -> toward WHITE, and it
+  overshoots, so -90 rendered BRIGHTER than +90:
+    Highlights +90  mean 160.0 -> 176.7
+    Highlights -90  mean 160.0 -> 190.4   <-- the giveaway
+  The line's own comment said "u* < 0 pushes toward black" — the code did the
+  opposite. Fixed by extracting the shared rule so they cannot drift again:
+    vec3 pushLuminance(vec3 rgb, float mask, float amount)
+    { return rgb + mask * amount * (amount > 0.0 ? (1.0 - rgb) : rgb); }
+  After: +90 -> 176.7 (up), -90 -> 114.8 (down), +90 out-brightens -90.
+  Swept all effects for the same `? (1.0 - x) : -x` pattern: only photo/glow.ts
+  (screen blend) and distort/bulge.ts (radial falloff) match, both correct.
+
+FIXED: Posterize had unreachable isNoop (off-by-one in `max`)
+  File: src/lib/effects/adjustments/posterize.ts
+  max: 255 but isNoop: levels >= 256 -> guard could never fire, so Apply was
+  never disabled at the top of the range. The threshold is the RIGHT one:
+  round(v*(n-1))/(n-1) is an exact 8-bit identity only when n-1 = 255 (n = 256);
+  at 255 it rounds into 254 buckets and shifts some channels by one LSB. So the
+  range was the bug, not the guard -> max raised to 256, guard is now live.
+
+PROBE GOTCHAS (both cost a wrong verdict first)
+  1. EffectDialog PERSISTS last-used settings, so a probe that sets only the
+     slider under test inherits the previous case. My first fx-hlsh-assert run
+     read "Shadows +90" as DARKER (160 -> 117.4) purely because Highlights was
+     still +90 from the case before. Reading the sliders back on open exposed it
+     ("opened at [-90, 0] -> set [0, 90]"). Pin EVERY slider in the dialog, and
+     delete settings.v1 -> effects.<id> when asserting "default".
+  2. A DARK test image makes highlight-side effects look broken: Highlights
+     masks by pow(luma,3), so on a mean-60 base it is a genuine near-no-op.
+     Choose the base to suit the effect (bright for highlights, dark for shadows).
+  3. The backtick guard caught me AGAIN while writing this fix — a new shader
+     comment quoted a tick and scan-shader-backticks.mjs flagged it before it
+     could 500 the build. Keep shader comments tick-free.
+  4. A suite run started right after a source edit reports phantom FAILs
+     (fx-controls2 "Bevel shows a rotation dial") because the Vite reload lands
+     mid-run. Let Vite settle first. Also capture per-probe output FILES rather
+     than piping to grep — these probes print "errors : none" (with a space) and
+     a per-file summary, so a naive pattern matches nothing and looks like the
+     probe produced no output.
+
+FILES: src/lib/effects/adjustments/highlightsShadows.ts
+       src/lib/effects/adjustments/posterize.ts
+PROBES: fx-smoke-all.mjs, fx-smoke-suspect.mjs, fx-suspect2.mjs,
+        fx-highlights.mjs, fx-hlsh-assert.mjs
+
+SUITE STATUS: 0 FAIL / 94 PASS across fx-audit(7) fx-controls2(32) fx-select(20)
+  fx-layer-effect(14) fx-shadow-color(12) fx-outline-premul(4) fx-hlsh-assert(5);
+  backtick scan PASS; tsc clean; svelte-check 0 errors / 52 warnings; no console
+  errors.
+
+STILL OPEN: identity bootstrap (IDENTITY.md / USER.md / SOUL.md, delete
+  BOOTSTRAP.md); docked Layer Effects panel; docs/ is stale (export.ps1 not run).

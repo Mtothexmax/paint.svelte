@@ -1,0 +1,7 @@
+/* ---- filter popup (FL-Studio-style applied-filter dialog) ---- */
+/* Anchor for the ▾ switcher menu: the browser positions itself below this. */
+.filter-switcher {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+}

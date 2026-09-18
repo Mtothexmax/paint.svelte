@@ -1,0 +1,16 @@
+=== dialog opening, as the FIRST action after New ===
+Median        dialog=true  title=Median  sliders=[Radius, Percentile, Quality]  applyDisabled=false
+   submenu items seen: [🌫 Add Noise… | 🧂 Median… | 🧹 Reduce Noise…]
+Reduce Noise  dialog=true  title=Reduce Noise  sliders=[Amount, Threshold]  applyDisabled=false
+   submenu items seen: [🌫 Add Noise… | 🧂 Median… | 🧹 Reduce Noise…]
+Add Noise     dialog=true  title=Add Noise  sliders=[Amount, Monochrome, Seed]  applyDisabled=false
+   submenu items seen: [🌫 Add Noise… | 🧂 Median… | 🧹 Reduce Noise…]
+
+=== strong-value tests on a Julia base ===
+UNCHANGED Highlights / Shadows   slider[0]=90 apply=true diff=0  ranges=[-100..100, -100..100]
+CHANGED   Highlights / Shadows   slider[1]=90 apply=true diff=763151  ranges=[-100..100, -100..100]
+CHANGED   Posterize              slider[0]=2 apply=true diff=763151  ranges=[2..255]
+CHANGED   Threshold              slider[0]=128 apply=true diff=763151  ranges=[0..255]
+CHANGED   Hue / Saturation       slider[1]=100 apply=false diff=139896  ranges=[-180..180, 0..200, 0..200]  [undo left 763151px]
+
+errors: none

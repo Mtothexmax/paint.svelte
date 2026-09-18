@@ -3,7 +3,7 @@
 	import { dialog } from '../../services/dialogService';
 	import type { EffectDialogPayload, LayerEffectDialogPayload } from '../../services/dialogService';
 	import NewImageDialog from './NewImageDialog.svelte';
-	import EffectDialog from './EffectDialog.svelte';
+	import FilterPopup from './FilterPopup.svelte';
 	import LayerEffectDialog from './LayerEffectDialog.svelte';
 	import RasterizeConfirmDialog from './RasterizeConfirmDialog.svelte';
 	import ImageSizeDialog from './ImageSizeDialog.svelte';
@@ -16,7 +16,9 @@
 {#if $dialog.kind === 'newImage'}
 	<NewImageDialog />
 {:else if $dialog.kind === 'effect'}
-	<EffectDialog payload={$dialog.payload as EffectDialogPayload} />
+	{#key ($dialog.payload as EffectDialogPayload).effectId}
+		<FilterPopup effectId={($dialog.payload as EffectDialogPayload).effectId} />
+	{/key}
 {:else if $dialog.kind === 'layerEffect'}
 	<LayerEffectDialog payload={$dialog.payload as LayerEffectDialogPayload} />
 {:else if $dialog.kind === 'rasterizeConfirm'}

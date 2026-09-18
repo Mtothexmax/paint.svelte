@@ -1,7 +1,7 @@
 import type { EffectDefinition, EffectSettings } from '../types';
 import { makeGlFilter } from '../shaders';
 
-const ANGLE = 45;
+const ANGLE = 135; // = 135 - 90 = 45 in shader terms: light from the lower right
 const STRENGTH = 80;
 
 // Stone bas-relief: the local surface normals are recovered from the
@@ -43,9 +43,16 @@ const definition: EffectDefinition = {
 	label: 'Relief',
 	icon: '🗿',
 	params: [
+		// Rotation dial (0 = up, clockwise) pointing at the LIGHT. Unlike
+		// Emboss, this shader's `lightDir = (cos t, sin t, 0.6)` IS the
+		// direction toward the light, so no sign flip: t = D - 90.
+		//
+		// Default 135 rather than 45: 135 - 90 = 45, the old shader angle, so
+		// the default look is unchanged (light from the lower right).
 		{
 			key: 'angle',
 			label: 'Angle',
+			kind: 'angle',
 			min: 0,
 			max: 360,
 			step: 1,
@@ -64,7 +71,9 @@ const definition: EffectDefinition = {
 		makeGlFilter(
 			RELIEF_FRAGMENT,
 			{
-				uAngle: { value: (settings.angle * Math.PI) / 180, type: 'f32' },
+				// `angle - 90`: maps the dial's (0 = up, clockwise) onto the
+				// shader's (+cos, +sin) light-direction vector.
+				uAngle: { value: ((settings.angle - 90) * Math.PI) / 180, type: 'f32' },
 				uStrength: { value: 0.08 + 2.6 * (settings.strength / 100), type: 'f32' }
 			},
 			1

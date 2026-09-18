@@ -1,0 +1,54 @@
+/* ---- filter select row (dropdown + icon reset) ---- */
+.fsel {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.fsel-label {
+	font-size: 12px;
+	color: var(--text-dim);
+}
+.fsel-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.fsel-input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 4px 6px;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	color: var(--text);
+	font-size: 12px;
+	cursor: pointer;
+}
+.fsel-input:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+.fsel-reset {
+	flex: 0 0 auto;
+	width: 24px;
+	height: 24px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	border: none;
+	border-radius: 5px;
+	color: var(--text-dim);
+	font-size: 15px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 0;
+}
+.fsel-reset:hover:not(:disabled) {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--text);
+}
+.fsel-reset:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}

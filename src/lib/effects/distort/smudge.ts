@@ -36,8 +36,20 @@ const definition: EffectDefinition = {
 			step: 1,
 			default: STRENGTH
 		},
-		{ key: 'centerX', label: 'Center X', min: 0, max: 100, step: 1, default: 50 },
-		{ key: 'centerY', label: 'Center Y', min: 0, max: 100, step: 1, default: 50 }
+		// Focal point as a pad (image-space position -> Y runs downward).
+		{
+			key: 'center',
+			label: 'Center',
+			kind: 'xy',
+			minX: 0,
+			maxX: 100,
+			minY: 0,
+			maxY: 100,
+			step: 1,
+			default: 50,
+			defaultY: 50,
+			yDown: true
+		}
 	],
 	filter: (settings: EffectSettings) =>
 		makeGlFilter(

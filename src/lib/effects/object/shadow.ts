@@ -40,7 +40,14 @@ const SHADOW_FRAGMENT = `
 		}
 		blurredA /= max(count, 1.0);
 
-		vec4 shadow = vec4(uColor, blurredA * uIntensity);
+		// Premultiplied alpha (Pixi's blend convention, and what every other
+		// effect here emits): rgb must be scaled by the alpha we output.
+		// Emitting the raw colour made a semi-transparent bright shadow render
+		// as a solid opaque slab — invisible while the colour was black
+		// (rgb 0 stays 0), glaring as soon as the colour row picks anything
+		// lighter. Default (black, opacity 128) is bit-for-bit unchanged.
+		float shadowA = blurredA * uIntensity;
+		vec4 shadow = vec4(uColor * shadowA, shadowA);
 
 		if (original.a > 0.01)
 			finalColor = original;
@@ -53,21 +60,21 @@ const definition: EffectDefinition = {
 	label: 'Drop Shadow',
 	icon: '⬛',
 	params: [
+		// Offset as a pad: drag the point and the shadow follows. The shader
+		// samples at `uv - offset`, so a POSITIVE offset moves the shadow DOWN
+		// — i.e. the value is already image space, hence `yDown`.
 		{
-			key: 'offsetX',
-			label: 'Offset X',
-			min: -50,
-			max: 50,
+			key: 'offset',
+			label: 'Offset',
+			kind: 'xy',
+			minX: -50,
+			maxX: 50,
+			minY: -50,
+			maxY: 50,
 			step: 1,
-			default: 4
-		},
-		{
-			key: 'offsetY',
-			label: 'Offset Y',
-			min: -50,
-			max: 50,
-			step: 1,
-			default: 4
+			default: 4,
+			defaultY: 4,
+			yDown: true
 		},
 		{
 			key: 'blur',
@@ -77,29 +84,18 @@ const definition: EffectDefinition = {
 			step: 1,
 			default: 4
 		},
+		// One colour row instead of three R/G/B sliders — same widget the two
+		// Outline effects use. Stored packed as 0xRRGGBB. `?? 0` keeps old
+		// persisted settings (which carried colorR/colorG/colorB) working;
+		// they resolve to black, which is exactly the old default.
 		{
-			key: 'colorR',
-			label: 'Red',
+			key: 'color',
+			label: 'Color',
 			min: 0,
-			max: 255,
+			max: 0xffffff,
 			step: 1,
-			default: 0
-		},
-		{
-			key: 'colorG',
-			label: 'Green',
-			min: 0,
-			max: 255,
-			step: 1,
-			default: 0
-		},
-		{
-			key: 'colorB',
-			label: 'Blue',
-			min: 0,
-			max: 255,
-			step: 1,
-			default: 0
+			default: 0,
+			kind: 'color'
 		},
 		{
 			key: 'intensity',
@@ -110,17 +106,19 @@ const definition: EffectDefinition = {
 			default: 128
 		}
 	],
-	filter: (settings: EffectSettings) =>
-		makeGlFilter(SHADOW_FRAGMENT, {
+	filter: (settings: EffectSettings) => {
+		const c = Math.max(0, Math.floor(settings.color ?? 0)) & 0xffffff;
+		return makeGlFilter(SHADOW_FRAGMENT, {
 			uOffsetX: { value: settings.offsetX, type: 'f32' },
 			uOffsetY: { value: settings.offsetY, type: 'f32' },
 			uBlur: { value: settings.blur, type: 'f32' },
 			uColor: {
-				value: [settings.colorR / 255, settings.colorG / 255, settings.colorB / 255],
+				value: [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255],
 				type: 'vec3<f32>'
 			},
 			uIntensity: { value: settings.intensity / 255, type: 'f32' }
-		}),
+		});
+	},
 	isNoop: (settings: EffectSettings) => settings.intensity <= 0
 };
 

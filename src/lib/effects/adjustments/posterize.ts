@@ -37,7 +37,13 @@ const definition: EffectDefinition = {
 			key: 'levels',
 			label: 'Colors per channel',
 			min: 2,
-			max: 255,
+			// 256, not 255: the formula is round(v * (n-1)) / (n-1), which is an
+			// exact identity for 8-bit input only when n-1 = 255, i.e. n = 256.
+			// At 255 the rounding lands on 254 buckets and shifts some channels
+			// by one LSB. The isNoop guard below already tests for 256, so with a
+			// max of 255 it was unreachable dead code and Apply was never
+			// disabled — the top of the range silently did nothing useful.
+			max: 256,
 			step: 1,
 			default: 16
 		}

@@ -7,6 +7,7 @@
 	import { commands } from '../../services/commandRegistry';
 	import { lastApplied } from '../../state/repeat';
 	import { effects, adjustmentEffects } from '../../effects';
+	import EffectBrowserMenu from '../common/EffectBrowserMenu.svelte';
 	import type { MenuEntry } from '../../services/menuService';
 	import BrightnessContrastSvg from '@material-symbols/svg-400/rounded/contrast.svg?raw';
 
@@ -100,6 +101,22 @@
 		openSub = null;
 	}
 
+	// --- Applied-effects browser (same menu as the Layer Effects "add"
+	// flyout, but picking runs the DESTRUCTIVE effects.* command instead
+	// of adding a live layer effect). ---
+	function pickAppliedEffect(effectId: string) {
+		const commandId = `effects.${effectId}`;
+		if (commands.isEnabled(commandId)) commands.run(commandId);
+		openMenu = null;
+		openSub = null;
+	}
+
+	function repeatApplied() {
+		$lastApplied?.apply();
+		openMenu = null;
+		openSub = null;
+	}
+
 	function iconOf(entry: MenuEntry): string {
 		if (entry.type === 'command')
 			return COMMAND_SVG_ICONS[entry.commandId] ?? COMMAND_ICONS[entry.commandId] ?? '';
@@ -173,7 +190,23 @@
 				{menu.label}
 			</button>
 			{#if openMenu === menu.label}
-				<div class="menu-panel">
+				{#if menu.label === 'Effects'}
+					<!-- Shared browser: identical columns to the Layer Effects
+					     "add" menu; a pick runs the applied effects.* command. -->
+					<EffectBrowserMenu
+						placement="down"
+						ariaLabel="Effects"
+						repeatLabel={$lastApplied?.menu === 'effects'
+							? `Repeat ${$lastApplied.name}`
+							: null}
+						onRepeat={repeatApplied}
+						getLabel={(id, fallback) => commands.label(`effects.${id}`) || fallback}
+						isEnabled={(id) => commands.isEnabled(`effects.${id}`)}
+						getShortcut={(id) => commands.shortcut(`effects.${id}`)}
+						onPick={pickAppliedEffect}
+					/>
+				{:else}
+					<div class="menu-panel">
 					{#if CATEGORY[menu.label] && $lastApplied?.menu === CATEGORY[menu.label]}
 						<button
 							class="menu-item"
@@ -257,7 +290,8 @@
 							</button>
 						{/if}
 					{/each}
-				</div>
+					</div>
+				{/if}
 			{/if}
 		</div>
 	{/each}

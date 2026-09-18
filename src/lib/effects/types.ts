@@ -29,9 +29,18 @@ export interface EffectParam {
 	 * 0xRRGGBB; 'checkbox' renders a checkbox storing 1/0 in `settings[key]`;
 	 * 'xy' renders an XYPicker (FL Studio style pad) writing `settings[keyX]` /
 	 * `settings[keyY]`; 'angle' renders an AnglePicker (dial) bound to
-	 * `settings[key]`. min/max/step are ignored for 'color' and 'checkbox'.
+	 * `settings[key]`; 'select' renders a dropdown over `options`, storing the
+	 * chosen option's numeric value in `settings[key]`. min/max/step are ignored
+	 * for 'color', 'checkbox' and 'select'.
 	 */
-	kind?: 'slider' | 'color' | 'checkbox' | 'xy' | 'angle';
+	kind?: 'slider' | 'color' | 'checkbox' | 'xy' | 'angle' | 'select';
+	/**
+	 * (select only) The choices, in order. `value` is what lands in
+	 * `settings[key]`; `label` is what the dropdown shows. Use a select for a
+	 * genuine enumeration — a slider whose label has to spell out its own
+	 * options ("Edge Behavior (0:Clamp, 1:Wrap, ...)") is the smell it replaces.
+	 */
+	options?: { value: number; label: string }[];
 	/** (xy only) horizontal range; defaults to -100..100 */
 	minX?: number;
 	maxX?: number;

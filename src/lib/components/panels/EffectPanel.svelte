@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
 	import type { LayerEffect } from '../../core/layers/Layer';
-	import { effectById, effectMenusWithEntries } from '../../effects';
+	import { effectById } from '../../effects';
 	import type { EffectSettings } from '../../effects';
 	import { getSettings, saveSettings } from '../../services/settingsService';
 	import FilterSlider from '../common/FilterSlider.svelte';
@@ -22,6 +22,7 @@
 	import CopyIcon from '@material-symbols/svg-400/rounded/content_copy.svg';
 	import PasteIcon from '@material-symbols/svg-400/rounded/content_paste.svg';
 	import CloseIcon from '@material-symbols/svg-400/rounded/close.svg';
+	import EffectBrowserMenu from '../common/EffectBrowserMenu.svelte';
 
 	import { closeLayerEffectsPanel } from '../../state/ui';
 
@@ -43,6 +44,7 @@
 	let addOpen = $state(false);
 	let canPaste = $state(hasCopiedEffects());
 	let unsubHist: (() => void) | null = null;
+	let addBtn: HTMLButtonElement | undefined = $state();
 
 	// --- resizable panel height (drag the corner grip, persisted) ---------
 	const FX_HEIGHT_KEY = 'paint.svelte.fxPanelHeight.v1';
@@ -115,6 +117,7 @@
 
 	onMount(() => {
 		panelHeight = loadHeight();
+		window.addEventListener('keydown', onGlobalKey);
 		const unsubs = [
 			documentRegistry.events.on(RegistryEvents.opened, attach),
 			documentRegistry.events.on(RegistryEvents.closed, attach),
@@ -123,6 +126,7 @@
 		];
 		attach();
 		return () => {
+			window.removeEventListener('keydown', onGlobalKey);
 			unsubs.forEach((u) => u());
 			unsubHist?.();
 		};
@@ -236,6 +240,22 @@
 		if (!selectedEff || !selectedDef) return;
 		saveSettings(`effects.${selectedDef.id}`, { ...selectedEff.settings });
 	}
+
+	// --- add-effect flyout (shared FL-Studio-style browser, opens UPWARD).
+	// Picking adds a LIVE layer effect (see EffectBrowserMenu; the MenuBar
+	// uses the same browser to run APPLIED effects instead).
+	function toggleAddMenu() {
+		addOpen = !addOpen;
+	}
+
+	/** Global ESC handler — closes the add menu while it's open. */
+	function onGlobalKey(e: KeyboardEvent): void {
+		if (e.key !== 'Escape') return;
+		if (addOpen) {
+			e.stopPropagation();
+			addOpen = false;
+		}
+	}
 </script>
 
 <div class="fx-panel" style="height:{panelHeight}px" oncontextmenu={(e) => e.preventDefault()}>
@@ -258,23 +278,27 @@
 	<div class="fx-body">
 		<div class="fx-tools">
 			<div class="fx-add">
-				<button class="fx-btn" title="Add effect" onclick={() => (addOpen = !addOpen)}>
+				<button
+					bind:this={addBtn}
+					class="fx-btn"
+					title="Add effect"
+					onclick={toggleAddMenu}
+				>
 					<img src={AddIcon} class="fx-ic" alt="Add" draggable="false" />
 				</button>
 				{#if addOpen}
-					<div class="fx-add-backdrop" onclick={() => (addOpen = false)}></div>
-					<div class="fx-add-menu">
-						{#each effectMenusWithEntries as group, gi}
-							{#if gi > 0}<div class="fx-add-sep"></div>{/if}
-							<div class="fx-add-head">{group.label}</div>
-							{#each group.effects as eff (eff.id)}
-								<button class="fx-add-item" onclick={() => addEffect(eff.id)}>
-									<span class="fx-add-ic">{eff.icon ?? ''}</span>
-									<span>{eff.label}</span>
-								</button>
-							{/each}
-						{/each}
-					</div>
+					<div
+						class="fx-add-backdrop"
+						onclick={() => (addOpen = false)}
+						onkeydown={onGlobalKey}
+						role="presentation"
+					></div>
+					<EffectBrowserMenu
+						anchorEl={addBtn}
+						placement="up"
+						ariaLabel="Add layer effect"
+						onPick={addEffect}
+					/>
 				{/if}
 			</div>
 			<button class="fx-btn" title="Remove selected effect" disabled={selectedIndex === null} onclick={removeSelected}>

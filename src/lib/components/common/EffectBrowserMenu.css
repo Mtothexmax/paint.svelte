@@ -1,0 +1,151 @@
+/* ---- shared effect browser (multi-column FL-Studio-style menu) ----
+   Used in two places with different apply paths:
+   - Layer Effects panel "add" flyout (opens UPWARD, live layer effects)
+   - MenuBar "Effects" dropdown (opens DOWNWARD, applied/destructive effects)
+   The picking behavior differs (onPick), the browser chrome is identical. */
+
+/* add-effect flyout (opens UPWARD from the dock by default) */
+.fx-add-menu {
+	position: absolute;
+	left: 0;
+	bottom: calc(100% + 12px);
+	z-index: 80;
+	/* `border-box` makes the `width`/`max-width` below include the 12px
+	   padding + 1px border, so the menu's VISIBLE width never exceeds
+	   `max-width`. JS sets an explicit width sized to ALL columns (never
+	   wider than the columns need, never wider than the viewport — the
+	   inline `max-width` subtracts the menu's own screen offset). Before
+	   that measurement lands, `auto` renders narrow for a frame rather
+	   than overflowing. `overflow-x: auto` keeps any columns beyond the
+	   viewport reachable through the horizontal scrollbar. */
+	box-sizing: border-box;
+	width: auto;
+	max-width: min(800px, calc(100vw - 24px));
+	max-height: calc(100dvh - 32px);
+	max-height: calc(100vh - 32px);
+	overflow-x: auto;
+	overflow-y: auto;
+	padding: 12px;
+	background: var(--bg-elev);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+	/* Real CSS multi-column flow — the column-width itself is injected
+	   inline so it tracks the widest item in the menu at open time.
+	   `column-fill: auto` lets columns balance at the end instead of
+	   greedily filling column 0 first; items flow individually across
+	   columns — when column 0 is full, the next .fx-add-item starts at the
+	   TOP of column 1. */
+	column-gap: 16px;
+	column-fill: auto;
+}
+/* Dropdown variant (MenuBar): opens DOWNWARD from the menu button. */
+.fx-add-menu.down {
+	top: calc(100% + 4px);
+	bottom: auto;
+	z-index: 60;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.fx-add-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	box-sizing: border-box;
+	margin: 8px 0 2px;
+	padding: 6px 8px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-bright, var(--text));
+	background: rgba(255, 255, 255, 0.03);
+	border: none;
+	border-left: 3px solid var(--accent);
+	border-radius: 3px;
+	text-align: left;
+	user-select: none;
+	font-family: inherit;
+	/* Header must not orphan at the bottom of a column: if the next break
+	   would land right after the header, push the header (and at least its
+	   first item) to the next column. All items beyond the first flow
+	   freely. */
+	break-after: avoid;
+	-webkit-column-break-after: avoid;
+	page-break-after: avoid;
+}
+.fx-add-head:first-child {
+	margin-top: 0;
+}
+.fx-add-head-ic {
+	width: 18px;
+	height: 18px;
+	filter: invert(0.78);
+	pointer-events: none;
+}
+.fx-add-head-folder {
+	font-size: 14px;
+	line-height: 1;
+}
+.fx-add-head-label {
+	flex: 1 1 auto;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.fx-add-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	box-sizing: border-box;
+	margin: 0 0 2px;
+	padding: 4px 8px;
+	font-size: 13px;
+	color: var(--text);
+	background: transparent;
+	border: none;
+	border-radius: 2px;
+	text-align: left;
+	cursor: pointer;
+	font-family: inherit;
+	transition: background-color 0.1s ease;
+	/* No break rule — items flow freely across columns. */
+}
+.fx-add-item:not(:disabled):hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: var(--text-bright, var(--text));
+}
+.fx-add-item:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+.fx-add-ic {
+	flex: 0 0 auto;
+	width: 16px;
+	text-align: center;
+	font-size: 14px;
+	line-height: 1;
+	color: #888;
+}
+.fx-add-item:not(:disabled):hover .fx-add-ic {
+	color: var(--accent);
+}
+.fx-add-item-label {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.fx-add-shortcut {
+	flex: 0 0 auto;
+	margin-left: auto;
+	padding-left: 12px;
+	color: #888;
+	font-size: 11px;
+	white-space: nowrap;
+}
+/* Separator between the optional repeat row and the browser columns. */
+.fx-add-sep {
+	height: 1px;
+	margin: 6px 2px 8px;
+	background: var(--border);
+}

@@ -116,7 +116,18 @@ const definition: EffectDefinition = {
         },
         {
             key: 'edgeBehavior',
-            label: 'Edge Behavior (0:Clamp, 1:Wrap, 2:Mirror, 3:Transparent)',
+            label: 'Edge Behavior',
+            kind: 'select',
+            // A dropdown, not a slider: this is a fixed set of four named
+            // choices. As a slider the label had to spell the options out
+            // ("Edge Behavior (0:Clamp, 1:Wrap, 2:Mirror, 3:Transparent)")
+            // because a range track cannot show them.
+            options: [
+                { value: 0, label: 'Clamp' },
+                { value: 1, label: 'Wrap' },
+                { value: 2, label: 'Mirror' },
+                { value: 3, label: 'Transparent' }
+            ],
             min: 0,
             max: 3,
             step: 1,

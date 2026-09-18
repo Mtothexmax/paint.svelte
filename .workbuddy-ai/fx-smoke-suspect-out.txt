@@ -1,0 +1,20 @@
+base built with Julia Fractal (self-diff 0)
+CHANGED   Glow                   diff=763151  apply=true  (defaults)
+CHANGED   Red Eye Removal        diff= 45891  apply=true  (defaults)
+CHANGED   Sharpen                diff= 57494  apply=true  (defaults)
+CHANGED   Add Noise              diff=669510  apply=true  (defaults)
+CHANGED   Median                 diff=669510  apply=null  (instant)
+CHANGED   Reduce Noise           diff=669510  apply=null  (instant)
+CHANGED   Exposure               diff=763151  apply=true  (perturbed -> 1)
+UNCHANGED Highlights / Shadows   diff=     0  apply=true  (perturbed -> 20)
+CHANGED   Hue / Saturation       diff=763151  apply=true  (perturbed -> 36)
+CHANGED   Sepia                  diff=763151  apply=null  (instant)
+UNCHANGED Posterize              diff=     0  apply=true  (defaults)
+CHANGED   Threshold              diff=763151  apply=true  (defaults)
+CHANGED   Curves                 diff=763151  apply=true  (defaults)
+CHANGED   Levels Adjustment      diff= 87666  apply=null  (instant)  [undo left 763151px]
+
+--- 14 re-tested on a colourful base ---
+changed   : 12
+unchanged : 2 -> Adjustments/Highlights / Shadows, Adjustments/Posterize
+errors    : none

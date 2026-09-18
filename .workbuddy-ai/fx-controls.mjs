@@ -21,7 +21,14 @@ const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+// Wait for the app shell, then absorb any full-reload Vite has queued from
+// recent source edits: without this the reload lands in the MIDDLE of the run
+// and destroys the execution context.
+await page.waitForFunction(() => !!document.querySelector('.menubar-btn'), { timeout: 60000 });
 await new Promise((r) => setTimeout(r, 2500));
+await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForFunction(() => !!document.querySelector('.menubar-btn'), { timeout: 60000 });
+await new Promise((r) => setTimeout(r, 1500));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clickByText = async (t) => {

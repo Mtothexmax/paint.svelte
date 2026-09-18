@@ -6,16 +6,21 @@
 	border: 1px solid var(--border);
 	border-radius: 8px;
 	box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
-	overflow: hidden;
+	/* NOTE: no `overflow: hidden` here — popups anchored in the title bar
+	   (e.g. the filter switcher menu) must be able to extend BEYOND the
+	   dialog bounds. Corners are rounded on the title/footer instead, and
+	   .m-body scrolls internally. */
 	display: flex;
 	flex-direction: column;
 }
 .m-title {
 	display: flex;
 	align-items: center;
+	gap: 4px;
 	justify-content: space-between;
 	padding: 6px 8px 6px 12px;
 	background: #353535;
+	border-radius: 7px 7px 0 0;
 	cursor: move;
 	user-select: none;
 	font-size: 13px;
@@ -23,21 +28,57 @@
 	color: var(--text);
 	touch-action: none;
 }
-.m-title-text {
-	pointer-events: none;
+.m-title-left {
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
 }
+/* Title bars with a left button (filter switcher): pull the left padding in
+   from 12px to 6px so the button sits exactly as far from the left border
+   (6 + 1 border = 7px) as from the top border (6 + 1 border = 7px).
+   Scoped with :has so all other dialogs keep their 12px title indent. */
+.m-title:has(.m-title-left) {
+	padding-left: 6px;
+}
+.m-title-right {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	flex: 0 0 auto;
+}
+/* Title-bar buttons (▾ triangle, ‹ › steppers, ✕ close) — all share the
+   exact same box: 22×22, centered glyph. */
+.m-menu-btn,
 .m-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
 	background: none;
 	border: none;
 	color: var(--text-dim);
 	font-size: 13px;
+	line-height: 1;
 	cursor: pointer;
-	padding: 2px 6px;
 	border-radius: 4px;
 }
+.m-menu-btn:hover,
 .m-close:hover {
 	background: rgba(255, 255, 255, 0.1);
 	color: var(--text);
+}
+/* Material icon inside title-bar buttons (dark glyphs → light UI). */
+.m-btn-ic {
+	width: 16px;
+	height: 16px;
+	filter: invert(0.88);
+	pointer-events: none;
+}
+.m-title-text {
+	flex: 1 1 auto;
+	pointer-events: none;
 }
 .m-body {
 	padding: 12px;
@@ -48,8 +89,15 @@
 }
 .m-footer {
 	display: flex;
+	align-items: center;
 	justify-content: flex-end;
 	gap: 8px;
 	padding: 10px 12px;
 	border-top: 1px solid var(--border);
+	border-radius: 0 0 7px 7px;
+}
+.m-footer-start {
+	margin-right: auto;
+	display: flex;
+	align-items: center;
 }

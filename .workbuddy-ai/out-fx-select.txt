@@ -1,0 +1,30 @@
+--- Motion Blur Edge Behavior (kind: select) ---
+select label  : Edge Behavior
+options       : [Clamp, Wrap, Mirror, Transparent]  values=[0, 1, 2, 3]
+sliders left  : [Distance]
+canvas clip   : 1078x811   black flood mean=3.81
+canvas means  : Clamp=3.81  Wrap=4.37  Mirror=3.81  Transparent=4.37
+vs Clamp      : Wrap: 33639px @x137..222  Mirror: 0px @xnull..null  Transparent: 33639px @x137..222
+
+PASS  Motion Blur dialog opened
+PASS  renders exactly one <select>  [count=1]
+PASS  the select is labelled "Edge Behavior" (no spelled-out options)  [label="Edge Behavior"]
+PASS  four named options in order  [options=[Clamp, Wrap, Mirror, Transparent]]
+PASS  no slider still spells its options out  [sliders=[Distance]]
+PASS  defaults to Clamp  [selected=0]
+PASS  reset is disabled at the default  [disabled=true]
+PASS  choosing Mirror sets the value to 2  [value=2 (raw="2")]
+PASS  reset becomes enabled once off-default  [disabled=false]
+PASS  reset restores Clamp  [value=0]
+PASS  edgeBehavior persists as a number, not a string  [value=3 type=number]
+PASS  the layer really was flooded black  [baseline=3.81]
+PASS  the effect was actually applied with the right settings  [200px @ 90deg, mode=0]
+PASS  the four edge modes do not all render alike  [Clamp=3.81 Wrap=4.37 Mirror=3.81 Transparent=4.37]
+PASS  Clamp and Mirror render identically (repeatable)  [differing pixels=0]
+PASS  Transparent differs from Clamp in the border band  [differing pixels=33639 of 874258]
+PASS  those differences sit at the image edge (where the streak leaves)  [band starts x=137, document left edge x=137]
+PASS  and they form a narrow border band, not a global change  [band width=85px of 1078]
+PASS  Wrap differs from Clamp too  [differing pixels=33639]
+PASS  no console errors
+
+20/20 passed   errors : none

@@ -44,7 +44,7 @@ const definition: EffectDefinition = {
 			key: 'radius',
 			label: 'Radius',
 			min: 0,
-			max: 50,
+			max: 1000,
 			step: 1,
 			default: RADIUS
 		}

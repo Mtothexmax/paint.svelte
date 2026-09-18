@@ -1,6 +1,8 @@
 import type { EffectDefinition, EffectSettings } from '../types';
 import { makeGlFilter } from '../shaders';
 
+const ANGLE = 45; // = 90 + 45 = 135 in shader terms: light from the upper right
+
 // Object: Bevel — simulates a 3-D edge by sampling the alpha gradient and
 // adding highlight toward the light angle and shadow on the opposite side.
 // The effect only touches pixels that are on the edge (alpha between 0 and 1
@@ -60,20 +62,28 @@ const definition: EffectDefinition = {
 			step: 1,
 			default: 20
 		},
+		// Rotation dial (0 = up, clockwise) pointing at the LIGHT. The shader's
+		// `(lx, ly) = (cos rad, sin rad)` is the direction the light TRAVELS
+		// (the top edge is lit when ly > 0), so `(lx, ly) = -dialDir` and
+		// t = 90 + D — the same convention as Emboss.
+		//
+		// Default 45 rather than 135: 90 + 45 = 135, the old shader angle, so
+		// the default look is unchanged (light from the upper right).
 		{
 			key: 'angle',
 			label: 'Light Angle',
 			min: 0,
 			max: 360,
 			step: 1,
-			default: 135,
+			default: ANGLE,
 			kind: 'angle'
 		}
 	],
 	filter: (settings: EffectSettings) =>
 		makeGlFilter(BEVEL_FRAGMENT, {
 			uDepth: { value: settings.depth / 100, type: 'f32' },
-			uAngle: { value: settings.angle, type: 'f32' }
+			// `90 + angle`: dial (0 = up, clockwise) -> the shader's light-travel vector.
+			uAngle: { value: 90 + settings.angle, type: 'f32' }
 		}),
 	isNoop: (settings: EffectSettings) => settings.depth <= 0
 };

@@ -1,5 +1,5 @@
 /* ---- effect color row (foreground/background picker buttons) ----
-   Single horizontal row: label + stored-color rectangle + both buttons.
+   Single horizontal row: label + stored-color rectangle + buttons.
    Wraps onto two lines in narrow hosts (effect dialogs). */
 .fcol {
 	display: flex;
@@ -49,4 +49,18 @@
 	height: 16px;
 	border-radius: 3px;
 	border: 1px solid rgba(255, 255, 255, 0.35);
+}
+/* rainbow swatch for the custom-color toggle */
+.fcol-swatch.fcol-rainbow {
+	background: conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.fcol-btn.on {
+	border-color: var(--accent);
+}
+/* inline custom picker: full row of its own, separated from the buttons */
+.fcol-custom {
+	flex: 1 1 100%;
+	min-width: 0;
+	border-top: 1px solid var(--border);
+	padding-top: 4px;
 }

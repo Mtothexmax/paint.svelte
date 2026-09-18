@@ -1,0 +1,7 @@
+base = Clouds, mean luminance 160.0
+CHANGED   Highlights +90  apply=true diff=762943  mean 160.0 -> 176.7
+CHANGED   Highlights -90  apply=true diff=762710  mean 160.0 -> 190.4
+CHANGED   Shadows +90     apply=true diff=763151  mean 160.0 -> 193.8
+CHANGED   Shadows -90     apply=true diff=687378  mean 160.0 -> 185.5
+
+errors: none
