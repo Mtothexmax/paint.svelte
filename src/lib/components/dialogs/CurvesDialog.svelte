@@ -3,8 +3,19 @@
 	// SVG spline editor, live preview and apply via the same off-screen pipeline.
 	import { onMount } from 'svelte';
 	import MovableDialog from '../common/MovableDialog.svelte';
+	import EffectBrowserMenu from '../common/EffectBrowserMenu.svelte';
+	import SwitchIcon from '@material-symbols/svg-400/rounded/arrow_drop_down.svg';
+	import PrevIcon from '@material-symbols/svg-400/rounded/chevron_left.svg';
+	import NextIcon from '@material-symbols/svg-400/rounded/chevron_right.svg';
 	import { getEditorRenderer } from '../../render/EditorRenderer';
-	import { applyFilterSwap } from '../../effects';
+	import { ADJUSTMENTS_MENU, applyFilterSwap, effectById } from '../../effects';
+	import {
+		adjustmentDialogs,
+		attachSwitcherDismiss,
+		nextAdjustmentId,
+		prevAdjustmentId,
+		switchAdjustment
+	} from './adjustmentSwitcher';
 	import {
 		curvesFilter,
 		defaultCurveSet,
@@ -29,6 +40,20 @@
 	let previewOn = $state(true);
 	let draggingIndex = $state<number | null>(null);
 	let svgEl = $state<SVGSVGElement | null>(null);
+	let switcherOpen = $state(false);
+
+	// ‹ › steppers cycle through dialog-based adjustments only (same order
+	// as the ▾ switcher menu); the window is REPLACED, never stacked.
+	const prevId = prevAdjustmentId('curves');
+	const nextId = nextAdjustmentId('curves');
+	const prevDef = effectById(prevId);
+	const nextDef = effectById(nextId);
+
+	function switchAdj(id: string): void {
+		switcherOpen = false;
+		if (id === 'curves') return;
+		switchAdjustment(id);
+	}
 
 	function pointsFor(ch: CurveChannel): CurvePoint[] {
 		return curve[ch];
@@ -178,11 +203,56 @@
 
 	onMount(() => {
 		preview();
-		return () => getEditorRenderer().setActiveLayerFilterPreview(null);
+		const detachSwitcher = attachSwitcherDismiss(
+			() => switcherOpen,
+			() => (switcherOpen = false)
+		);
+		return () => {
+			detachSwitcher();
+			getEditorRenderer().setActiveLayerFilterPreview(null);
+		};
 	});
 </script>
 
 <MovableDialog title="Curves" onClose={cancel} width={420}>
+	{#snippet titleLeft()}
+		<span class="filter-switcher">
+			<button
+				class="m-menu-btn"
+				title="Change adjustment"
+				aria-label="Change adjustment"
+				aria-expanded={switcherOpen}
+				onclick={() => (switcherOpen = !switcherOpen)}
+			><img src={SwitchIcon} class="m-btn-ic" alt="" draggable="false" /></button>
+			{#if switcherOpen}
+				<EffectBrowserMenu
+					placement="down"
+					ariaLabel="Replace adjustment"
+					isEnabled={() => true}
+					groups={[{ label: ADJUSTMENTS_MENU, effects: adjustmentDialogs }]}
+					onPick={switchAdj}
+				/>
+			{/if}
+		</span>
+	{/snippet}
+
+	{#snippet titleRight()}
+		{#if prevDef && nextDef}
+			<button
+				class="m-menu-btn"
+				title={prevDef.label}
+				aria-label="Previous adjustment: {prevDef.label}"
+				onclick={() => switchAdj(prevId)}
+			><img src={PrevIcon} class="m-btn-ic" alt="" draggable="false" /></button>
+			<button
+				class="m-menu-btn"
+				title={nextDef.label}
+				aria-label="Next adjustment: {nextDef.label}"
+				onclick={() => switchAdj(nextId)}
+			><img src={NextIcon} class="m-btn-ic" alt="" draggable="false" /></button>
+		{/if}
+	{/snippet}
+
 	<div class="tabs">
 		{#each CHANNELS as ch}
 			<button

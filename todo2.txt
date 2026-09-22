@@ -1164,3 +1164,96 @@ PROBE GOTCHA: a `filter` transition means a 300ms wait can read the un-settled
 
 FOUND, STILL NOT FIXED: the dead .dialog / .dialog-backdrop / .dialog-title /
   .dialog-close / .dialog-footer CSS in layout.css (0 references).
+
+-- DONE 2026-09-22: effects colour picker z-index below the dialog header ------
+
+User: "the z index of the color picker for filters is below for example the
+  dialog header".
+
+SYMPTOM: in the Outline / Drop Shadow dialogs the floating custom-colour popup
+  (.fcol-color-pop, opened from the .fcol-stored swatch) painted UNDER the
+  dialog's title bar. clampPopup() flips the popup ABOVE the swatch when there
+  is no room below -- which is exactly when it collides with .m-title.
+
+ROOT CAUSE -- a stacking-context trap, not a number. MovableDialog.css had:
+    .m-dialog > *        { position: relative; z-index: 1; }
+    .m-dialog > .m-title { z-index: 2; }
+  .fcol-color-pop is rendered INSIDE .m-body, so that z-index:1 gave .m-body its
+  OWN stacking context and the popup's z-index:1300 was trapped inside a
+  z-index:1 box, while the title's z-index:2 outranked it. Raising the popup's
+  z-index could never have fixed it. position:fixed escapes overflow/clipping
+  but NEVER a stacking context -- the misleading part, since it IS fixed.
+  Confirmed by elementFromPoint at the popup∩title overlap -> DIV.m-title
+  (inPopup:false); trapping chain [{m-body,z:"1"},{m-dialog,z:"1200"}].
+
+THE REAL CONSTRAINT -- two popups pulling in opposite directions. A dialog hosts
+  popups in TWO places:
+    * the TITLE BAR owns the filter switcher's effect browser
+      (.fx-add-menu.down, z-index 62 in EffectBrowserMenu.css)
+    * the BODY owns the effect colour picker (.fcol-color-pop, z-index 1300)
+  With a stacking context per direct child, whichever parent outranked the other
+  hid the OTHER's popup -- structurally contradictory, so NO numeric value works.
+
+FIX (MovableDialog.css): stop creating the per-child contexts.
+  - .m-dialog > *  -> position:relative with NO z-index
+  - deleted the .m-dialog > .m-title { z-index: 2 } rule
+  - .m-dialog::after (grain overlay) -> z-index:-1, so it stays above the
+    dialog's own gradient but below all content
+  Everything now lives in the dialog's own stacking context, where the two
+  popups compare real z-indexes (1300 > 62 > plain content) and BOTH win.
+
+ALSO restyled EffectColorRow.css onto the palette: raised .fcol-btn plate +
+  transition: filter 100ms, border-color 100ms; .fcol-stored -> border:none +
+  0 0 0 1px rgba(0,0,0,.8) ring (hover -> --accent); .fcol-color-pop -> chrome
+  gradient + 4-layer shadow. A comment records that position:fixed does NOT
+  escape a stacking context, so nobody re-adds z-index to .m-body.
+
+VERIFIED (new scripts/z_fcol.mjs): drags the dialog down 380px so the colour row
+  sits near the viewport bottom, forcing the flip into the header, then probes
+  the overlap centre. After the fix: titleZ "auto", bodyZ "auto", hit
+  cls "cp-quick" / inPopup true / inTitle false, chain [{m-dialog,z:"1200"}]
+  (nothing trapping), occluded FALSE, errors: none. Screenshot
+  z-fcol-after-crop.png shows the popup covering the header with the title's
+  "▾ O..." and the X peeking out either side.
+
+REGRESSION CHECK (new scripts/z_switcher.mjs): the one behaviour the stacked-child
+  removal could plausibly have changed is the TITLE-BAR switcher menu, which lost
+  the shielding of .m-title's context. Opens a filter (Gaussian Blur) ->
+  .filter-switcher .m-menu-btn -> asserts the menu paints above the body it drops
+  over. Result: menuZ "62", titleZ/bodyZ "auto", overlap 371x51, hit
+  "fx-add-menu down" / inMenu true -- PASSES.
+
+ALSO repaired probe-suite rot, round 2 (both were ALREADY failing before this
+  change -- proved by temporarily reverting MovableDialog.css and re-running:
+  identical failures, so stale probes, not regressions):
+  - effects_probe: navigated .menu-panel .sub-panel submenus that no longer
+    exist (the Effects menubar item renders the FLAT, searchable
+    EffectBrowserMenu). Now opens .fx-add-menu, narrows via the live search box
+    (native value setter + input event, or the Svelte listener never fires),
+    then clicks the .fx-add-item whose label startsWith the effect label --
+    includes('Outline') also matches "Ink Outline...", a different effect.
+    Also input.fsl-range -> input.fsl-input: FilterSlider is a CUSTOM control,
+    there is no input[type=range]. Now: 49 effects, 0 shader errors, apply
+    pipeline swaps the surface + grows history, 0 page errors.
+  - fxpanel_probe: (a) read .layer-fx opacity 250ms after hover and asserted
+    === '1'; the reveal is a 120ms transition and headless compositing starts it
+    late, so it read 0.9393 -> now polls until the value SETTLES (3 stable rAF
+    samples). (b) asserted :hover on the badge, but the pointer is at the row's
+    centre and the badge sits at the row's far right -- it is
+    .layer-row:hover .layer-fx, so the ROW is the hover target. (c) hardcoded
+    ring RGBs 59,130,246 / 154,154,154, which drifted when the palette was
+    aligned -> now resolves --accent / --text-dim AT RUNTIME via a throwaway
+    span. (d) .fx-props .fsl-label -> .fsl-label-frame (renamed), and the
+    expected Feather labels are now DERIVED from the effect definition
+    (['Shrink','Blur']), not the old literal 'Feather' which was never a param
+    label at all.
+
+RULE for the probe suite: never hardcode a colour that comes from a CSS token,
+  and never assume a transition finished after a fixed sleep -- poll for the
+  settled value. Both classes of rot produced FALSE failures that looked like UI
+  bugs.
+
+VERIFIED: tsc clean; svelte-check 0 errors / 54 warnings (baseline held);
+  z_fcol.mjs + z_switcher.mjs + gizmo_imagesize_probe + layers_probe +
+  effects_probe + fxpanel_probe all PASS; errors: none.
+

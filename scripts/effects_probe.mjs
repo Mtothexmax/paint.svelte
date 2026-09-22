@@ -147,28 +147,41 @@ async function main() {
 			await sleep(250);
 			return title;
 		}
-		const subOpen = await page.evaluate((lbl) => {
-			const b = [...document.querySelectorAll('.menu-item .menu-text')]
-				.find((s) => s.textContent.trim() === lbl)?.closest('.sub-holder');
-			if (!b) return false;
-			b.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
-			return true;
-		}, menuLabel);
-		if (!subOpen) throw new Error('submenu not found: ' + menuLabel);
-		await sleep(250);
+		// The Effects menubar item renders the shared EffectBrowserMenu — a
+		// FLAT, searchable browser with columns per category (`.fx-add-menu`,
+		// `.fx-add-item`). The old nested `.menu-panel .sub-panel` submenus no
+		// longer exist, so this probe must go through the browser instead.
+		// `menuLabel` (the category) is now only informational — the browser
+		// groups by category itself.
+		void menuLabel;
+		await page.waitForSelector('.fx-add-menu', { timeout: 8000 });
+		await sleep(200);
+		// Narrow with the live filter first: it keeps the candidate list tiny
+		// and makes the prefix match below unambiguous.
+		await page.evaluate((lbl) => {
+			const s = document.querySelector('.fx-add-menu .fx-add-search');
+			if (!s) return;
+			// React/Svelte-controlled input: set the value through the native
+			// setter so the `input` listener actually fires.
+			const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+			setter.call(s, lbl);
+			s.dispatchEvent(new Event('input', { bubbles: true }));
+		}, effectLabel);
+		await sleep(350);
 		const itemText = hasParams ? effectLabel + '…' : effectLabel;
-		const res = await page.evaluate(
-			(lbl) => {
-				const h0 = window.__REGISTRY__.active.history.length;
-				const b = [...document.querySelectorAll('.menu-panel.sub-panel .menu-item .menu-text')]
-					.find((s) => (s.textContent || '').trim() === lbl)?.closest('.menu-item');
-				if (!b) return { clicked: false, h0 };
-				b.click();
-				return { clicked: true, h0 };
-			},
-			itemText
-		);
-		if (!res.clicked) throw new Error('effect menu item not found: ' + itemText);
+		const res = await page.evaluate((lbl) => {
+			const h0 = window.__REGISTRY__.active.history.length;
+			// PREFIX match, not `includes`: the command label for a param effect
+			// is e.g. "Outline…", and `includes('Outline')` would also hit
+			// "Ink Outline…" — a different effect entirely.
+			const b = [...document.querySelectorAll('.fx-add-menu .fx-add-item')].find((e) =>
+				(e.querySelector('.fx-add-item-label')?.textContent || '').trim().startsWith(lbl)
+			);
+			if (!b) return { clicked: false, h0 };
+			b.click();
+			return { clicked: true, h0 };
+		}, effectLabel);
+		if (!res.clicked) throw new Error('effect browser item not found: ' + itemText);
 		if (!hasParams) {
 			// Instant effect (no '…'): applies straight away.
 			const after = await page.evaluate(async (h0) => {
@@ -221,8 +234,11 @@ async function main() {
 		const histBefore = doc.history.length;
 		commands.run('effects.gaussianBlur');
 		await new Promise((r) => setTimeout(r, 400));
-		const slider = document.querySelector('.m-dialog input.fsl-range');
-		if (!slider) return { ok: false, reason: 'no fsl-range' };
+		// FilterSlider is a CUSTOM control (`.fsl`), not an `input[type=range]`:
+		// the editable value lives in `.fsl-input` (type=text) inside
+		// `.fsl-valuebox`, and its `oninput` calls setValue() straight away.
+		const slider = document.querySelector('.m-dialog input.fsl-input');
+		if (!slider) return { ok: false, reason: 'no fsl-input' };
 		slider.value = '30';
 		slider.dispatchEvent(new Event('input', { bubbles: true }));
 		slider.dispatchEvent(new Event('change', { bubbles: true }));

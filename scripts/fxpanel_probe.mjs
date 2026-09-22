@@ -77,13 +77,35 @@ async function main() {
 	const rowBox = await (await page.$('.layer-row')).boundingBox();
 	const idleOpacity = await page.evaluate(() => getComputedStyle(document.querySelector('.layer-fx')).opacity);
 	await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
-	await sleep(250);
-	const hoverOpacity = await page.evaluate(() => getComputedStyle(document.querySelector('.layer-fx')).opacity);
+	// The reveal is a 120ms `opacity` transition (LayersPanel.css). A fixed
+	// sleep reads it mid-flight (0.9393) because headless compositing can
+	// start the transition late — so poll until it SETTLES instead.
+	const hoverOpacity = await page.evaluate(async () => {
+		const el = document.querySelector('.layer-fx');
+		const deadline = performance.now() + 2000;
+		let last = '';
+		let stable = 0;
+		while (performance.now() < deadline) {
+			const o = getComputedStyle(el).opacity;
+			if (o === last) {
+				if (++stable >= 3) return o;
+			} else {
+				stable = 0;
+				last = o;
+			}
+			await new Promise((r) => requestAnimationFrame(r));
+		}
+		return getComputedStyle(el).opacity;
+	});
+	// NOTE: assert `:hover` on the ROW, not the badge — the badge sits at the
+	// row's far right while the pointer is at the row's centre, so the badge
+	// itself is never the hover target (`.layer-row:hover .layer-fx`).
+	const rowHovered = await page.evaluate(() => document.querySelector('.layer-row').matches(':hover'));
 	await page.evaluate(() => document.querySelector('.layer-fx')?.click());
 	await sleep(400);
 	const opened = await page.evaluate(() => !!document.querySelector('.fx-panel'));
-	log('[0] badge reveal + open:', JSON.stringify({ idleOpacity, hoverOpacity, opened }));
-	if (!(idleOpacity === '0' && hoverOpacity === '1' && opened)) throw new Error('panel open FAILED');
+	log('[0] badge reveal + open:', JSON.stringify({ idleOpacity, hoverOpacity, rowHovered, opened }));
+	if (!(idleOpacity === '0' && hoverOpacity === '1' && rowHovered && opened)) throw new Error('panel open FAILED');
 
 	// --- via service: add, toggle, copy, second layer, paste ---------------
 	const serviceStep = await page.evaluate(async () => {
@@ -252,7 +274,7 @@ async function main() {
 
 		const row = document.querySelector('.fx-props .fcol');
 		const btns = [...document.querySelectorAll('.fx-props .fcol-btn')].map((b) => b.textContent.replace(/\s+/g, ' ').trim());
-		const sliderLabels = [...document.querySelectorAll('.fx-props .fsl-label')].map((s) => s.textContent.trim());
+		const sliderLabels = [...document.querySelectorAll('.fx-props .fsl-label-frame')].map((s) => s.textContent.trim());
 		const stored = document.querySelector('.fx-props .fcol-stored')?.style?.background ?? null;
 
 		// choose a known foreground color, then click its button
@@ -297,6 +319,19 @@ async function main() {
 	const badge = await page.evaluate(async () => {
 		const { removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
 		const doc = window.__REGISTRY__.active;
+		// Resolve the palette TOKENS the ring is built from, instead of
+		// hardcoding RGB. These drifted once already when the chrome palette
+		// was aligned, which made a correct UI look like a failure.
+		const token = (name) => {
+			const probe = document.createElement('span');
+			probe.style.color = `var(${name})`;
+			document.body.appendChild(probe);
+			const c = getComputedStyle(probe).color;
+			probe.remove();
+			return c;
+		};
+		const accent = token('--accent');
+		const textDim = token('--text-dim');
 		const withFx = !!document.querySelector('.layer-fx.hasFx');
 		const ringWith = getComputedStyle(document.querySelector('.layer-fx')).boxShadow;
 		const fcolDir = getComputedStyle(document.querySelector('.fx-props .fcol')).flexDirection;
@@ -306,14 +341,15 @@ async function main() {
 		await new Promise((r) => setTimeout(r, 300));
 		const withoutFx = !document.querySelector('.layer-fx.hasFx') && !!document.querySelector('.layer-fx');
 		const ringWithout = getComputedStyle(document.querySelector('.layer-fx')).boxShadow;
-		return { withFx, ringWith, fcolDir, withoutFx, ringWithout };
+		return { withFx, ringWith, accent, fcolDir, withoutFx, ringWithout, textDim };
 	});
 	log('[5] badge + single-row:', JSON.stringify(badge));
+	// `.layer-fx.hasFx.on` rings with --accent; plain `.layer-fx.on` with --text-dim.
 	const badgeOk =
 		badge.withFx === true &&
-		/59,\s*130,\s*246/.test(badge.ringWith) &&
+		badge.ringWith.includes(badge.accent) &&
 		badge.withoutFx === true &&
-		/154,\s*154,\s*154/.test(badge.ringWithout) &&
+		badge.ringWithout.includes(badge.textDim) &&
 		badge.fcolDir === 'row';
 
 	// --- [6] drag & drop reorder via synthetic DragEvents -------------------
@@ -393,7 +429,11 @@ async function main() {
 		await clear();
 		addLayerEffect(layer.id, 'feather', getSettings('effects.feather', effectById('feather').defaults));
 		await new Promise((r) => setTimeout(r, 400));
-		const sliderLabels = [...document.querySelectorAll('.fx-props .fsl-label')].map((s) => s.textContent.trim());
+		const sliderLabels = [...document.querySelectorAll('.fx-props .fsl-label-frame')].map((s) => s.textContent.trim());
+		// Derive the expectation from the effect definition rather than
+		// hardcoding labels — "Feather" was never a param label (the params
+		// are Shrink + Blur), so the old literal list was simply wrong.
+		const featherLabels = effectById('feather').params.map((p) => p.label);
 
 		await clear();
 		addLayerEffect(layer.id, 'addNoise', getSettings('effects.addNoise', effectById('addNoise').defaults));
@@ -407,12 +447,11 @@ async function main() {
 		document.querySelector('.fx-props input[type=checkbox]')?.click();
 		await new Promise((r) => setTimeout(r, 350));
 		const afterOn = doc.activeLayer.effects.find((e) => e.id === 'addNoise')?.settings?.linkAlpha;
-		return { sliderLabels, boxLabel, initiallyChecked, afterOff, afterOn };
+		return { sliderLabels, featherLabels, boxLabel, initiallyChecked, afterOff, afterOn };
 	});
 	log('[8] panel widgets:', JSON.stringify(widgets));
 	const widgetsOk =
-		widgets.sliderLabels.includes('Feather') &&
-		widgets.sliderLabels.includes('Shrink') &&
+		JSON.stringify(widgets.sliderLabels) === JSON.stringify(widgets.featherLabels) &&
 		widgets.boxLabel === 'Link to alpha' &&
 		widgets.initiallyChecked === true &&
 		widgets.afterOff === 0 &&

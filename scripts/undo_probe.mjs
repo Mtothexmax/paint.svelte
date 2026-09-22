@@ -51,10 +51,15 @@ async function main() {
 				case 'blur':
 					commands.run('effects.gaussianBlur');
 					await new Promise((r) => setTimeout(r, 300));
-					const slider = document.querySelector('.m-dialog input.fsl-range');
-					slider.value = '30';
+					// FilterSlider is a CUSTOM control — there is NO
+					// `input[type=range]`; the value field is `.fsl-input`
+					// (see the paint-verify-ui skill). `.fsl-range` matched
+					// nothing, so `slider.value` threw on null and the whole
+					// undo probe died before it tested anything.
+					const slider = document.querySelector('.m-dialog input.fsl-input');
+					if (!slider) throw new Error('gaussianBlur dialog has no .fsl-input');
+					Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(slider, '30');
 					slider.dispatchEvent(new Event('input', { bubbles: true }));
-					slider.dispatchEvent(new Event('change', { bubbles: true }));
 					await new Promise((r) => setTimeout(r, 200));
 					document.querySelector('.m-dialog .btn-primary')?.click();
 					break;

@@ -5,7 +5,8 @@
 	// on the LEFT of Cancel/Apply, and a ▾ triangle button at the top-left
 	// of the title bar that opens the filter menu to REPLACE the current
 	// filter, plus ‹ › steppers at the top-right. Generic over any effect
-	// id — used for every applied filter (see DialogHost).
+	// id — used for every applied filter AND every dialog-based adjustment
+	// (see DialogHost). An adjustment window browses adjustments only.
 	import { onMount } from 'svelte';
 	import MovableDialog from '../common/MovableDialog.svelte';
 	import EffectBrowserMenu from '../common/EffectBrowserMenu.svelte';
@@ -20,12 +21,22 @@
 	import AnglePicker from '../common/AnglePicker.svelte';
 	import XyParam from '../common/XyParam.svelte';
 	import { getEditorRenderer } from '../../render/EditorRenderer';
-	import { applyEffect, effectById, effectMenusWithEntries } from '../../effects';
+	import {
+		ADJUSTMENTS_MENU,
+		applyEffect,
+		effectById,
+		effectMenusWithEntries
+	} from '../../effects';
 	import type { EffectSettings } from '../../effects';
-	import { closeDialog, openDialog } from '../../services/dialogService';
-	import type { DialogKind } from '../../services/dialogService';
+	import { closeDialog } from '../../services/dialogService';
 	import { getSettings, saveSettings } from '../../services/settingsService';
 	import { rememberLastApplied } from '../../state/repeat';
+	import {
+		adjustmentDialogOrder,
+		adjustmentDialogs,
+		attachSwitcherDismiss,
+		switchAdjustment
+	} from './adjustmentSwitcher';
 
 	interface Props {
 		effectId: string;
@@ -42,18 +53,21 @@
 
 	const noop = $derived(!!def && !!def.isNoop && def.isNoop(settings));
 
+	// An adjustment window browses ONLY dialog-based adjustments (same ▾ + ‹ ›
+	// chrome as filters, but its own cycle); a filter window browses filters.
+	const isAdjustment = def?.menu === ADJUSTMENTS_MENU;
+	const kindWord = isAdjustment ? 'adjustment' : 'filter';
+
 	// Whole filter list in browser-menu order for the ‹ › steppers.
 	// Wraps around both ends.
 	const filterOrder: string[] = effectMenusWithEntries.flatMap((g) =>
 		g.effects.map((e) => e.id)
 	);
-	const orderIndex = filterOrder.indexOf(effectId);
+	const order = isAdjustment ? adjustmentDialogOrder : filterOrder;
+	const orderIndex = order.indexOf(effectId);
 	const prevId =
-		orderIndex >= 0
-			? filterOrder[(orderIndex - 1 + filterOrder.length) % filterOrder.length]
-			: effectId;
-	const nextId =
-		orderIndex >= 0 ? filterOrder[(orderIndex + 1) % filterOrder.length] : effectId;
+		orderIndex >= 0 ? order[(orderIndex - 1 + order.length) % order.length] : effectId;
+	const nextId = orderIndex >= 0 ? order[(orderIndex + 1) % order.length] : effectId;
 	const prevDef = effectById(prevId);
 	const nextDef = effectById(nextId);
 
@@ -91,43 +105,25 @@
 		closeDialog();
 	}
 
-	/** Replace the current filter: clear its preview and open the picked
-	 * filter's dialog (DialogHost remounts by effect id). Mirrors the
-	 * command routing in services/commands.ts — effects with a custom
-	 * `dialog` override (e.g. Curves) open their dedicated dialog instead
-	 * of the generic popup. */
+	/** Replace the current filter/adjustment: clear its preview and open the
+	 * picked entry's dialog (DialogHost remounts by effect id). Mirrors the
+	 * command routing in services/commands.ts — entries with a custom
+	 * `dialog` override (e.g. Curves, Levels) open their dedicated dialog
+	 * instead of the generic popup. */
 	function switchFilter(id: string) {
 		switcherOpen = false;
 		if (id === effectId) return;
-		getEditorRenderer().setActiveLayerFilterPreview(null);
-		const target = effectById(id);
-		openDialog(
-			(target?.dialog ?? 'effect') as NonNullable<DialogKind>,
-			target?.dialog ? undefined : { effectId: id }
-		);
+		switchAdjustment(id);
 	}
 
 	onMount(() => {
 		preview();
-		// First Escape closes the switcher menu (capture runs before
-		// MovableDialog's bubble handler, which would close the dialog).
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape' && switcherOpen) {
-				e.stopPropagation();
-				switcherOpen = false;
-			}
-		};
-		// Clicking anywhere outside the switcher closes it (the click itself
-		// still goes through — no stopPropagation here).
-		const onPointerDown = (e: MouseEvent) => {
-			if (switcherOpen && !(e.target as HTMLElement | null)?.closest('.filter-switcher'))
-				switcherOpen = false;
-		};
-		window.addEventListener('keydown', onKey, true);
-		document.addEventListener('mousedown', onPointerDown, true);
+		const detachSwitcher = attachSwitcherDismiss(
+			() => switcherOpen,
+			() => (switcherOpen = false)
+		);
 		return () => {
-			window.removeEventListener('keydown', onKey, true);
-			document.removeEventListener('mousedown', onPointerDown, true);
+			detachSwitcher();
 			getEditorRenderer().setActiveLayerFilterPreview(null);
 		};
 	});
@@ -139,16 +135,17 @@
 			<span class="filter-switcher">
 				<button
 					class="m-menu-btn"
-					title="Change filter"
-					aria-label="Change filter"
+					title="Change {kindWord}"
+					aria-label="Change {kindWord}"
 					aria-expanded={switcherOpen}
 					onclick={() => (switcherOpen = !switcherOpen)}
 				><img src={SwitchIcon} class="m-btn-ic" alt="" draggable="false" /></button>
 				{#if switcherOpen}
 					<EffectBrowserMenu
 						placement="down"
-						ariaLabel="Replace filter"
+						ariaLabel="Replace {kindWord}"
 						isEnabled={() => true}
+						groups={isAdjustment ? [{ label: ADJUSTMENTS_MENU, effects: adjustmentDialogs }] : undefined}
 						onPick={switchFilter}
 					/>
 				{/if}
@@ -160,13 +157,13 @@
 				<button
 					class="m-menu-btn"
 					title={prevDef.label}
-					aria-label="Previous filter: {prevDef.label}"
+					aria-label="Previous {kindWord}: {prevDef.label}"
 					onclick={() => switchFilter(prevId)}
 				><img src={PrevIcon} class="m-btn-ic" alt="" draggable="false" /></button>
 				<button
 					class="m-menu-btn"
 					title={nextDef.label}
-					aria-label="Next filter: {nextDef.label}"
+					aria-label="Next {kindWord}: {nextDef.label}"
 					onclick={() => switchFilter(nextId)}
 				><img src={NextIcon} class="m-btn-ic" alt="" draggable="false" /></button>
 			{/if}

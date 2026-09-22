@@ -98,17 +98,28 @@ async function main() {
 	log('   before:', JSON.stringify(BEFORE.samples));
 	const same = (a, b) => a.every((v, i) => v === b[i]);
 
-	log('[4] open Clouds dialog at max Grainyness (400) and check the LIVE preview');
+	log('[4] open Clouds dialog, max all params, and check the LIVE preview');
 	await page.evaluate(async () => {
 		const { commands } = await import('/paint.svelte/src/lib/services/commandRegistry.ts');
 		commands.run('effects.clouds');
 		await new Promise((r) => setTimeout(r, 400));
-		const sliders = [...document.querySelectorAll('.m-dialog input.fsl-range')];
-		const grain = sliders[2];
-		if (!grain) throw new Error('grainyness slider not found');
-		grain.value = '400';
-		grain.dispatchEvent(new Event('input', { bubbles: true }));
-		grain.dispatchEvent(new Event('change', { bubbles: true }));
+		// FilterSlider is a CUSTOM control — there is NO `input[type=range]`, so
+		// the old `.fsl-range` selector matched nothing and this step silently
+		// did nothing (see the paint-verify-ui skill). Also, Clouds no longer
+		// has a "Grainyness" param at all — it is Scale / Power / Seed now — so
+		// pin all three to their max for a strong, unmistakable preview.
+		const rows = [...document.querySelectorAll('.m-dialog .fsl')];
+		if (rows.length !== 3) throw new Error(`expected 3 Clouds sliders, found ${rows.length}`);
+		for (const row of rows) {
+			const input = row.querySelector('input.fsl-input');
+			if (!input) throw new Error('Clouds slider has no .fsl-input');
+			const max = Number(row.querySelector('.fsl-track')?.getAttribute('aria-valuemax'));
+			Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(
+				input,
+				String(Number.isFinite(max) ? max : 255)
+			);
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+		}
 		await new Promise((r) => setTimeout(r, 400));
 	});
 	const PREVIEW = await previewAt([{ x: 2, y: 2 }, { x: 25, y: 25 }]);

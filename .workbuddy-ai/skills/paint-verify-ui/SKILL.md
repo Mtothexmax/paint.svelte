@@ -604,20 +604,120 @@ that to prove the close button works (see the pointer-capture gotcha below).
   `backgroundImage` against the reference component's — `linear-gradient(…)` vs
   a bare `rgb(…)` is the tell. See the chrome-bar recipe in the project
   `MEMORY.md` (`.m-title` vs `.color-mode-head`).
+- **Poll for a settled transition — a fixed sleep reads it mid-flight.** The
+  same family as the `filter` case above, and it bit again on
+  `.layer-fx`'s `transition: opacity 120ms ease`: a read 250 ms after
+  `page.mouse.move()` returned **`0.9393`**, and the probe's `=== '1'` assertion
+  failed on a perfectly working reveal. Headless compositing can start a
+  transition late, so *any* fixed wait is a guess. Poll until the value stops
+  changing instead:
+  ```js
+  const settled = await page.evaluate(async (sel) => {
+    const el = document.querySelector(sel);
+    const deadline = performance.now() + 2000;
+    let last = '', stable = 0;
+    while (performance.now() < deadline) {
+      const o = getComputedStyle(el).opacity;
+      if (o === last) { if (++stable >= 3) return o; } else { stable = 0; last = o; }
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return getComputedStyle(el).opacity;
+  }, '.layer-fx');
+  ```
+- **Assert `:hover` on the element that OWNS the hover rule, not the one you are
+  measuring.** `.layer-fx` is revealed by `.layer-row:hover .layer-fx`; the badge
+  sits at the row's far right while the probe's pointer is at the row's centre,
+  so `badge.matches(':hover')` is **false** on a healthy UI. Assert the *row*.
+  (And note `el.click()` still opens the panel regardless — which is exactly why
+  the wrong assertion can sit in a probe for months.)
+- **Never hardcode a colour that comes from a CSS token.** `fxpanel_probe`
+  asserted the fx-badge ring as `/59,\s*130,\s*246/` and `/154,\s*154,\s*154/`;
+  when the chrome palette was aligned those became `rgb(44,111,224)` (`--accent`)
+  and `rgb(141,146,156)` (`--text-dim`), so a correct UI reported FAIL. Resolve
+  the token at runtime instead:
+  ```js
+  const token = (name) => {                      // -> "rgb(44, 111, 224)"
+    const p = document.createElement('span');
+    p.style.color = `var(${name})`;
+    document.body.appendChild(p);
+    const c = getComputedStyle(p).color;
+    p.remove();
+    return c;
+  };
+  // assert badge.ringWith.includes(token('--accent'))
+  ```
+- **Derive expected labels from the effect DEFINITION, not from literals.**
+  `fxpanel_probe` asserted the Feather dialog shows a `'Feather'` slider — there
+  has never been such a param; they are `Shrink` + `Blur`. Use
+  `effectById('feather').params.map((p) => p.label)` so the expectation tracks the
+  registry. (Same spirit as reading values back instead of pinning them.)
+- **Match an effect's label with `startsWith`, not `includes`.** Effect labels
+  are not unique by substring: `includes('Outline')` also selects **"Ink
+  Outline…"**, a completely different effect with no `kind:'color'` param — so a
+  probe expecting `.fcol-stored` finds nothing and looks like a UI bug. Match
+  `/^Outline/` against `.fx-add-item-label` (and search-filter first, which makes
+  the candidate list unambiguous).
 
 ## Z-order / stacking-context checks
 
 A `z-index` is relative to its nearest positioned ancestor's **stacking context**
 and cannot escape it, so "the menu is 80, the dialog is 1200, therefore the menu
-is under the dialog" is not something you can read off the source. Two traps,
-both hit for real:
+is under the dialog" is not something you can read off the source.
 
-- **`.m-dialog > * { position: relative; z-index: 1 }`** gives *every* direct
-  child its own stacking context. The filter-switcher menu anchored in the title
-  bar is therefore capped inside the title bar's context — and `.m-body` /
-  `.m-footer` are later siblings at the same level, so they painted straight over
-  the open menu even though the menu's own `z-index` was 60. Fix: raise the title
-  bar (`.m-dialog > .m-title { z-index: 2 }`).
+- **A dialog hosts popups in TWO places that pull in opposite directions — so no
+  child of `.m-dialog` may declare a `z-index`.** This is the trap, and the
+  "obvious" fix for it is wrong:
+  - the **title bar** owns the filter switcher's effect browser
+    (`.fx-add-menu.down`, `z-index: 62`);
+  - the **body** owns the effect colour picker (`.fcol-color-pop`,
+    `z-index: 1300`), which `clampPopup()` flips **above** its swatch when there
+    is no room below — exactly when it collides with `.m-title`.
+
+  The code used to be `.m-dialog > * { position: relative; z-index: 1 }` plus
+  `.m-dialog > .m-title { z-index: 2 }`. That gives `.m-body` its own stacking
+  context, so the colour picker's `1300` was **trapped inside a `z-index: 1`
+  box** and the title's `2` outranked it — the picker painted *under* the header.
+  Raising the title's `z-index` (which this file previously advised, and which was
+  applied at the time) only makes it worse, and raising the picker's own
+  `z-index` can never help: **`position: fixed` escapes overflow/clipping but
+  NEVER a stacking context.** Whichever parent outranks the other hides the
+  *other's* popup, so no numeric value satisfies both.
+
+  Fix: leave `.m-dialog > *` at `position: relative` with **no `z-index`** (and
+  no per-child `z-index` rule at all), so every popup lives in the dialog's own
+  stacking context and the two simply compare real z-indexes
+  (`1300 > 62 > plain content`) — **both** win. Put the grain overlay at
+  `z-index: -1` so it stays above the dialog's gradient but below content.
+
+  Whenever a z-index complaint arrives, dump the **trapping chain** before
+  touching any number — it names the real culprit in one line:
+  ```js
+  const chain = await page.evaluate(() => {
+    const out = []; let el = document.querySelector('.fcol-color-pop')?.parentElement;
+    while (el && el !== document.body) {
+      const cs = getComputedStyle(el);
+      if (cs.zIndex !== 'auto' || cs.transform !== 'none' ||
+          cs.filter !== 'none' || cs.isolation === 'isolate')
+        out.push({ cls: String(el.className).slice(0, 40), z: cs.zIndex, pos: cs.position });
+      el = el.parentElement;
+    }
+    return out;
+  });
+  // [{m-body, z:"1"}, {m-dialog, z:"1200"}]  -> .m-body is the trap
+  ```
+  And check the *siblings* too (`titleZ` / `bodyZ` both being `"auto"` is the
+  healthy state).
+- **A popup that FLIPS position is the hard case to test.** `.fcol-color-pop`
+  sits above its swatch normally and below nothing; the bug only appears once
+  `clampPopup()` flips it into the header, i.e. when the swatch is near the
+  viewport bottom. So the probe must **drag the dialog down first** (380px works)
+  before opening the popup — opening it wherever the dialog happens to land tests
+  the easy path and passes while the bug is live. See `scripts/z_fcol.mjs`.
+- **Removing a stacking context changes the OTHER popup in the same subtree.**
+  Killing the per-child `z-index` also removed the shield the title-bar switcher
+  menu enjoyed. Re-check it explicitly (`scripts/z_switcher.mjs`: open a filter →
+  `.filter-switcher .m-menu-btn` → assert the menu paints over the body it drops
+  down across). A stacking fix is never local to the popup you were shown.
 - **`elementFromPoint` is 3d-aware and reports what actually receives the
   click**, so it is the right oracle — but sampling only the menu's centre misses
   a partial overlap. **Grid-sample the intersection** and count the hits:

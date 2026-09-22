@@ -6,6 +6,7 @@
 	// - MenuBar passes an onPick that runs the APPLIED (destructive) command.
 	import { onMount } from 'svelte';
 	import { effectMenusWithEntries } from '../../effects';
+	import type { ResolvedEffect } from '../../effects';
 
 	import BlurIcon from '@material-symbols/svg-400/rounded/blur_on.svg';
 	import DistortIcon from '@material-symbols/svg-400/rounded/transform.svg';
@@ -20,6 +21,9 @@
 		getLabel?: (effectId: string, fallback: string) => string;
 		isEnabled?: (effectId: string) => boolean;
 		getShortcut?: (effectId: string) => string | undefined;
+		/** Effect groups to browse. Defaults to the Effects submenus —
+		 * pass a single Adjustments group to browse adjustments instead. */
+		groups?: readonly { label: string; effects: readonly ResolvedEffect[] }[];
 		/** Element the menu is anchored to (e.g. the button that opened it).
 		 * Used for the first-paint bounds before the menu itself is measured.
 		 * Optional — falls back to the menu's own rect. */
@@ -36,6 +40,7 @@
 		getLabel,
 		isEnabled,
 		getShortcut,
+		groups = effectMenusWithEntries,
 		anchorEl = null,
 		placement = 'up',
 		ariaLabel = 'Choose effect',
@@ -89,8 +94,8 @@
 	 * (e.g. with "…") match what the user sees. */
 	const visibleGroups = $derived.by(() => {
 		const q = filter.trim().toLowerCase();
-		if (!q) return effectMenusWithEntries;
-		return effectMenusWithEntries
+		if (!q) return groups;
+		return groups
 			.map((g) => {
 				if (g.label.toLowerCase().includes(q)) return g;
 				const effects = g.effects.filter((e) => {

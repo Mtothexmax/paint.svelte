@@ -37,22 +37,34 @@
 	opacity: 0.22;
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
 	mix-blend-mode: overlay;
-	/* Stay just below interactive content but above the gradient bg. */
-	z-index: 0;
+	/* NEGATIVE, so it sits above the dialog's own gradient background but
+	   below every piece of content. It used to be 0 with the children lifted
+	   to 1 — see the stacking note below for why that had to change. */
+	z-index: -1;
 }
 .m-dialog > * {
-	/* Lift content above the grain layer. */
+	/* `position: relative` with NO `z-index` on purpose: the children must NOT
+	   create stacking contexts. See the note below. */
 	position: relative;
-	z-index: 1;
 }
-/* The title bar OWNS the popups anchored in it (the filter switcher's effect
-   browser). Because every direct child above is z-index 1, the menu's own
-   z-index is trapped inside the title bar's stacking context — and the body
-   and footer are later siblings at the same level, so they painted straight
-   over an open menu. The title bar has to outrank them. */
-.m-dialog > .m-title {
-	z-index: 2;
-}
+/* ---- why no child of .m-dialog may declare a z-index ------------------
+   A dialog hosts popups in TWO places, and they pull in opposite directions:
+     • the TITLE BAR owns the filter switcher's effect browser (.fx-add-menu,
+       z-index 80 in EffectBrowserMenu.css);
+     • the BODY owns the effect colour picker (.fcol-color-pop, z-index 1300
+       in EffectColorRow.css).
+   Giving each direct child its own stacking context (`z-index: 1`, plus
+   `z-index: 2` on the title) made those two demands contradictory: the
+   popup's own z-index is trapped inside its parent's context, so whichever
+   parent outranked the other hid the other's popup. Title at 2 meant the
+   colour picker — which is inside the body, and which flips ABOVE its swatch
+   when there is no room below — painted UNDERNEATH the header.
+   `position: fixed` does not help: it escapes overflow/clipping, never a
+   stacking context.
+   Leaving the children at `z-index: auto` puts everything in the dialog's own
+   stacking context, where the two popups simply compare their real z-indexes
+   (1300 > 80 > plain content) and both win. The grain goes negative so it
+   still stays under the content. */
 
 .m-title {
 	display: flex;
@@ -86,6 +98,15 @@
 	align-items: center;
 	gap: 2px;
 	flex: 0 0 auto;
+}
+
+/* Anchor for the ▾ switcher menu (filter AND adjustment dialogs): the
+   browser menu positions itself below this. Lives here (not in the
+   dialog CSS) so every MovableDialog-based switcher gets it. */
+.filter-switcher {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
 }
 
 /* Title-bar buttons (▾ triangle, ‹ › steppers, ✕ close) — all share the
