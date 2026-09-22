@@ -26,10 +26,17 @@
 	overflow-x: auto;
 	overflow-y: auto;
 	padding: 12px;
-	background: var(--bg-elev);
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+	/* Same chrome plate as the other menus (.menu-panel): gradient shell,
+	   black hairline, inset top highlight, layered drop-shadow. The outer
+	   shadow points the way the menu opens. */
+	background-color: var(--chrome-lo);
+	background-image: linear-gradient(180deg, var(--chrome-hi), var(--chrome-lo));
+	border: 1px solid rgba(0, 0, 0, 0.7);
+	border-radius: 8px;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.1) inset,
+		0 -16px 32px -8px rgba(0, 0, 0, 0.7),
+		0 -2px 6px rgba(0, 0, 0, 0.5);
 	/* Real CSS multi-column flow — the column-width itself is injected
 	   inline so it tracks the widest item in the menu at open time.
 	   `column-fill: auto` lets columns balance at the end instead of
@@ -39,12 +46,17 @@
 	column-gap: 16px;
 	column-fill: auto;
 }
-/* Dropdown variant (MenuBar): opens DOWNWARD from the menu button. */
+/* Dropdown variant (MenuBar): opens DOWNWARD from the menu button. Sits one
+   step above the plain menu panels (60) and their sub-panels (61) so a tall
+   browser is never clipped by a neighbouring menu. */
 .fx-add-menu.down {
 	top: calc(100% + 4px);
 	bottom: auto;
-	z-index: 60;
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+	z-index: 62;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.1) inset,
+		0 16px 32px -8px rgba(0, 0, 0, 0.7),
+		0 2px 6px rgba(0, 0, 0, 0.5);
 }
 /* Live filter field (font-dropdown pattern): spans all columns on top. */
 .fx-add-search-row {
@@ -55,19 +67,23 @@
 	width: 100%;
 	box-sizing: border-box;
 	padding: 6px 10px;
-	background: var(--bg);
-	border: 1px solid var(--border);
+	background: var(--well);
+	border: 1px solid rgba(0, 0, 0, 0.7);
 	border-radius: 5px;
 	color: var(--text);
 	font-size: 13px;
 	font-family: inherit;
 	outline: none;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) inset;
 }
 .fx-add-search::placeholder {
-	color: var(--text-dim);
+	color: var(--text-faint);
 }
 .fx-add-search:focus {
-	border-color: var(--accent);
+	border-color: var(--accent-ring);
+	box-shadow:
+		0 1px 2px rgba(0, 0, 0, 0.5) inset,
+		0 0 0 1px rgba(60, 130, 255, 0.35);
 }
 .fx-add-empty {
 	column-span: all;
@@ -85,11 +101,11 @@
 	padding: 6px 8px;
 	font-size: 12px;
 	font-weight: 600;
-	color: var(--text-bright, var(--text));
-	background: rgba(255, 255, 255, 0.03);
+	color: var(--text-dim);
+	background: rgba(255, 255, 255, 0.04);
 	border: none;
-	border-left: 3px solid var(--accent);
-	border-radius: 3px;
+	border-left: 2px solid rgba(60, 130, 255, 0.55);
+	border-radius: 4px;
 	text-align: left;
 	user-select: none;
 	font-family: inherit;
@@ -131,16 +147,20 @@
 	color: var(--text);
 	background: transparent;
 	border: none;
-	border-radius: 2px;
+	border-radius: 5px;
 	text-align: left;
 	cursor: pointer;
 	font-family: inherit;
-	transition: background-color 0.1s ease;
+	transition:
+		background-color 80ms ease,
+		color 80ms ease;
 	/* No break rule — items flow freely across columns. */
 }
+/* Same hover as the plain menus' rows, so both menu types feel like one
+   control surface. */
 .fx-add-item:not(:disabled):hover {
-	background: rgba(255, 255, 255, 0.08);
-	color: var(--text-bright, var(--text));
+	background: rgba(60, 130, 255, 0.25);
+	color: #fff;
 }
 .fx-add-item:disabled {
 	opacity: 0.35;
@@ -152,10 +172,10 @@
 	text-align: center;
 	font-size: 14px;
 	line-height: 1;
-	color: #888;
+	color: var(--text-dim);
 }
 .fx-add-item:not(:disabled):hover .fx-add-ic {
-	color: var(--accent);
+	color: var(--accent-ring);
 }
 .fx-add-item-label {
 	flex: 1 1 auto;
@@ -168,13 +188,20 @@
 	flex: 0 0 auto;
 	margin-left: auto;
 	padding-left: 12px;
-	color: #888;
+	color: var(--text-faint);
 	font-size: 11px;
 	white-space: nowrap;
 }
-/* Separator between the optional repeat row and the browser columns. */
+/* Separator between the optional repeat row and the browser columns —
+   matches .menu-separator so the two menu types agree. */
 .fx-add-sep {
 	height: 1px;
 	margin: 6px 2px 8px;
-	background: var(--border);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.12) 15%,
+		rgba(255, 255, 255, 0.12) 85%,
+		transparent
+	);
 }

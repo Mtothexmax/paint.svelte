@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selection toolbar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+        colors: {
+          chrome: { hi:'#2b2e34', lo:'#1a1c20', bar1:'#34383f', bar2:'#22252a' },
+          well: '#0b0c0e',
+          ink: { DEFAULT:'#e7e9ee', dim:'#8d929c', faint:'#5d626c' },
+          accent: { DEFAULT:'#2c6fe0', glow:'#3c82ff', ring:'#6fd4ff' }
+        }
+      }
+    }
+  }
+</script>
+<style>
+  /*
+    Kept as scoped CSS for the same reason as the opacity-slider page:
+    multi-layer inset shadows, a repeating grain background, and a couple
+    of pseudo-element details that Tailwind's utilities don't express as
+    a single class. Everything else on this page is Tailwind utilities.
+  */
+  ::selection{ background:#2c6fe0; color:#fff; }
+
+  .grain::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.18;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+  .bar-shadow{
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.09) inset,
+      0 -1px 0 rgba(0,0,0,.5) inset,
+      0 10px 24px -12px rgba(0,0,0,.65);
+  }
+  .seg-well{ box-shadow:0 2px 5px rgba(0,0,0,.7) inset, 0 0 0 1px rgba(0,0,0,.8); }
+  .seg-btn.on{
+    background:linear-gradient(180deg,#3f82f2,#2c6fe0 55%,#2158b8);
+    box-shadow:0 1px 0 rgba(255,255,255,.28) inset, 0 1px 3px rgba(0,0,0,.5), 0 0 10px rgba(60,130,255,.28);
+    color:#fff;
+  }
+  .ddown-shadow{ box-shadow:0 1px 0 rgba(255,255,255,.1) inset, 0 1px 2px rgba(0,0,0,.5); }
+  .crop-btn{
+    box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 1px 3px rgba(0,0,0,.5), 0 0 0 1px rgba(60,130,255,.35);
+  }
+  .crop-btn:hover{ box-shadow:0 1px 0 rgba(255,255,255,.22) inset, 0 1px 4px rgba(0,0,0,.55), 0 0 0 1px rgba(111,212,255,.55), 0 0 10px rgba(60,130,255,.25); }
+  .divider{ background:linear-gradient(180deg,transparent,rgba(255,255,255,.12) 30%,rgba(255,255,255,.12) 70%,transparent); }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body class="min-h-screen m-0 flex items-center justify-center p-6 font-sans text-ink select-none
+             bg-[radial-gradient(120%_100%_at_50%_0%,#111214,#050506)] antialiased">
+
+<div class="w-full max-w-[880px] relative overflow-hidden rounded-[8px] border border-black/60 grain bar-shadow
+            bg-gradient-to-b from-chrome-bar1 to-chrome-bar2 h-12">
+
+  <div class="relative h-full w-full flex items-center gap-3 px-3 text-[12px]">
+
+    <span class="text-ink-dim font-medium whitespace-nowrap">Mode:</span>
+
+    <div id="modeSeg" role="group" aria-label="Selection mode"
+         class="seg-well flex gap-0.5 p-0.5 rounded-[7px] bg-[#0d0f11]">
+      <button data-mode="replace" title="Replace the selection" aria-pressed="true"
+              class="seg-btn on flex items-center gap-1 px-2.5 py-1 rounded-md border-0 cursor-pointer
+                     text-[12px] font-medium text-ink-dim whitespace-nowrap transition-[background,box-shadow,color] duration-100">
+        <span aria-hidden="true">⛶</span>Replace
+      </button>
+      <button data-mode="add" title="Add to the selection" aria-pressed="false"
+              class="seg-btn flex items-center gap-1 px-2.5 py-1 rounded-md border-0 cursor-pointer
+                     text-[12px] font-medium text-ink-dim hover:text-ink whitespace-nowrap transition-[background,box-shadow,color] duration-100">
+        <span aria-hidden="true">+</span>Add
+      </button>
+      <button data-mode="subtract" title="Subtract from the selection" aria-pressed="false"
+              class="seg-btn flex items-center gap-1 px-2.5 py-1 rounded-md border-0 cursor-pointer
+                     text-[12px] font-medium text-ink-dim hover:text-ink whitespace-nowrap transition-[background,box-shadow,color] duration-100">
+        <span aria-hidden="true">−</span>Subtract
+      </button>
+    </div>
+
+    <span class="divider w-px h-6 flex-none" aria-hidden="true"></span>
+
+    <span class="text-ink-dim font-medium whitespace-nowrap">Ratio:</span>
+
+    <div class="relative">
+      <div class="ddown-shadow flex items-stretch rounded-md border border-black/60 overflow-hidden
+                  bg-gradient-to-b from-[#3a3e45] to-[#272a2f]">
+        <button id="ratioCycleBtn" title="Click to cycle through ratios"
+                class="flex items-center gap-1.5 pl-2.5 pr-2.5 py-1.5 border-0 cursor-pointer
+                       text-[12px] font-medium text-ink whitespace-nowrap hover:brightness-[1.15]
+                       transition-[filter] duration-100 active:translate-y-px">
+          <span aria-hidden="true" class="text-ink-dim">⛶</span>
+          <span id="ratioLabel">Free Ratio</span>
+        </button>
+
+        <span class="w-px my-1.5 bg-black/50 shadow-[1px_0_0_rgba(255,255,255,.08)]" aria-hidden="true"></span>
+
+        <button id="ratioMenuBtn" aria-haspopup="listbox" aria-expanded="false" title="Choose a ratio"
+                class="flex items-center px-2 border-0 cursor-pointer hover:brightness-[1.15]
+                       transition-[filter] duration-100 active:translate-y-px">
+          <span id="ratioArrow" class="text-ink-faint text-[10px] transition-transform duration-150">▾</span>
+        </button>
+      </div>
+
+      <ul id="ratioMenu" role="listbox" tabindex="-1"
+          class="hidden absolute left-0 top-[calc(100%+6px)] z-20 w-40 py-1 rounded-[7px] border border-black/70
+                 bg-gradient-to-b from-chrome-hi to-chrome-lo shadow-[0_16px_32px_-8px_rgba(0,0,0,.7),0_1px_0_rgba(255,255,255,.1)_inset]
+                 text-[12px] max-h-64 overflow-y-auto">
+        <li role="option" data-value="Free Ratio" aria-selected="true"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink hover:bg-accent/25">Free Ratio</li>
+        <li role="option" data-value="Original" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">Original</li>
+        <li role="option" data-value="1:1 Square" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">1:1 Square</li>
+        <li role="option" data-value="4:3" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">4:3</li>
+        <li role="option" data-value="3:2" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">3:2</li>
+        <li role="option" data-value="5:4" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">5:4</li>
+        <li role="option" data-value="16:9" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">16:9</li>
+        <li role="option" data-value="21:9 Cinematic" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">21:9 Cinematic</li>
+        <li role="option" data-value="2:3 Portrait" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">2:3 Portrait</li>
+        <li role="option" data-value="9:16 Portrait" aria-selected="false"
+            class="ratio-opt px-3 py-1.5 cursor-pointer text-ink-dim hover:bg-accent/25 hover:text-ink">9:16 Portrait</li>
+      </ul>
+    </div>
+
+    <span class="text-ink-faint whitespace-nowrap ml-1" title="Hold Shift while dragging to constrain to square proportions">
+      Shift: square
+    </span>
+
+    <button id="cropBtn" title="Crop the image to the selection bounding box"
+            class="crop-btn ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md border-0 cursor-pointer
+                   text-[12px] font-semibold text-accent-ring whitespace-nowrap
+                   bg-gradient-to-b from-[#26314a] to-[#1a2334] hover:from-[#2c3a58] hover:to-[#1f2b40]
+                   transition-[filter,box-shadow] duration-100 active:translate-y-px">
+      <span aria-hidden="true">✂</span>Crop to Selection
+    </button>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  // segmented mode control
+  document.getElementById('modeSeg').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    var kids = this.querySelectorAll('button');
+    kids.forEach(function(k){
+      var on = (k === b);
+      k.classList.toggle('on', on);
+      k.setAttribute('aria-pressed', String(on));
+    });
+  });
+
+  // ratio split control: left cycles, right opens the menu
+  var ratioCycleBtn = document.getElementById('ratioCycleBtn');
+  var ratioMenuBtn  = document.getElementById('ratioMenuBtn');
+  var ratioMenu     = document.getElementById('ratioMenu');
+  var ratioLabel    = document.getElementById('ratioLabel');
+  var ratioArrow    = document.getElementById('ratioArrow');
+  var ratioOpts     = Array.prototype.slice.call(ratioMenu.querySelectorAll('.ratio-opt'));
+  var ratioValues   = ratioOpts.map(function(o){ return o.dataset.value; });
+  var ratioIndex    = 0;
+
+  function selectRatio(value){
+    ratioIndex = ratioValues.indexOf(value);
+    if(ratioIndex < 0) ratioIndex = 0;
+    ratioLabel.textContent = ratioValues[ratioIndex];
+    ratioOpts.forEach(function(o){
+      var sel = (o.dataset.value === ratioValues[ratioIndex]);
+      o.setAttribute('aria-selected', String(sel));
+      o.classList.toggle('text-ink', sel);
+      o.classList.toggle('text-ink-dim', !sel);
+    });
+  }
+
+  function openMenu(){
+    ratioMenu.classList.remove('hidden');
+    ratioMenuBtn.setAttribute('aria-expanded','true');
+    ratioArrow.style.transform = 'rotate(180deg)';
+  }
+  function closeMenu(){
+    ratioMenu.classList.add('hidden');
+    ratioMenuBtn.setAttribute('aria-expanded','false');
+    ratioArrow.style.transform = '';
+  }
+
+  ratioCycleBtn.addEventListener('click', function(){
+    selectRatio(ratioValues[(ratioIndex + 1) % ratioValues.length]);
+    closeMenu();
+  });
+
+  ratioMenuBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    ratioMenu.classList.contains('hidden') ? openMenu() : closeMenu();
+  });
+  ratioMenu.addEventListener('click', function(e){
+    var li = e.target.closest('.ratio-opt'); if(!li) return;
+    selectRatio(li.dataset.value);
+    closeMenu();
+  });
+  document.addEventListener('click', function(e){
+    if(!ratioMenuBtn.contains(e.target) && !ratioCycleBtn.contains(e.target) && !ratioMenu.contains(e.target)) closeMenu();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeMenu();
+  });
+
+  // crop action (placeholder hook)
+  document.getElementById('cropBtn').addEventListener('click', function(){
+    // wire up to your crop logic here
+  });
+})();
+</script>
+</body>
+</html>

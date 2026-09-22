@@ -7,7 +7,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const log = (...a) => console.log(...a);
@@ -52,21 +52,21 @@ async function main() {
 	const newClicked = await clickText('.menu-item', 'New');
 	log('    clicks:', JSON.stringify({ fileClicked, newClicked }));
 	try {
-		await page.waitForSelector('.dialog', { timeout: 8000 });
+		await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	} catch {
 		const dump = await page.evaluate(() => ({
 			menus: [...document.querySelectorAll('.menubar-btn')].map((e) => e.textContent.trim()),
 			items: [...document.querySelectorAll('.menu-item')].map((e) => e.textContent.replace(/\s+/g, ' ').trim()).slice(0, 12),
-			dialogs: document.querySelectorAll('.dialog, .m-dialog').length
+			dialogs: document.querySelectorAll('.m-dialog').length
 		}));
 		throw new Error('no .dialog; dump=' + JSON.stringify(dump));
 	}
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 	let ready = false;
 	for (let i = 0; i < 60; i++) {
 		ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { hasEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -75,14 +75,14 @@ async function main() {
 	await sleep(800);
 	if (!ready) throw new Error('editor never mounted');
 	await page.evaluate(async () => {
-		const { applyFill } = await import('/src/lib/services/fillService.ts');
+		const { applyFill } = await import('/paint.svelte/src/lib/services/fillService.ts');
 		if (applyFill(50, 50, { r: 255, g: 80, b: 40, a: 255 }) !== 'ok') throw new Error('fill failed');
 		await new Promise((r) => setTimeout(r, 500));
 	});
 
 	// --- open Levels --------------------------------------------------------
 	const opened = await page.evaluate(async () => {
-		const { commands } = await import('/src/lib/services/commandRegistry.ts');
+		const { commands } = await import('/paint.svelte/src/lib/services/commandRegistry.ts');
 		commands.run('effects.levels');
 		await new Promise((r) => setTimeout(r, 600));
 		return !!document.querySelector('.m-dialog .lv-main');
@@ -164,9 +164,9 @@ async function main() {
 		const okEnabled = okBtn && !okBtn.disabled;
 		okBtn?.click();
 		await new Promise((r) => setTimeout(r, 800));
-		const { sampleSurfacePixels } = await import('/src/lib/render/readback.ts');
+		const { sampleSurfacePixels } = await import('/paint.svelte/src/lib/render/readback.ts');
 		const px = sampleSurfacePixels(
-			(await import('/src/lib/render/EditorRenderer.ts')).getEditorRenderer(),
+			(await import('/paint.svelte/src/lib/render/EditorRenderer.ts')).getEditorRenderer(),
 			doc.activeLayer.surfaceId,
 			doc.width,
 			doc.height,
@@ -188,7 +188,7 @@ async function main() {
 
 	// --- Cancel leaves the surface alone ------------------------------------
 	const cancelled = await page.evaluate(async () => {
-		const { commands } = await import('/src/lib/services/commandRegistry.ts');
+		const { commands } = await import('/paint.svelte/src/lib/services/commandRegistry.ts');
 		const doc = window.__REGISTRY__.active;
 		commands.run('effects.levels');
 		await new Promise((r) => setTimeout(r, 600));

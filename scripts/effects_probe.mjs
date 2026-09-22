@@ -7,7 +7,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const log = (...a) => console.log(...a);
@@ -44,7 +44,7 @@ async function main() {
 
 	// --- Step 1: registry discovery ---------------------------------------
 	const discovery = await page.evaluate(async () => {
-		const mod = await import('/src/lib/effects/index.ts');
+		const mod = await import('/paint.svelte/src/lib/effects/index.ts');
 		return {
 			effects: mod.effects.map((e) => ({ id: e.id, label: e.label, menu: e.menu, hasParams: e.params.length > 0 })),
 			menus: mod.effectMenusWithEntries.map((m) => ({ label: m.label, count: m.effects.length }))
@@ -84,9 +84,9 @@ async function main() {
 	await clickText('.menubar-btn', 'File');
 	await sleep(200);
 	await clickText('.menu-item', 'New…');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 	await sleep(600);
 	const docName = await page.evaluate(() => window.__REGISTRY__.active?.name || '(none)');
 	log('[2] created doc:', docName);
@@ -212,9 +212,9 @@ async function main() {
 
 	// --- Step 4: apply Gaussian Blur and verify the surface swap -----------
 	const applied = await page.evaluate(async () => {
-		const { commands } = await import('/src/lib/services/commandRegistry.ts');
-		const { effectById } = await import('/src/lib/effects/index.ts');
-		const { openDialog } = await import('/src/lib/services/dialogService.ts');
+		const { commands } = await import('/paint.svelte/src/lib/services/commandRegistry.ts');
+		const { effectById } = await import('/paint.svelte/src/lib/effects/index.ts');
+		const { openDialog } = await import('/paint.svelte/src/lib/services/dialogService.ts');
 		const def = effectById('gaussianBlur');
 		const doc = window.__REGISTRY__.active;
 		const beforeId = doc.activeLayer.surfaceId;

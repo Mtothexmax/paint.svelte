@@ -308,12 +308,14 @@
 	/* Opaque colour fading to nothing over a transparency checkerboard, so the
 	   track reads as "solid at the left, see-through at the right" whatever the
 	   hue is. The checkerboard is mid-grey rather than the swatches' near-black:
-	   an opaque BLACK left end has to stand out against it, and against #383838
-	   it simply disappeared. */
+	   an opaque BLACK left end has to stand out against it, and against a dark
+	   checker it simply disappeared. Hence this one deliberately does NOT use
+	   the `#232629`/`#15171a` pair the other checkers do — it is the same two
+	   lightnesses as before, re-hued onto the chrome ramp. */
 	.fg-alpha-slider {
 		background-image:
 			linear-gradient(to right, var(--alpha-from, #000) 0%, var(--alpha-to, transparent) 100%),
-			repeating-conic-gradient(#6a6a6a 0% 25%, #454545 0% 50%);
+			repeating-conic-gradient(#6a7080 0% 25%, #454a54 0% 50%);
 		background-size: auto, 6px 6px;
 	}
 	.fg-bright-slider::-webkit-slider-thumb,

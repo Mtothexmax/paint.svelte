@@ -37,10 +37,11 @@
 .fsl-step:hover {
 	filter: brightness(1.18);
 }
-.fsl-step:active {
-	transform: translateY(1px);
+.fsl-step:active,
+.fsl-step.push {
 	background: linear-gradient(to bottom, #202327, #2b2f35);
 	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) inset;
+	transform: translateY(1px);
 }
 .fsl-step-ic {
 	width: 10px;
@@ -56,7 +57,7 @@
 	width: 140px;
 	flex: 1 1 auto;
 	min-width: 48px;
-	height: 28px;
+	height: 24px;
 	border-radius: 7px;
 	/* No pointer/hand cursor anywhere on the slider — plain resize arrow. */
 	cursor: ew-resize;
@@ -65,8 +66,10 @@
 	outline: none;
 }
 .fsl-track:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 1px;
+	outline: none;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 0 0 2px #6fd4ff;
 }
 .fsl-track.dragging {
 	cursor: ew-resize;
@@ -182,14 +185,18 @@
 	);
 }
 /* Center tick (range middle — 0 on symmetric ranges): deliberately subtle,
-   above everything so it reads on gray, blue and gradient alike. */
+   above everything so it reads on gray, blue and gradient alike. A centred
+   DOT rather than a full-height line, so it reads as a neutral *marker* and
+   can never be mistaken for the value-position line (.fsl-pos) that gradient
+   tracks draw — the two used to look identical in shape. */
 .fsl-tick-center {
 	position: absolute;
-	top: 3px;
-	bottom: 3px;
 	left: 50%;
-	width: 2px;
-	margin-left: -1px;
+	top: 50%;
+	width: 5px;
+	height: 5px;
+	transform: translate(-50%, -50%);
+	border-radius: 50%;
 	background: rgba(255, 255, 255, 0.5);
 	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
 	pointer-events: none;
@@ -255,6 +262,10 @@
 .fsl-valuebox:hover {
 	border-color: rgba(255, 255, 255, 0.2);
 }
+.fsl-valuebox:focus-within {
+	border-color: #6fd4ff;
+	background: rgba(0, 0, 0, 0.7);
+}
 .fsl-input {
 	border: 0;
 	padding: 0;
@@ -304,4 +315,11 @@
 .fsl-reset:disabled {
 	opacity: 0.35;
 	cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.fsl-step,
+	.fsl-thumb {
+		transition: none;
+	}
 }

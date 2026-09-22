@@ -17,6 +17,7 @@
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/vite": "^4.3.0",
+		"puppeteer-core": "^25.11.0",
 		"svelte": "^5.56.1",
 		"svelte-check": "^4.6.0",
 		"tailwindcss": "^4.3.0",
@@ -26,6 +27,8 @@
 	"dependencies": {
 		"@fluentui-emoji/svg": "^2.2.0",
 		"@material-symbols/svg-400": "^0.47.1",
+		"onnx-proto": "^8.0.1",
+		"onnxruntime-web": "^1.31.0-dev.20260918-bc8e7ed75",
 		"pixi.js": "^8.20.1"
 	}
 }

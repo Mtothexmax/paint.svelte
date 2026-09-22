@@ -96,10 +96,10 @@
 		height: 104px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		background-color: #2f2f2f;
+		background-color: var(--well);
 		background-image:
-			linear-gradient(45deg, #3d3d3d 25%, transparent 25%, transparent 75%, #3d3d3d 75%),
-			linear-gradient(45deg, #3d3d3d 25%, transparent 25%, transparent 75%, #3d3d3d 75%);
+			linear-gradient(45deg, #232629 25%, transparent 25%, transparent 75%, #232629 75%),
+			linear-gradient(45deg, #232629 25%, transparent 25%, transparent 75%, #232629 75%);
 		background-size: 12px 12px;
 		background-position: 0 0, 6px 6px;
 		display: flex;
@@ -152,7 +152,7 @@
 		padding: 10px 12px;
 		border-radius: 6px;
 		border: 1px solid var(--border);
-		background: #333;
+		background: var(--chrome-hi);
 		color: var(--text);
 		cursor: pointer;
 		text-align: left;
@@ -162,8 +162,8 @@
 			border-color 0.12s ease;
 	}
 	.pd-choice:hover {
-		background: #3c3c3c;
-		border-color: #4d4d4d;
+		background: var(--chrome-bar1);
+		border-color: var(--line);
 	}
 	.pd-choice.primary {
 		background: var(--accent-soft);

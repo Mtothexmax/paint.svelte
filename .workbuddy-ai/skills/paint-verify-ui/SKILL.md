@@ -14,21 +14,31 @@ source" is routinely wrong.
 
 | Thing | Value |
 |---|---|
-| Dev server | `http://localhost:5173/` (a second instance sometimes on 5174) |
+| Dev server | `http://localhost:5173/paint.svelte/` — **note the base path** |
 | Node | `C:/Users/mtoth/.workbuddy-ai/binaries/node/versions/22.22.2-2/node.exe` |
 | Chrome | `C:/Program Files/Google/Chrome/Application/chrome.exe` |
 | `puppeteer-core` | in `node_modules` (v25.x) but **not** in `package.json` — do not "fix" that |
 | Probe scripts | `.workbuddy-ai/*.mjs`, screenshots `.workbuddy-ai/*.png` |
 
-Check the server first: `curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/`
+**Probe the BASE PATH, never the root.** `vite.config.ts` sets
+`paths: { base: '/paint.svelte' }`, so the app is served from
+`http://localhost:5173/paint.svelte/`. The bare root 302-redirects, and in dev it
+can answer **500 `Invalid URL`** from SvelteKit's host-validation middleware —
+which reads as a broken dev server but is not one. A probe pointed at the root
+dies at `page.goto` or times out on `.menubar-btn` for no real reason.
+
+Check the server first:
+`curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/paint.svelte/`
 → `200` means it is up. Start it with `npm run dev` (background) if not.
+Module URLs sit under the same base (`…/paint.svelte/src/lib/…`) — handy for
+`curl`ing a module Vite has refused to compile.
 
 ## Harness template
 
 ```js
 import puppeteer from 'puppeteer-core';
 
-const URL = process.argv[2] ?? 'http://localhost:5173/';
+const URL = process.argv[2] ?? 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const OUT = 'C:/dev/paint.svelte/.workbuddy-ai/';
 
@@ -74,12 +84,47 @@ await new Promise((r) => setTimeout(r, 1600));
 ```
 `SVGA` = 800×600. Other presets sit next to it in the same dialog.
 
+**Open a second document.** The start screen (and its `New…` button) is gone
+once a document exists, so use the File menu — and match menu rows with
+*contains*, not *startsWith*, because a row's `textContent` begins with its icon
+glyph (`🖼️New…`):
+```js
+[...document.querySelectorAll('.menubar-btn')].find((b) => b.textContent.trim() === 'File')?.click();
+await sleep(400);
+[...document.querySelectorAll('.menu-panel .menu-item')].find((x) => x.textContent.includes('New'))?.click();
+await page.waitForFunction(() => !!document.querySelector('.m-dialog'), { timeout: 15000 });
+```
+`Ctrl+Alt+N` is the registered shortcut but does **not** fire from a synthetic
+`page.keyboard` press here, so drive the menu instead.
+
 **Pick a tool** — buttons carry `aria-label`:
 ```js
-await page.evaluate(() => document.querySelector('button[aria-label="Rectangle Select"]')?.click());
+await page.evaluate(() => document.querySelector('.tool-btn[aria-label="Rectangle Select"]')?.click());
 ```
 Known labels: `Paintbrush`, `Paint Bucket`, `Rectangle Select`, `Move Selected
-Pixels`, `Zoom`, `Pan`.
+Pixels`, `Zoom`, `Pan`, `Text`, `Shapes`, `Gradient`, `Color Picker`,
+`Clone Stamp`, `Recolor`, `Line / Curve`, `Lasso Select`, `Ellipse Select`,
+`Move Selection`, `Magic Wand`, `Pencil`, `Eraser`.
+
+**Inspect the tool-options bar.** `src/lib/components/shell/ToolOptions.svelte`
+renders one branch per tool; `tb-look.mjs` screenshots the strip and dumps the
+computed style of each part. The bar's design language (see `layout.css`
+`:root` — `--chrome-bar1/2`, `--chrome-hi/lo`, `--well`, `--text-faint`,
+`--accent-ring`):
+
+| part | selector | look |
+| --- | --- | --- |
+| the bar | `.options-strip` | gradient plate + grain, lit top edge |
+| segmented control | `.seg` / `.seg-btn` / `.seg-btn.on` | recessed `--well` groove; active pill is a blue 3-stop gradient with a glow |
+| split dropdown | `.isp` / `.isp-arrow` / `.isp-menu` | raised plate, hairline between halves, arrow flips when open |
+| action button | `.tb-btn` / `.tb-btn.primary` | raised plate; `.primary` is the blue-tinted ring+glow action |
+| group rule | `.tb-divider` | 24px vertical hairline |
+| secondary text | `.hint` | `--text-faint`, a step dimmer than `.aa-label` |
+| number field | `.fsl-num` | the same `--well` groove |
+
+`.mini-btn` is **not** the toolbar button any more — it stays a flat ghost
+button for panel headers (the Layers panel's `＋ ⇩ ⧉ ↑ ↓` row). Don't restyle it
+to fix the strip.
 
 **Pick a sub-mode** — the options strip uses `.seg-btn`, and the label carries an
 icon prefix, so match with `includes`, never `===`:
@@ -103,7 +148,7 @@ await page.evaluate((i, v) => {
 
 **Screenshot a specific element / region.**
 ```js
-const el = await page.$('.dialog');
+const el = await page.$('.m-dialog');   // NOT '.dialog' — that class is dead
 await el.screenshot({ path: OUT + 'shot.png' });
 // or a clipped page region:
 await page.screenshot({ path: OUT + 'crop.png', clip: { x: 0, y: 590, width: 900, height: 310 } });
@@ -218,12 +263,35 @@ const dialogShape = () => page.evaluate(() => {
     title: d.querySelector('.m-title-text')?.textContent?.trim() ?? null,
     hasPad: !!d.querySelector('.xyp-pad'),        // xy param
     hasDial: !!d.querySelector('.ang-svg'),       // angle param
-    sliderLabels: [...d.querySelectorAll('.fsl-label')].map((s) => s.textContent.trim()),
+    sliderLabels: [...d.querySelectorAll('.fsl-label-frame')].map((s) => s.textContent.trim()),
+    sliderValues: [...d.querySelectorAll('.fsl-track')].map((t) => Number(t.getAttribute('aria-valuenow'))),
     xyFields: [...d.querySelectorAll('.xyp-num')].map((i) => Number(i.value)),
     dialValue: d.querySelector('.ang-num') ? Number(d.querySelector('.ang-num').value) : null
   };
 });
 ```
+
+**`FilterSlider` has NO `input[type=range]`.** It is a custom track
+(`.fsl-track` with `role="slider"`, plus `.fsl-well` / `.fsl-thumb` /
+`.fsl-fill`), so `input[type=range]`, `.fsl-range` and `.fsl-label` all match
+**nothing**. Drive it through its always-editable value field and read the
+track's `aria-valuenow` back:
+
+```js
+const setSlider = async (i, v) => {          // i = index in the dialog
+  await page.evaluate(({ i, v }) => {
+    const el = document.querySelectorAll('.m-dialog .fsl-input')[i];
+    if (!el) return false;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, String(v));
+    el.dispatchEvent(new Event('input', { bubbles: true }));   // 'input' alone is enough
+    return true;
+  }, { i, v });
+  await new Promise((r) => setTimeout(r, 600));   // let Svelte re-derive `noop`
+};
+const readSliders = () => page.evaluate(() =>
+  [...document.querySelectorAll('.m-dialog .fsl-track')].map((t) => Number(t.getAttribute('aria-valuenow'))));
+```
+
 Drive the pad with `page.mouse` at `pad.x + dx`, `pad.y + dy` and read `xyFields`
 back. An `xy` param writes `settings[keyX]` / `settings[keyY]`, so replacing a
 `centerX`/`centerY` (or `offsetX`/`offsetY`) slider pair with one pad is a
@@ -451,12 +519,220 @@ that to prove the close button works (see the pointer-capture gotcha below).
   `LayerEffectDialog.svelte` each render params with their own copy of the same
   `{#if param.kind === ...}` chain. Miss one and the docked layer-effect dialog
   silently falls through to a plain slider.
+- **A selector that matches NOTHING looks exactly like a passing test.** This is
+  the single most expensive failure mode in this project and it has now bitten
+  twice. `FilterSlider` was refactored from a native range input to a custom
+  track, and every probe still driving `.m-dialog .fsl-range` matched zero
+  elements — so `setSlider` became a no-op while the dialog kept its *persisted*
+  values and the canvas still changed. The runs printed plausible means and
+  "PASS". The same happened again when the **Effects menu** was swapped for
+  `<EffectBrowserMenu>` (see below): the scene builder silently applied nothing.
+  **Always assert the driver found the controls before trusting any result:**
+  ```js
+  const n = (await readSliders()).length;
+  if (n !== EXPECTED) { console.log(`FAIL driver found ${n}, expected ${EXPECTED}`); process.exit(1); }
+  ```
+  and dump the real DOM (`diag-fsl-classes.mjs` style) whenever a result looks
+  "too clean", identical across cases, or a base scene has an unexpected mean.
+  **Identical numbers across different parameter values is the tell** — four
+  different Highlights/Shadows values all reporting `diff=328082` was not a
+  shader bug, it was a menu that never opened.
+- **The `Effects` menu is NOT a `.menu-panel` any more.** `MenuBar.svelte` now
+  branches on the label: `{#if menu.label === 'Effects'}<EffectBrowserMenu …/>`
+  `{:else}<div class="menu-panel">`. `EffectBrowserMenu` uses different markup,
+  so `.menu-panel .menu-item` and `.sub-panel .menu-item` find **nothing** under
+  Effects. `Adjustments` (and the other menus) still use `.menu-panel`.
+  **But it is easier to drive than the old nested submenu** — it is a flat,
+  searchable list (`src/lib/components/common/EffectBrowserMenu.svelte`, opened
+  as a `FilterPopup`), not folder→submenu. To open any effect:
+  ```js
+  // 1. open the Effects menu
+  [...document.querySelectorAll('.menubar-btn')].find((b) => b.textContent.trim() === 'Effects')?.click();
+  // 2. type into the search box (it filters the flat list) …
+  const s = document.querySelector('.fx-add-search');
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(s, 'Clouds');
+  s.dispatchEvent(new Event('input', { bubbles: true }));
+  // 3. … then click the matching row
+  [...document.querySelectorAll('.fx-add-item')].find((b) => b.textContent.includes('Clouds'))?.click();
+  ```
+  Useful classes: `.fx-add-menu` (root), `.fx-add-search` (filter input),
+  `.fx-add-head-label` (group heading — the list is grouped, not nested),
+  `.fx-add-item` (one effect; `.fx-add-item-label`, `.fx-add-ic`), `.fx-add-sep`.
+  **Every probe in `.workbuddy-ai/` that predates this refactor is stale**
+  (`fx-audit`, `fx-controls2`, `fx-select`, `fx-shadow-color`,
+  `fx-outline-premul`, `fx-smoke-*`, `fx-suspect2`, `fx-highlights`): they
+  enumerate Effects via `.menu-panel .menu-item` and silently see only the
+  Adjustments entries. `fx-audit` reporting *"discovered 13 candidate entries"*
+  instead of ~50 is the signature. Repairing one means swapping its `openLeaf`
+  for the three steps above.
+  Alternatively build scenes with tools — the Paint Bucket flood-fills the whole
+  layer with no coordinates, and `Adjustments ▸ Brightness / Contrast` at +100
+  (twice) is an easy way to lift a black fill to a bright base.
+- **Two dead selectors are still in circulation — check both before trusting a
+  probe.** The `FilterSlider` refactor renamed the parts, and probes written
+  against the old native `<input type=range>` fail *silently*:
+  `.fsl-range` → gone (the value field is `.fsl-input`, the track `.fsl-track`,
+  the thumb `.fsl-thumb`), and `.fsl-label` → `.fsl-label-frame`.
+  A probe asserting `sliderLabels` from `.fsl-label` reads `[]` and reports
+  "renders its sliders: FAIL" on a perfectly healthy dialog
+  (`fx-layer-effect` does exactly this).
+- **Mask-based effects need a base whose luminance suits them, and the assertion
+  must know that.** Highlights/Shadows mask by `pow(luma,3)` / `pow(1-luma,3)`,
+  so on a bright base `Shadows +90` is *legitimately* sub-LSB (mask ≈0.027)
+  while on a black base the same case moves the mean by ~200. Compute the mask
+  from the measured base luminance and only require movement when it is awake
+  (`mask > 0.05`), otherwise a correct shader reads as a failure. Also: on a
+  uniform base the mean moves without any pixel differing by more than the
+  usual 24/px threshold, so report the diff count as context rather than gating
+  on it.
+- **A `filter` transition makes a hover assertion lie.** Reading
+  `getComputedStyle(el).filter` 300 ms after `page.hover()` returned
+  `brightness(1)` — the identity value Chrome interpolates *from* — while the
+  rule was in fact applying. Wait **≥700 ms** and assert
+  `el.matches(':hover') === true` before concluding a hover rule did not apply.
+  (Same trap for any transitioned property: check the property you did *not*
+  transition as the control — here `background-image` proved the hover state
+  was live.)
+- **A two-class scoped override is not optional when a global has `:not()`.**
+  `.btn-primary:hover:not(:disabled)` is **(0,3,0)** — `:not()` contributes its
+  argument's specificity. So `.foo:hover` (0,2,0) loses and the global
+  `filter: brightness(1.1)` stacks on top of your hover gradient. Use
+  `.parent .foo:hover` (0,3,0, later in source) plus an explicit `filter: none`.
+  Grep the global rule before assuming a single-class override is enough.
+- **A "flat band" is usually a missing gradient, not a missing border.** When a
+  header still looks unstyled after you fix its rule, diff its computed
+  `backgroundImage` against the reference component's — `linear-gradient(…)` vs
+  a bare `rgb(…)` is the tell. See the chrome-bar recipe in the project
+  `MEMORY.md` (`.m-title` vs `.color-mode-head`).
+
+## Z-order / stacking-context checks
+
+A `z-index` is relative to its nearest positioned ancestor's **stacking context**
+and cannot escape it, so "the menu is 80, the dialog is 1200, therefore the menu
+is under the dialog" is not something you can read off the source. Two traps,
+both hit for real:
+
+- **`.m-dialog > * { position: relative; z-index: 1 }`** gives *every* direct
+  child its own stacking context. The filter-switcher menu anchored in the title
+  bar is therefore capped inside the title bar's context — and `.m-body` /
+  `.m-footer` are later siblings at the same level, so they painted straight over
+  the open menu even though the menu's own `z-index` was 60. Fix: raise the title
+  bar (`.m-dialog > .m-title { z-index: 2 }`).
+- **`elementFromPoint` is 3d-aware and reports what actually receives the
+  click**, so it is the right oracle — but sampling only the menu's centre misses
+  a partial overlap. **Grid-sample the intersection** and count the hits:
+
+```js
+const hits = await page.evaluate(() => {
+  const m = document.querySelector('.fx-add-menu');
+  const d = document.querySelector('.m-dialog');
+  const mr = m.getBoundingClientRect(), dr = d.getBoundingClientRect();
+  const x0 = Math.max(mr.left, dr.left), x1 = Math.min(mr.right, dr.right);
+  const y0 = Math.max(mr.top, dr.top),  y1 = Math.min(mr.bottom, dr.bottom);
+  let mine = 0, over = 0; const kinds = new Set();
+  for (let i = 1; i <= 6; i++) for (let j = 1; j <= 6; j++) {
+    const el = document.elementFromPoint(
+      Math.round(x0 + (x1 - x0) * i / 7), Math.round(y0 + (y1 - y0) * j / 7));
+    if (!el) continue;
+    if (m.contains(el)) mine++;
+    else { over++; kinds.add(`${el.tagName}.${String(el.className).split(' ')[0]}`); }
+  }
+  return { mine, over, kinds: [...kinds] };
+});
+// over === 0   -> fully clickable
+// over === 36  -> fully occluded
+```
+
+Report `over` **and** the covering class names — `BUTTON.btn-primary` names the
+culprit directly, which is how the footer-button case above was found.
+
+The effect dialogs are deliberately **non-modal and draggable** (`MovableDialog`
+has no backdrop), so a menubar dropdown (`z-index 62`) *is* covered by an open
+dialog (`1200`). That is a product decision — the user confirmed the dialogs
+should win. Don't "fix" it by raising the menus without asking.
+
+## Design tokens (the palette a change has to fit)
+
+`:root` in `src/routes/layout.css` holds **one** ramp, taken from the Claude
+reference (`opacity-slider.html`). The older neutral tokens are now *aliases*
+onto it, so a component written against either name lands on the same palette:
+
+| token | value | meaning |
+|---|---|---|
+| `--stage` | `#111214` | app backdrop (only `html, body` uses it) |
+| `--chrome-hi` / `--chrome-lo` | `#2b2e34` / `#1a1c20` | the chrome plate gradient |
+| `--chrome-bar1` / `--chrome-bar2` | `#34383f` / `#22252a` | title bars / strips |
+| `--well` | `#0b0c0e` | recessed groove |
+| `--bg` | `var(--well)` | legacy alias — "field surface" |
+| `--bg-elev` | `var(--chrome-hi)` | legacy alias — raised plate |
+| `--panel` | `var(--chrome-lo)` | legacy alias — panel body |
+| `--border` | `rgba(0,0,0,0.7)` | **a seam**, not a line |
+| `--line` / `--line-strong` | `rgba(255,255,255,.14)` / `.22` | a **visible** hairline |
+| `--text` / `--text-dim` / `--text-faint` | `#e7e9ee` / `#8d929c` / `#5d626c` | ink ramp |
+| `--accent` / `--accent-glow` / `--accent-ring` | `#2c6fe0` / `#3c82ff` / `#6fd4ff` | accent |
+
+**`--border` is black, so it is invisible on a dark surface.** Anything drawing a
+*visible* line — crosshairs (`XYPicker`), menu separators, drop-zone dashes
+(`FontDropdown`), the angle dial (`AnglePicker`), the toolbar rule (`.tool-sep`),
+the status-bar hairline — must use `--line`. A rule that uses `--border` as a
+**fill** rather than an edge (the Layers panel's fx badge) needs a literal solid
+grey or it vanishes. Grep `var(--border)` and check each hit's role before
+assuming a palette swap is safe.
+
+The transparency checker is `#232629` on `#15171a` (the reference's pair) —
+*except* `ToolbarColorPicker`'s alpha slider, which deliberately keeps a mid-grey
+checker so an opaque black left end still reads against it.
+
+**`.dialog` / `.dialog-backdrop` / `.dialog-title` / `.dialog-close` /
+`.dialog-footer` in `layout.css` are DEAD CSS** (0 references — every modal
+migrated to `MovableDialog`). Don't spend time restyling them, and don't read
+them as evidence of how a modal looks.
+
+### The probe suite rots silently — check that a failure predates you
+
+Almost every probe in `scripts/` was written *before* two refactors, and two
+stale patterns make a probe die at step 1 in a way that looks like a regression
+you just caused:
+
+1. `'.dialog'` — dead class (see above). Every modal is `.m-dialog`.
+2. `const BASE = 'http://localhost:5173/'` / `import('/src/lib/…')` — missing
+   the `/paint.svelte/` base, so dynamic module imports 404.
+
+**Before debugging such a failure, prove it predates you**: if
+`grep -rn 'class="dialog' src/` finds nothing, the selector is dead — not
+broken by you. Repair the whole suite in one idempotent pass:
+
+```bash
+cd /c/dev/paint.svelte
+for f in scripts/*.mjs; do
+  sed -i \
+    -e "s/'\.dialog, \.m-dialog'/'\.m-dialog'/g" \
+    -e "s/'\.dialog /'\.m-dialog /g" \
+    -e "s/'\.dialog'/'\.m-dialog'/g" \
+    -e "s|'http://localhost:5173/'|'http://localhost:5173/paint.svelte/'|g" \
+    -e "s|import('/src/lib|import('/paint.svelte/src/lib|g" \
+    "$f"
+done
+```
+
+The `'.dialog, .m-dialog'` rule must run first, or it degrades to
+`'.m-dialog, .m-dialog'`. `'.dialog-backdrop'` is left alone on purpose: it sits
+in a `!!querySelector(...)` "no dimming backdrop" assertion that stays correct
+(if vacuous) after the migration.
+
+> **Do not run mutating git commands in this repo.** `.git/refs/agents`,
+> `.git/refs/codex`, `.git/cursor` and `.git/opencode` show several other AI
+> tools operate on this working copy concurrently. A `git stash`/`gc` here can
+> race theirs — and on 2026-09-22 the entire object store (`.git/objects`, loose
+> *and* packed) was found missing mid-session. Verify with read-only git only
+> (`status`, `diff`, `ls-remote`).
 
 ## Definition of done
 
 1. `npx tsc --noEmit -p tsconfig.json` → clean.
 2. `npm run check` → **0 errors**; warnings must be at or below the standing
-   baseline (**52 as of 2026-09-11**, down from 56). A *new* warning means a real
+   baseline (**54 as of 2026-09-22**; 55 on 2026-09-19, 52 before the
+   FilterSlider/menu refactor added 3). A *new* warning means a real
    defect (the `Unused CSS selector` case above was exactly that).
 3. Probe prints the asserted values plus `errors: none`.
 4. A screenshot of the changed UI, presented to the user.

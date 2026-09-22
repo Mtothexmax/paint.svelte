@@ -5,10 +5,16 @@
 	min-width: 180px;
 	max-width: 280px;
 	padding: 4px;
-	background: #303030;
+	/* Same chrome plate as `.menu-panel` — the context menu is a sibling of
+	   the menubar dropdowns, not a separate surface. */
+	background-color: var(--chrome-lo);
+	background-image: linear-gradient(180deg, var(--chrome-hi), var(--chrome-lo));
 	border: 1px solid var(--border);
-	border-radius: 6px;
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+	border-radius: 8px;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.1) inset,
+		0 16px 32px -8px rgba(0, 0, 0, 0.7),
+		0 2px 6px rgba(0, 0, 0, 0.5);
 	user-select: none;
 }
 .ctx-item {
@@ -30,16 +36,17 @@
 	color: #fff;
 }
 .ctx-item.disabled {
-	color: #6b6b6b;
+	color: var(--text-faint);
 }
 .ctx-shortcut {
-	color: #999;
+	color: var(--text-faint);
 	font-size: 11px;
 }
 .ctx-sep {
 	height: 1px;
 	margin: 4px 6px;
-	background: var(--border);
+	/* A visible divider, not a seam — `--border` is black now. */
+	background: var(--line);
 }
 .ctx-slider {
 	display: flex;

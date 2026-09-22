@@ -5,12 +5,12 @@
 	width: auto;
 	max-width: 44px;
 	flex-shrink: 0;
-	background-color: #1a1a1a;
+	background-color: #15171a;
 	background-image: conic-gradient(
 		#000 0 25%,
-		#1a1a1a 0 50%,
+		#15171a 0 50%,
 		#000 0 75%,
-		#1a1a1a 0
+		#15171a 0
 	);
 	background-size: 12px 12px;
 	position: relative;
@@ -139,7 +139,9 @@ img.layer-thumb {
 	   white wash) so users never confuse it with the blueish hasFx state
 	   below, which also reads as "soft/dim". */
 	color: var(--text);
-	background: var(--border);
+	/* A SOLID chrome-family grey — deliberately not `--border`, which is a
+	   black hairline now and would leave this badge invisible. */
+	background: #3a3e45;
 	/* Hidden unless the row is hovered or the layer has effects. The panel
 	   being open (.on) only adds the ring when the badge is shown. */
 	opacity: 0;
@@ -152,7 +154,7 @@ img.layer-thumb {
 	pointer-events: auto;
 }
 .layer-fx:hover {
-	background: #4a4a4a;
+	background: #4a505a;
 	color: var(--text);
 }
 /* blueish once the layer has at least one effect */

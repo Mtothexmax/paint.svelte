@@ -121,5 +121,14 @@ export const MENUS: MenuDef[] = [
 				)
 			}))
 		]
+	},
+	// Deliberately LAST in the array: `MenuBar` renders `{#each MENUS}`, so
+	// array order is the on-screen order. AI Models is a self-contained
+	// one-entry menu rather than an editing step, so it sits at the far right
+	// instead of interrupting the File → Effects run.
+	{
+		label: 'AI Models',
+		enabled: true,
+		entries: [{ type: 'command', commandId: 'ai.removeBackground' }]
 	}
 ];

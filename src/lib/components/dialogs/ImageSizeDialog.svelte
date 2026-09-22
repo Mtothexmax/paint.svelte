@@ -209,13 +209,13 @@
 							{/each}
 						{/each}
 					</div>
-					<div class="text-xs" style="color:#9a9a9a;">
+					<div class="text-xs" style="color:var(--text-dim);">
 						The area beyond the current image becomes transparent.
 					</div>
 				</div>
 			{/if}
 
-			<div class="text-xs" style="color:#9a9a9a;">
+			<div class="text-xs" style="color:var(--text-dim);">
 				Current: {origW} × {origH} px &middot; New: {Math.round(width || 0)} × {Math.round(height || 0)} px
 				&middot; ~{formatBytes(surfaceBytes(Math.round(width || 0), Math.round(height || 0)))} per layer
 				&middot; limit: {MAX_PIXELS.toLocaleString()} px

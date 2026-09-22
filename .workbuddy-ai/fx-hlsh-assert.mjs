@@ -72,14 +72,18 @@ const openLeaf = async (group, leaf) => {
 	}
 	return false;
 };
+// FilterSlider is a CUSTOM track (role="slider") — there is no
+// input[type=range] in the dialog at all, so `.fsl-range` matches nothing and
+// a probe built on it silently no-ops. Drive the always-editable `.fsl-input`
+// text field instead (its input handler parses + calls setValue), and read the
+// value back from the track's aria-valuenow.
 const setSlider = async (i, v) => {
 	await page.evaluate(
 		(arg) => {
-			const el = [...document.querySelectorAll('.m-dialog .fsl-range')][arg.i];
+			const el = [...document.querySelectorAll('.m-dialog .fsl-input')][arg.i];
 			if (!el) return;
 			Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, String(arg.v));
 			el.dispatchEvent(new Event('input', { bubbles: true }));
-			el.dispatchEvent(new Event('change', { bubbles: true }));
 		},
 		{ i, v }
 	);
@@ -89,7 +93,9 @@ const setSlider = async (i, v) => {
 // slider carries over from the previous case unless we zero it. Read them back
 // so a contaminated case is visible rather than silently mis-measured.
 const readSliders = async () =>
-	page.evaluate(() => [...document.querySelectorAll('.m-dialog .fsl-range')].map((e) => Number(e.value)));
+	page.evaluate(() =>
+		[...document.querySelectorAll('.m-dialog .fsl-track')].map((t) => Number(t.getAttribute('aria-valuenow')))
+	);
 const applyDialog = async () => {
 	const clicked = await page.evaluate(() => {
 		const btn = [...document.querySelectorAll('.m-footer button')].find((b) => b.textContent.includes('Apply'));
@@ -172,6 +178,22 @@ const CASES = [
 let pass = 0;
 let fail = 0;
 const means = {};
+
+// Guard: if the driver cannot find the sliders, EVERY case below would
+// "pass" vacuously (the dialog keeps its persisted values and the canvas
+// still changes). Fail loudly instead.
+{
+	await openLeaf('Adjustments', 'Highlights / Shadows');
+	const n = (await readSliders()).length;
+	await escape();
+	if (n !== 2) {
+		console.log(`FAIL  driver found ${n} sliders in the dialog, expected 2 — probe is stale`);
+		await browser.close();
+		process.exit(1);
+	}
+	console.log(`driver OK: ${n} sliders found\n`);
+}
+
 for (const [hlVal, shVal, label, dir] of CASES) {
 	await openLeaf('Adjustments', 'Highlights / Shadows');
 	const before = await readSliders();

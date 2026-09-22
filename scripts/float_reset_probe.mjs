@@ -10,7 +10,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const log = (...a) => console.log(...a);
@@ -37,14 +37,14 @@ async function main() {
 	await page.evaluate(() => { [...document.querySelectorAll('.menubar-btn')].find((e) => e.textContent.includes('File'))?.click(); });
 	await sleep(200);
 	await page.evaluate(() => { [...document.querySelectorAll('.menu-item')].find((e) => (e.textContent || '').includes('New'))?.click(); });
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 
 	let ready = false;
 	for (let i = 0; i < 60; i++) {
 		ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { hasEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -67,8 +67,8 @@ async function main() {
 
 	// rect selection + rotate mode, shared setup
 	await page.evaluate(async () => {
-		const { setRectSelection } = await import('/src/lib/services/selectionService.ts');
-		const { activeToolId, moveToolMode } = await import('/src/lib/state/ui.ts');
+		const { setRectSelection } = await import('/paint.svelte/src/lib/services/selectionService.ts');
+		const { activeToolId, moveToolMode } = await import('/paint.svelte/src/lib/state/ui.ts');
 		setRectSelection('rect', { x: 20, y: 20 }, { x: 220, y: 140 });
 		activeToolId.set('move-pixels');
 		moveToolMode.set('rotate');
@@ -122,7 +122,7 @@ async function main() {
 	// --- [2] floating + Edit→Undo -------------------------------------------
 	// need a prior history entry: apply one committed transform first
 	await page.evaluate(async () => {
-		const { setRectSelection } = await import('/src/lib/services/selectionService.ts');
+		const { setRectSelection } = await import('/paint.svelte/src/lib/services/selectionService.ts');
 		setRectSelection('rect', { x: 20, y: 20 }, { x: 220, y: 140 });
 		await new Promise((r) => setTimeout(r, 200));
 	});
@@ -147,7 +147,7 @@ async function main() {
 
 	// --- [3] floating + tool switch → reset, NOT silent commit ---------------
 	await page.evaluate(async () => {
-		const { activeToolId, moveToolMode } = await import('/src/lib/state/ui.ts');
+		const { activeToolId, moveToolMode } = await import('/paint.svelte/src/lib/state/ui.ts');
 		activeToolId.set('move-pixels');
 		moveToolMode.set('rotate');
 		await new Promise((r) => setTimeout(r, 200));
@@ -155,7 +155,7 @@ async function main() {
 	await ringDrag();
 	const h3 = await page.evaluate(() => window.__REGISTRY__.active.history.length);
 	await page.evaluate(async () => {
-		const { activeToolId } = await import('/src/lib/state/ui.ts');
+		const { activeToolId } = await import('/paint.svelte/src/lib/state/ui.ts');
 		activeToolId.set('brush');
 		await new Promise((r) => setTimeout(r, 400));
 	});
@@ -169,7 +169,7 @@ async function main() {
 
 	// --- [4] Enter still applies ---------------------------------------------
 	await page.evaluate(async () => {
-		const { activeToolId, moveToolMode } = await import('/src/lib/state/ui.ts');
+		const { activeToolId, moveToolMode } = await import('/paint.svelte/src/lib/state/ui.ts');
 		activeToolId.set('move-pixels');
 		moveToolMode.set('rotate');
 		await new Promise((r) => setTimeout(r, 200));

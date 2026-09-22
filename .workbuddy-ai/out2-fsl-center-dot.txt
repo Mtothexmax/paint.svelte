@@ -1,0 +1,16 @@
+centre markers found: 2
+  [0] size 5x5 radius 50% bg rgba(255, 255, 255, 0.5)  dot(686,309) vs track(686,309)  track 266x28
+  [1] size 5x5 radius 50% bg rgba(255, 255, 255, 0.5)  dot(686,347) vs track(686,347)  track 266x28
+saved fsl-center-dot.png
+saved fsl-center-dot-zoom.png
+saved fsl-center-dot-offset.png
+  after moving to 90: dot centre 686 vs track centre 686, covered by thumb = false
+PASS  the dialog shows one centre marker per slider
+PASS  the marker is a dot, not a full-height line (square, and small vs the track)
+PASS  the marker is round
+PASS  the marker sits at the track centre horizontally
+PASS  the marker sits at the track centre vertically (the middle, not the top)
+PASS  the old full-height line is gone (height was track height minus 6px)
+
+6/6 PASS
+errors: none

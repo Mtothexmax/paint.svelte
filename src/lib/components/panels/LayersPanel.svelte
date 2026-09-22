@@ -315,7 +315,7 @@
 </script>
 
 <div class="panel-card flex h-full flex-col">
-	<div class="flex items-center justify-between">
+	<div class="panel-head flex items-center justify-between">
 		<div class="panel-title">Layers</div>
 		<div class="flex gap-0.5">
 			<button class="mini-btn" title="Add layer" onclick={() => addLayer()}>＋</button>

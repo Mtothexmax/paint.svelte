@@ -21,9 +21,10 @@
 	border: 1px solid var(--border);
 	border-radius: 6px;
 	background:
-		linear-gradient(var(--border), var(--border)) center / 100% 1px no-repeat,
-		linear-gradient(var(--border), var(--border)) center / 1px 100% no-repeat,
-		var(--bg-elev, #1e1e1e);
+		/* Crosshair: a VISIBLE line, so `--line`, not the black `--border`. */
+		linear-gradient(var(--line), var(--line)) center / 100% 1px no-repeat,
+		linear-gradient(var(--line), var(--line)) center / 1px 100% no-repeat,
+		var(--bg-elev, #2b2e34);
 	cursor: crosshair;
 	touch-action: none;
 	user-select: none;
@@ -33,7 +34,7 @@
 	width: 12px;
 	height: 12px;
 	border-radius: 50%;
-	background: var(--accent, #4f8cff);
+	background: var(--accent, #2c6fe0);
 	border: 2px solid #fff;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 	transform: translate(-50%, -50%);
@@ -57,7 +58,7 @@
 }
 .xyp-num {
 	width: 64px;
-	background: var(--bg-elev, #1e1e1e);
+	background: var(--bg-elev, #2b2e34);
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	color: var(--text);

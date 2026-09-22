@@ -1,0 +1,21 @@
+--- layer-effect dialog (Layers panel ▸ right-click ▸ Add Layer Effect) ---
+context menu  : 5 items; layer styles offered
+dialog title  : Drop Shadow — Layer Effect
+pad=Offset  colors=[Color]  sliders=[]  selects=0
+
+PASS  the layers panel shows a layer row  [rows=1]
+PASS  right-click opens the layer context menu  [5 items]
+PASS  the menu offers "Add Layer Effect"  [items=[─ Add Layer Effect ─ | Bevel | Drop Shadow | Feather | Outline]]
+PASS  it lists the Object-submenu layer styles  [effects=[Bevel, Drop Shadow, Feather, Outline]]
+PASS  the layer-effect dialog opens  [{"title":"Drop Shadow — Layer Effect","hasPad":true,"padLabel":"Offset","colorRows":["Color"],"sliderLabels":[],"selects":0,"hasApply":true}]
+PASS  titled as a layer effect  [title="Drop Shadow — Layer Effect"]
+PASS  renders the offset pad  [pad=Offset]
+PASS  renders the colour row  [colors=[Color]]
+FAIL  renders its sliders  [sliders=[]]
+PASS  has an Apply button  [apply=true]
+PASS  the colour row repaints to white on click  [rgb(0, 0, 0) -> rgb(255, 255, 255)]
+PASS  applying closes the dialog  [dialogGone=true]
+PASS  applying changes the canvas  [hash 4005 vs 4005]
+PASS  no console errors
+
+13/14 passed   errors : none

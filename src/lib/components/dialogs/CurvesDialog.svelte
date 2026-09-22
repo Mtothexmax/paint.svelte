@@ -210,14 +210,17 @@
 			onpointerup={onPointerUp}
 			ondblclick={onDblClick}
 		>
-			<rect x="0" y="0" width="1" height="1" fill="#1f2937" rx="0.01" />
+			<!-- Plot surface: the app's recessed well, not a slate panel. SVG
+			     presentation attributes cannot take `var()`, so these are the
+			     literal palette values. -->
+			<rect x="0" y="0" width="1" height="1" fill="#0b0c0e" rx="0.01" />
 			<!-- grid -->
 			{#each [0.25, 0.5, 0.75] as g}
-				<line x1={g} y1="0" x2={g} y2="1" stroke="#374151" stroke-width="0.002" />
-				<line x1="0" y1={g} x2="1" y2={g} stroke="#374151" stroke-width="0.002" />
+				<line x1={g} y1="0" x2={g} y2="1" stroke="#2b2e34" stroke-width="0.002" />
+				<line x1="0" y1={g} x2="1" y2={g} stroke="#2b2e34" stroke-width="0.002" />
 			{/each}
 			<!-- diagonal -->
-			<line x1="0" y1="1" x2="1" y2="0" stroke="#4b5563" stroke-width="0.003" />
+			<line x1="0" y1="1" x2="1" y2="0" stroke="#5d626c" stroke-width="0.003" />
 			<!-- curve -->
 			{#each CHANNELS as ch}
 				{#if activeChannel === ch.key}
@@ -259,23 +262,34 @@
 		gap: 4px;
 		margin-bottom: 8px;
 	}
+	/* Same plate as `.tb-btn` / `.seg-btn` so the dialog's controls match the
+	   rest of the app instead of carrying their own grey ramp. */
 	.tab {
 		flex: 1;
 		padding: 6px 0;
-		background: #374151;
-		color: #e5e7eb;
-		border: 1px solid #4b5563;
-		border-radius: 4px;
+		background: linear-gradient(180deg, #3a3e45, #272a2f);
+		color: var(--text-dim);
+		border: 1px solid var(--border);
+		border-radius: 6px;
 		cursor: pointer;
 		font-size: 12px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		gap: 4px;
+		transition: filter 100ms;
 	}
+	.tab:hover {
+		filter: brightness(1.15);
+	}
+	/* Active = the shared accent pill (.seg-btn.on / .menubar-btn.open). */
 	.tab.active {
-		background: #4b5563;
-		border-color: #9ca3af;
+		background: linear-gradient(180deg, #3f82f2, #2c6fe0 55%, #2158b8);
+		color: #fff;
+		box-shadow:
+			0 1px 0 rgba(255, 255, 255, 0.28) inset,
+			0 1px 3px rgba(0, 0, 0, 0.5),
+			0 0 10px rgba(60, 130, 255, 0.28);
 	}
 	.dot {
 		width: 8px;
@@ -301,21 +315,22 @@
 	.btn-reset {
 		padding: 4px 10px;
 		font-size: 12px;
-		background: #374151;
-		color: #e5e7eb;
-		border: 1px solid #4b5563;
-		border-radius: 4px;
+		background: linear-gradient(180deg, #3a3e45, #272a2f);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: 6px;
 		cursor: pointer;
+		transition: filter 100ms;
 	}
 	.btn-reset:hover {
-		background: #4b5563;
+		filter: brightness(1.18);
 	}
 	.radio {
 		display: flex;
 		align-items: center;
 		gap: 6px;
 		font-size: 13px;
-		color: #e5e7eb;
+		color: var(--text);
 		margin-top: 4px;
 	}
 </style>

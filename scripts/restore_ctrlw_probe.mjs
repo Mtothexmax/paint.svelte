@@ -5,7 +5,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 async function clickByText(page, sel, t) {
@@ -49,8 +49,8 @@ async function idbRecords(page) {
 async function opaquePixels(page) {
 	return page.evaluate(async () => {
 		const [{ getEditorRenderer }, { surfaceToPngBlob }] = await Promise.all([
-			await import('/src/lib/render/EditorRenderer.ts'),
-			await import('/src/lib/render/export.ts')
+			await import('/paint.svelte/src/lib/render/EditorRenderer.ts'),
+			await import('/paint.svelte/src/lib/render/export.ts')
 		]);
 		const doc = window.__REGISTRY__?.active;
 		if (!doc) return { count: -1, w: 0, h: 0 };
@@ -138,9 +138,9 @@ async function run(it, delayMs, paint) {
 	await clickByText(page, '.menubar-btn', 'File');
 	await sleep(250);
 	await clickByText(page, '.menu-item', 'New…');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 	await sleep(600);
 	const nameBefore = await page.evaluate(() => window.__REGISTRY__.active?.name || '(none)');
 	if (paint) {

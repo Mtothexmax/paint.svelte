@@ -8,7 +8,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const log = (...a) => console.log(...a);
@@ -35,14 +35,14 @@ async function main() {
 	await page.evaluate(() => { [...document.querySelectorAll('.menubar-btn')].find((e) => e.textContent.includes('File'))?.click(); });
 	await sleep(200);
 	await page.evaluate(() => { [...document.querySelectorAll('.menu-item')].find((e) => (e.textContent || '').includes('New'))?.click(); });
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 
 	let ready = false;
 	for (let i = 0; i < 60; i++) {
 		ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { hasEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -52,8 +52,8 @@ async function main() {
 	if (!ready) throw new Error('editor never mounted');
 
 	await page.evaluate(async () => {
-		const { setRectSelection } = await import('/src/lib/services/selectionService.ts');
-		const { activeToolId, moveToolMode } = await import('/src/lib/state/ui.ts');
+		const { setRectSelection } = await import('/paint.svelte/src/lib/services/selectionService.ts');
+		const { activeToolId, moveToolMode } = await import('/paint.svelte/src/lib/state/ui.ts');
 		setRectSelection('rect', { x: 20, y: 20 }, { x: 220, y: 140 });
 		activeToolId.set('move-pixels');
 		moveToolMode.set('rotate');
@@ -73,8 +73,8 @@ async function main() {
 	// composite selections, plain shape geometry otherwise.
 	const draggerGaps = () =>
 		page.evaluate(async () => {
-			const { affinePoint } = await import('/src/lib/render/affine.ts');
-			const { selectionOutlinePoints } = await import('/src/lib/render/selection.ts');
+			const { affinePoint } = await import('/paint.svelte/src/lib/render/affine.ts');
+			const { selectionOutlinePoints } = await import('/paint.svelte/src/lib/render/selection.ts');
 			const doc = window.__REGISTRY__.active;
 			const engine = window.__MOVE__.engine();
 			const st = engine.transformState;
@@ -149,7 +149,7 @@ async function main() {
 
 	// --- [2] scale via the live ne dragger ----------------------------------
 	await page.evaluate(async () => {
-		const { moveToolMode } = await import('/src/lib/state/ui.ts');
+		const { moveToolMode } = await import('/paint.svelte/src/lib/state/ui.ts');
 		moveToolMode.set('move');
 		await new Promise((r) => setTimeout(r, 200));
 	});
@@ -188,7 +188,7 @@ async function main() {
 
 	// --- [3] plain-rect regression: exact sync + classic scale math ---------
 	await page.evaluate(async () => {
-		const { setRectSelection } = await import('/src/lib/services/selectionService.ts');
+		const { setRectSelection } = await import('/paint.svelte/src/lib/services/selectionService.ts');
 		setRectSelection('rect', { x: 300, y: 300 }, { x: 500, y: 420 });
 		await new Promise((r) => setTimeout(r, 300));
 	});

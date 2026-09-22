@@ -1,0 +1,17 @@
+colours: fg=rgb(0, 0, 0) bg=rgb(255, 255, 255)
+after X:  fg=rgb(0, 0, 0) bg=rgb(255, 255, 255)
+brighten pass 1: opened=true setBrightness=true applied=true
+brighten pass 2: opened=true setBrightness=true applied=true
+base mean luminance 178.4
+
+driver OK: 2 sliders found
+
+PASS  Highlights +90  set=[90,0] apply=true  diff=763151  mean 178.4 -> 199.3  (want up, moved +20.9)
+PASS  Highlights -90  set=[-90,0] apply=true  diff=763151  mean 178.4 -> 102.4  (want down, moved -75.9)
+PASS  Shadows +90     set=[0,90] apply=true  diff=     0  mean 178.4 -> 178.4  (want up, moved +0.0)  [mask 0.027 — near no-op expected here]
+PASS  Shadows -90     set=[0,-90] apply=true  diff=     0  mean 178.4 -> 176.6  (want down, moved -1.7)  [mask 0.027 — near no-op expected here]
+
+PASS  Highlights +90 brighter than -90  (+90 199.3 vs -90 102.4)
+
+5/5 PASS
+errors: none

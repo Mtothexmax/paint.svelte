@@ -2,7 +2,9 @@
 	// Layer: components. Mounts the currently-open dialog from the dialog store.
 	import { dialog } from '../../services/dialogService';
 	import type { EffectDialogPayload, LayerEffectDialogPayload } from '../../services/dialogService';
+	import type { AiBackgroundRemovalPayload } from '../../services/dialogService';
 	import NewImageDialog from './NewImageDialog.svelte';
+	import AiBackgroundRemovalDialog from './AiBackgroundRemovalDialog.svelte';
 	import FilterPopup from './FilterPopup.svelte';
 	import LayerEffectDialog from './LayerEffectDialog.svelte';
 	import RasterizeConfirmDialog from './RasterizeConfirmDialog.svelte';
@@ -36,4 +38,6 @@
 	<LevelsDialog />
 {:else if $dialog.kind === 'paste'}
 	<PasteDialog />
+{:else if $dialog.kind === 'aiBackgroundRemoval'}
+	<AiBackgroundRemovalDialog payload={$dialog.payload as AiBackgroundRemovalPayload} />
 {/if}

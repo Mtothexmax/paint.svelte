@@ -405,9 +405,9 @@
 
 	<div class="flex h-full w-full items-center gap-4 px-2 text-xs select-none" style="color:var(--text-dim);">
 	{#if isPaint && $activeLayerIsText}
-		<span class="tooloptions-placeholder">This is a text layer — rasterize it before painting on it.</span>
+		<span class="hint">This is a text layer — rasterize it before painting on it.</span>
 		<button
-			class="mini-btn"
+			class="tb-btn primary"
 			title="Convert this text layer to a plain raster layer so paint tools can edit it"
 			onclick={rasterizeTextLayer}
 		>
@@ -460,6 +460,7 @@
 			</span>
 		{/if}
 		<FilterSlider label="Spacing" min={1} max={300} step={1} unit="%" default={15} bind:value={$brushSpacing} />
+		<span class="tb-divider" aria-hidden="true"></span>
 		<span class="aa-label">Anti-alias:</span>
 		<IconSplitButton options={AA_OPTIONS} bind:value={aa} title="Anti-aliased rendering" />
 	{:else if isPencil}
@@ -492,6 +493,7 @@
 				− Subtract
 			</button>
 		</div>
+		<span class="tb-divider" aria-hidden="true"></span>
 		{#if $activeToolId === 'select-rect'}
 			<span class="aa-label">Ratio:</span>
 			<IconSplitButton
@@ -541,9 +543,10 @@
 			{/if}
 		{/if}
 		{#if $activeToolId === 'select-rect' || $activeToolId === 'select-ellipse'}
-			<span class="aa-label" title="Hold Shift while dragging to constrain to square proportions">Shift: square</span>
+			<span class="hint" title="Hold Shift while dragging to constrain to square proportions">Shift: square</span>
 		{/if}
 		{#if isLasso}
+			<span class="tb-divider" aria-hidden="true"></span>
 			<span class="aa-label">Tool:</span>
 			<div class="seg">
 				<button
@@ -562,14 +565,14 @@
 				</button>
 			</div>
 			{#if $activeToolId === 'select-poly'}
-				<button class="mini-btn" onclick={requestPolygonFinish} title="Finish the polygon selection">
+				<button class="tb-btn" onclick={requestPolygonFinish} title="Finish the polygon selection">
 					✓ Finish
 				</button>
 			{/if}
 		{/if}
 		{#if $selectionActive}
 			<button
-				class="mini-btn"
+				class="tb-btn primary"
 				title="Crop the image to the selection bounding box"
 				onclick={() => commands.run('image.cropToSelection')}
 			>
@@ -590,6 +593,7 @@
 			onchange={(e) => setTextFontSize(parseFloat((e.currentTarget as HTMLInputElement).value))}
 			title="Font size in pixels"
 		/>
+		<span class="tb-divider" aria-hidden="true"></span>
 		<div class="seg" role="group" aria-label="Weight and decorations">
 			<button
 				class="seg-btn"
@@ -628,6 +632,7 @@
 				S
 			</button>
 		</div>
+		<span class="tb-divider" aria-hidden="true"></span>
 		<div class="seg" role="group" aria-label="Text alignment">
 			<button
 				class="seg-btn"
@@ -657,10 +662,11 @@
 				<img src={AlignRightIcon} alt="" class="h-4 w-4" draggable="false" />
 			</button>
 		</div>
-		<button class="mini-btn" onclick={requestTextCommit} title="Render the text into the layer"> ✓ Finish </button>
-		<button class="mini-btn" onclick={requestTextCancel} title="Discard the text draft"> ✕ </button>
+		<button class="tb-btn primary" onclick={requestTextCommit} title="Render the text into the layer"> ✓ Finish </button>
+		<button class="tb-btn" onclick={requestTextCancel} title="Discard the text draft"> ✕ </button>
 	{:else if isFill}
 		<FilterSlider label="Tolerance" min={0} max={100} step={1} unit="%" bind:value={$fillTolerance} />
+		<span class="tb-divider" aria-hidden="true"></span>
 		<span class="aa-label">Flood Mode:</span>
 		<div class="seg" role="group" aria-label="Flood mode">
 			<button
@@ -680,7 +686,7 @@
 				🌐 Global
 			</button>
 		</div>
-		<span class="tooloptions-placeholder" title="Changing tolerance or flood mode re-applies the last fill">
+		<span class="hint" title="Changing tolerance or flood mode re-applies the last fill">
 			Tolerance edits re-apply the last fill.
 		</span>
 	{:else if isWand}
@@ -692,6 +698,7 @@
 			unit="%"
 			bind:value={$fillTolerance}
 		/>
+		<span class="tb-divider" aria-hidden="true"></span>
 		<span class="aa-label">Flood Mode:</span>
 		<div class="seg" role="group" aria-label="Flood mode">
 			<button
@@ -711,12 +718,12 @@
 				🌐 Global
 			</button>
 		</div>
-		<span class="tooloptions-placeholder" title="Tolerance and flood mode are shared with the paint bucket">
+		<span class="hint" title="Tolerance and flood mode are shared with the paint bucket">
 			Shared with the paint bucket.
 		</span>
 		{#if $selectionActive}
 			<button
-				class="mini-btn"
+				class="tb-btn primary"
 				title="Crop the image to the selection bounding box"
 				onclick={() => commands.run('image.cropToSelection')}
 			>
@@ -738,6 +745,7 @@
 				</button>
 			{/each}
 		</div>
+		<span class="tb-divider" aria-hidden="true"></span>
 		<FilterSlider label="Brush Width" min={1} max={50} step={1} bind:value={$shapeWidth} />
 		<span class="aa-label">Line Style:</span>
 		<IconSplitButton options={LINE_STYLE_OPTIONS} bind:value={lineStyle} title="Line style" />
@@ -767,14 +775,15 @@
 				❚ Both
 			</button>
 		</div>
-		<span class="aa-label" title="Hold Shift while dragging to constrain to square proportions">Shift: square</span>
+		<span class="hint" title="Hold Shift while dragging to constrain to square proportions">Shift: square</span>
 	{:else if isLine}
 		<FilterSlider label="Brush Width" min={1} max={50} step={1} bind:value={$lineWidth} />
 		<IconSplitButton options={ARROW_START_OPTIONS} bind:value={startArrowState} title="Start arrow" />
 		<IconSplitButton options={LINE_STYLE_OPTIONS} bind:value={curveStyle} title="Line style" />
 		<IconSplitButton options={ARROW_END_OPTIONS} bind:value={endArrowState} title="End arrow" />
-		<button class="mini-btn" onclick={requestLineCommit} title="Render the line into the layer"> ✓ Finish </button>
-		<button class="mini-btn" onclick={requestLineCancel} title="Discard the line draft"> ✕ </button>
+		<span class="tb-divider" aria-hidden="true"></span>
+		<button class="tb-btn primary" onclick={requestLineCommit} title="Render the line into the layer"> ✓ Finish </button>
+		<button class="tb-btn" onclick={requestLineCancel} title="Discard the line draft"> ✕ </button>
 	{:else if isGradient}
 		<span class="aa-label">Mode:</span>
 		<div class="seg" role="group" aria-label="Gradient mode">
@@ -811,6 +820,7 @@
 				<img class="seg-icon" src={GradientConicalIcon} alt="Conical" />
 			</button>
 		</div>
+		<span class="tb-divider" aria-hidden="true"></span>
 		<span class="aa-label">Repeat:</span>
 		<div class="seg" role="group" aria-label="Gradient repeat">
 			<button
@@ -838,20 +848,23 @@
 				Mirrored
 			</button>
 		</div>
-		<button class="mini-btn" onclick={requestGradientCommit} title="Render the gradient into the layer"> ✓ Finish </button>
-		<button class="mini-btn" onclick={requestGradientCancel} title="Discard the gradient draft"> ✕ </button>
+		<span class="tb-divider" aria-hidden="true"></span>
+		<button class="tb-btn primary" onclick={requestGradientCommit} title="Render the gradient into the layer"> ✓ Finish </button>
+		<button class="tb-btn" onclick={requestGradientCancel} title="Discard the gradient draft"> ✕ </button>
 	{:else if isClone}
 		<FilterSlider label="Size" min={1} max={400} step={1} bind:value={$cloneSize} />
 		<FilterSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$cloneOpacity} />
 		<FilterSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$cloneHardness} />
-		<span class="tooloptions-placeholder" title="Hold Alt and click to set the clone source">
+		<span class="tb-divider" aria-hidden="true"></span>
+		<span class="hint" title="Hold Alt and click to set the clone source">
 			Alt+click sets the source.
 		</span>
 	{:else if isRecolor}
 		<FilterSlider label="Size" min={1} max={400} step={1} bind:value={$recolorSize} />
 		<FilterSlider label="Opacity" min={0} max={100} step={1} unit="%" bind:value={$recolorOpacity} />
 		<FilterSlider label="Hardness" min={0} max={100} step={1} unit="%" bind:value={$recolorHardness} />
-		<span class="tooloptions-placeholder" title="Paints the foreground colour, destination alpha is preserved">
+		<span class="tb-divider" aria-hidden="true"></span>
+		<span class="hint" title="Paints the foreground colour, destination alpha is preserved">
 			Alpha is preserved.
 		</span>
 	{:else if isEyedropper}
@@ -862,6 +875,7 @@
 			/>
 			Copy color to clipboard as hex
 		</label>
+		<span class="tb-divider" aria-hidden="true"></span>
 		<span class="aa-label">Sample:</span>
 		<div class="seg" role="group" aria-label="Eyedropper sample source">
 			<button
@@ -888,7 +902,8 @@
 			bind:value={alphaMode}
 			title="Include alpha in sampled hex"
 		/>
-		<span class="tooloptions-placeholder" title="Left click samples the foreground slot, right click the background slot">
+		<span class="tb-divider" aria-hidden="true"></span>
+		<span class="hint" title="Left click samples the foreground slot, right click the background slot">
 			Left click → foreground, right click → background.
 		</span>
 	{:else if isMovePixels}
@@ -905,11 +920,12 @@
 				</button>
 			{/each}
 		</div>
+		<span class="tb-divider" aria-hidden="true"></span>
 		{#if $moveToolMode !== 'move'}
 			<!-- Rotate / Distort build up a floating transform; these commit or
 			     discard it (Enter and Escape do the same). -->
 			<button
-				class="mini-btn accent"
+				class="tb-btn primary"
 				disabled={!$moveTransformFloating}
 				title={$moveTransformFloating
 					? 'Apply the transform to the layer (Enter)'
@@ -919,7 +935,7 @@
 				✓ Apply
 			</button>
 			<button
-				class="mini-btn"
+				class="tb-btn"
 				disabled={!$moveTransformFloating}
 				title={$moveTransformFloating
 					? 'Discard the transform — the pixels go back (Escape)'
@@ -931,7 +947,7 @@
 		{/if}
 		{#if $selectionActive}
 			<button
-				class="mini-btn"
+				class="tb-btn primary"
 				title="Crop the image to the selection bounding box"
 				onclick={() => commands.run('image.cropToSelection')}
 			>
@@ -939,10 +955,10 @@
 			</button>
 		{/if}
 	{:else if isMoveSelection}
-		<span class="tooloptions-placeholder">Drag inside the selection to move its outline.</span>
+		<span class="hint">Drag inside the selection to move its outline.</span>
 		{#if $selectionActive}
 			<button
-				class="mini-btn"
+				class="tb-btn primary"
 				title="Crop the image to the selection bounding box"
 				onclick={() => commands.run('image.cropToSelection')}
 			>

@@ -1,64 +1,108 @@
-/* ---- split toggle button (icon + ?) ---- */
+/* ---- split toggle button (icon + ?) ----
+   A raised plate with a lit top edge, matching the rest of the options bar.
+   Left part cycles the value, the ▾ part opens the list; a hairline divides
+   them so the two hit areas are legible before you hover. */
 .isp {
 	position: relative;
 	display: inline-flex;
 	align-items: stretch;
-	height: 26px;
-	background: var(--panel);
-	border: 1px solid var(--border);
-	border-radius: 5px;
+	height: 24px;
+	background: linear-gradient(180deg, #3a3e45, #272a2f);
+	border: 1px solid rgba(0, 0, 0, 0.6);
+	border-radius: 6px;
 	overflow: visible;
 	padding: 0;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.1) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5);
 }
 .isp.open {
-	border-color: var(--accent);
+	border-color: rgba(111, 212, 255, 0.55);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.14) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5),
+		0 0 0 1px rgba(60, 130, 255, 0.35);
 }
 .isp-icon {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 26px;
+	width: 24px;
 	font-size: 15px;
-	cursor: pointer;
-	border-right: 1px solid var(--border);
+	border-radius: 5px 0 0 5px;
 }
-.isp-icon:hover {
-	background: rgba(255, 255, 255, 0.08);
+/* Main part (icon + optional label): one element, one shared hover. Only
+   the ▾ arrow opens the menu. */
+.isp-main {
+	display: flex;
+	align-items: center;
+	border-radius: 5px 0 0 5px;
+	cursor: pointer;
+}
+.isp-main:hover {
+	background: rgba(255, 255, 255, 0.09);
+}
+.isp-main:active {
+	filter: brightness(0.88);
 }
 .isp-arrow {
+	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 14px;
-	font-size: 9px;
-	color: var(--text-dim);
+	width: 16px;
+	font-size: 10px;
+	color: var(--text-faint);
 	cursor: pointer;
+	border-radius: 0 5px 5px 0;
+	transition:
+		color 100ms,
+		transform 150ms;
+}
+/* Inset hairline between the two hit areas. */
+.isp-arrow::before {
+	content: '';
+	position: absolute;
+	left: 0;
+	top: 6px;
+	bottom: 6px;
+	width: 1px;
+	background: rgba(0, 0, 0, 0.5);
+	box-shadow: 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 .isp-arrow:hover {
-	background: rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.09);
 	color: var(--text);
+}
+.isp-arrow:active {
+	filter: brightness(0.88);
+}
+/* Arrow flips while the list is open, so the control reads as expanded. */
+.isp.open .isp-arrow {
+	transform: rotate(180deg);
 }
 .isp-label-inline {
 	display: flex;
 	align-items: center;
-	padding: 0 8px 0 4px;
+	padding: 0 8px 0 5px;
 	font-size: 12px;
+	font-weight: 500;
 	color: var(--text);
 	white-space: nowrap;
-	cursor: pointer;
-}
-.isp-label-inline:hover {
-	background: rgba(255, 255, 255, 0.08);
 }
 .isp-menu {
 	position: fixed;
 	z-index: 1300;
 	min-width: 220px;
 	max-width: 300px;
-	background: #303030;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+	max-height: 320px;
+	overflow-y: auto;
+	background: linear-gradient(180deg, var(--chrome-hi), var(--chrome-lo));
+	border: 1px solid rgba(0, 0, 0, 0.7);
+	border-radius: 7px;
+	box-shadow:
+		0 16px 32px -8px rgba(0, 0, 0, 0.7),
+		0 1px 0 rgba(255, 255, 255, 0.1) inset;
 	padding: 4px;
 	display: flex;
 	flex-direction: column;
@@ -76,7 +120,7 @@
 	cursor: pointer;
 }
 .isp-item:hover {
-	background: rgba(255, 255, 255, 0.07);
+	background: rgba(44, 111, 224, 0.25);
 }
 .isp-item.on {
 	background: var(--accent-soft);
@@ -103,5 +147,5 @@
 }
 .isp-check {
 	flex: 0 0 auto;
-	color: var(--accent);
+	color: var(--accent-ring);
 }

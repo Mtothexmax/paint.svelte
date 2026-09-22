@@ -28,16 +28,16 @@
 	}
 </script>
 
-<div class="flex h-full w-full flex-col items-center justify-center gap-6 p-8" style="background:#1f1f1f;">
+<div class="flex h-full w-full flex-col items-center justify-center gap-6 p-8" style="background:var(--stage);">
 	<div class="flex flex-col items-center gap-3">
 		<img src={favicon} alt="" draggable="false" class="h-16 w-16" style="image-rendering:auto;" />
-		<h1 class="text-xl font-semibold" style="color:#e0e0e0;">Paint</h1>
-		<p class="text-sm" style="color:#9a9a9a;">Drop images here, open a file, or create a new canvas.</p>
+		<h1 class="text-xl font-semibold" style="color:var(--text);">Paint</h1>
+		<p class="text-sm" style="color:var(--text-dim);">Drop images here, open a file, or create a new canvas.</p>
 	</div>
 
 	<div
 		class="flex w-full max-w-xl cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors"
-		style="border-color:{dragging ? '#3b82f6' : '#4a4a4a'}; background:{dragging ? 'rgba(59,130,246,0.08)' : 'transparent'};"
+		style="border-color:{dragging ? 'var(--accent)' : 'var(--line)'}; background:{dragging ? 'var(--accent-soft)' : 'transparent'};"
 		role="button"
 		tabindex="0"
 		ondragover={onDragOver}
@@ -47,8 +47,8 @@
 		onkeydown={onZoneKey}
 	>
 		<span class="text-3xl">🖼️</span>
-		<span class="text-sm font-medium" style="color:#c8c8c8;">Click to open, or drop image files here</span>
-		<span class="text-xs" style="color:#7a7a7a;">PNG · JPEG · WebP — multiple files open multiple tabs</span>
+		<span class="text-sm font-medium" style="color:var(--text);">Click to open, or drop image files here</span>
+		<span class="text-xs" style="color:var(--text-faint);">PNG · JPEG · WebP — multiple files open multiple tabs</span>
 	</div>
 
 	<div class="flex flex-wrap items-center justify-center gap-3">

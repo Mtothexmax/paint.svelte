@@ -30,7 +30,8 @@
 		unit?: string;
 		/** CSS background value (gradient or colour) painted on the track */
 		gradient?: string;
-		/** Opt-in center tick (range middle) — explicit per effect param. */
+		/** Opt-in center marker (range middle) — explicit per effect param.
+		 * Rendered as a small dot at the track centre, not a line. */
 		centerTick?: boolean;
 		/** Fill the available width (e.g. layers-panel opacity row) instead
 		 * of sizing to content. */
@@ -105,11 +106,21 @@
 		if (commit) onCommit?.();
 	}
 
-	function setFromClientX(clientX: number, commit: boolean): void {
+	function setFromClientX(clientX: number, commit: boolean, fine: boolean): void {
 		const track = trackEl;
 		if (!track || range <= 0) return;
 		const r = track.getBoundingClientRect();
-		setValue(min + ((clientX - r.left) / Math.max(r.width, 1)) * range, commit);
+		let pct = ((clientX - r.left) / Math.max(r.width, 1)) * 100;
+		if (!fine) {
+			// Snap to quarter stops unless Alt is held (fine adjust).
+			for (const stop of [0, 25, 50, 75, 100]) {
+				if (Math.abs(pct - stop) < 1.3) {
+					pct = stop;
+					break;
+				}
+			}
+		}
+		setValue(min + (pct / 100) * range, commit);
 	}
 
 	function onTrackDown(e: PointerEvent): void {
@@ -128,11 +139,11 @@
 		} catch {
 			/* ignore */
 		}
-		setFromClientX(e.clientX, false);
+		setFromClientX(e.clientX, false, e.altKey);
 	}
 	function onTrackMove(e: PointerEvent): void {
 		if (!dragging || !trackEl?.hasPointerCapture(e.pointerId)) return;
-		setFromClientX(e.clientX, false);
+		setFromClientX(e.clientX, false, e.altKey);
 		if (!dragNotified) {
 			dragNotified = true;
 			ondragchange?.(true);
@@ -153,10 +164,31 @@
 		setValue(value + factor * s, true);
 	}
 
-	/** Step buttons: left click = 1 step, right click = 10 steps. */
-	function onStepDown(dir: -1 | 1, e: MouseEvent): void {
+	/** Step buttons: left click = 1 step, right click = 10 steps. Holding
+	 * repeats after 380 ms every 45 ms (like the reference design). */
+	let pushDir: -1 | 0 | 1 = $state(0);
+	let stepTimer: ReturnType<typeof setTimeout> | undefined;
+	let stepRepeat: ReturnType<typeof setInterval> | undefined;
+	function stopStep(): void {
+		pushDir = 0;
+		if (stepTimer !== undefined) {
+			clearTimeout(stepTimer);
+			stepTimer = undefined;
+		}
+		if (stepRepeat !== undefined) {
+			clearInterval(stepRepeat);
+			stepRepeat = undefined;
+		}
+	}
+	function startStep(dir: -1 | 1, e: MouseEvent): void {
 		e.preventDefault();
-		stepBy((e.button === 2 ? 10 : 1) * dir);
+		stopStep();
+		const size = (e.button === 2 ? 10 : 1) * dir;
+		pushDir = dir;
+		stepBy(size);
+		stepTimer = setTimeout(() => {
+			stepRepeat = setInterval(() => stepBy(size), 45);
+		}, 380);
 	}
 
 	function onTrackKey(e: KeyboardEvent): void {
@@ -223,13 +255,18 @@
 	}
 </script>
 
+<svelte:window onpointerup={stopStep} onblur={stopStep} />
+
 <div class="fsl" class:grow={grow}>
 	<button
 		type="button"
 		class="fsl-step"
+		class:push={pushDir === -1}
 		title="Decrease (right-click: −10 steps)"
 		aria-label="Decrease {label}"
-		onmousedown={(e) => onStepDown(-1, e)}
+		onmousedown={(e) => startStep(-1, e)}
+		onmouseup={stopStep}
+		onmouseleave={stopStep}
 		oncontextmenu={(e) => e.preventDefault()}
 	><img src={MinusIcon} class="fsl-step-ic" alt="" draggable="false" /></button>
 	<div
@@ -244,7 +281,7 @@
 		aria-valuemax={max}
 		aria-valuenow={clampToRange(value)}
 		aria-valuetext="{displayValue}{unit}"
-		title="{label} — drag or click to set, double-click to reset"
+		title="{label} — drag to set (Alt: fine adjust), double-click to reset"
 		onpointerdown={onTrackDown}
 		onpointermove={onTrackMove}
 		onpointerup={onTrackUp}
@@ -335,9 +372,12 @@
 	<button
 		type="button"
 		class="fsl-step"
+		class:push={pushDir === 1}
 		title="Increase (right-click: +10 steps)"
 		aria-label="Increase {label}"
-		onmousedown={(e) => onStepDown(1, e)}
+		onmousedown={(e) => startStep(1, e)}
+		onmouseup={stopStep}
+		onmouseleave={stopStep}
 		oncontextmenu={(e) => e.preventDefault()}
 	><img src={PlusIcon} class="fsl-step-ic" alt="" draggable="false" /></button>
 	{#if dflt !== undefined}

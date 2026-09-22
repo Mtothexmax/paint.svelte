@@ -1,0 +1,18 @@
+discovered 13 candidate entries
+  (no dialog appeared for Adjustments ▸ Auto-Level)
+  (no dialog appeared for Adjustments ▸ Black and White)
+  (no dialog appeared for Adjustments ▸ Invert Alpha)
+  (no dialog appeared for Adjustments ▸ Invert Colors Ctrl+Shift+I)
+  (no dialog appeared for Adjustments ▸ Sepia)
+  (no dialog appeared for Distort ▸ Polar Inversion)
+  (no dialog appeared for Distort ▸ Polar Inversion)
+  (no dialog appeared for Distort ▸ Polar Inversion)
+  (no dialog appeared for Distort ▸ Polar Inversion)
+file:///C:/dev/paint.svelte/.workbuddy-ai/fx-audit.mjs:229
+	await page.mouse.move(pad.x + 3, pad.y + 3);
+	                          ^
+
+TypeError: Cannot read properties of null (reading 'x')
+    at file:///C:/dev/paint.svelte/.workbuddy-ai/fx-audit.mjs:229:28
+
+Node.js v22.22.2

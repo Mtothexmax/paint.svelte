@@ -33,7 +33,7 @@
 	position: relative;
 	width: 110px;
 	height: 16px;
-	background: #2f2f2f;
+	background: var(--well);
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	overflow: hidden;

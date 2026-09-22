@@ -13,6 +13,7 @@ export type DialogKind =
 	| 'selectionSize'
 	| 'paste'
 	| 'layerOpacity'
+	| 'aiBackgroundRemoval'
 	| null;
 
 export interface DialogState {
@@ -59,6 +60,11 @@ export interface PasteDialogPayload {
 	canvasWidth: number;
 	canvasHeight: number;
 	onChoose: (choice: PasteOversizeChoice) => void;
+}
+
+/** Payload for the 'aiBackgroundRemoval' dialog: source layer snapshot. */
+export interface AiBackgroundRemovalPayload {
+	layerId: string;
 }
 
 export const dialog = writable<DialogState>({ kind: null });

@@ -28,7 +28,7 @@
 	padding: 0;
 	border-radius: 4px;
 	border: 1px solid var(--border);
-	background-image: repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+	background-image: repeating-conic-gradient(#232629 0% 25%, #15171a 0% 50%);
 	background-size: 8px 8px;
 	cursor: pointer;
 	font: inherit;

@@ -3,7 +3,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const log = (...a) => console.log(...a);
 
@@ -33,9 +33,9 @@ async function main() {
 	await clickText('.menubar-btn', 'File');
 	await sleep(200);
 	await clickText('.menu-item', 'New…');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 	await sleep(600);
 
 	const step = (label) =>
@@ -43,7 +43,7 @@ async function main() {
 			const doc = window.__REGISTRY__.active;
 			const before = doc.activeLayer.surfaceId;
 			// apply invertColors via the menu command (no dialog)
-			const { commands } = await import('/src/lib/services/commandRegistry.ts');
+			const { commands } = await import('/paint.svelte/src/lib/services/commandRegistry.ts');
 			switch (lbl) {
 				case 'invert':
 					commands.run('adjustments.invertColors');

@@ -70,9 +70,15 @@
 		gap: 8px;
 		padding: 6px 8px;
 		border-radius: 5px;
-		border: 1px solid #555;
-		background: rgba(24, 24, 24, 0.94);
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+		/* Chrome plate, like every other floating surface. The edge stays a
+		   mid grey (`--text-faint`) rather than the black `--border`: this HUD
+		   floats over arbitrary canvas content, so it must read against light
+		   AND dark pixels. */
+		border: 1px solid var(--text-faint);
+		background: var(--chrome-lo);
+		box-shadow:
+			0 1px 0 rgba(255, 255, 255, 0.09) inset,
+			0 4px 14px rgba(0, 0, 0, 0.55);
 		/* Must never eat the pointer — the canvas keeps receiving moves. */
 		pointer-events: none;
 		font-size: 11px;
@@ -86,12 +92,12 @@
 		width: 34px;
 		height: 34px;
 		border-radius: 4px;
-		border: 1px solid #666;
+		border: 1px solid var(--text-faint);
 		overflow: hidden;
-		background-color: #2f2f2f;
+		background-color: var(--well);
 		background-image:
-			linear-gradient(45deg, #4a4a4a 25%, transparent 25%, transparent 75%, #4a4a4a 75%),
-			linear-gradient(45deg, #4a4a4a 25%, transparent 25%, transparent 75%, #4a4a4a 75%);
+			linear-gradient(45deg, #232629 25%, transparent 25%, transparent 75%, #232629 75%),
+			linear-gradient(45deg, #232629 25%, transparent 25%, transparent 75%, #232629 75%);
 		background-size: 10px 10px;
 		background-position: 0 0, 5px 5px;
 		position: relative;

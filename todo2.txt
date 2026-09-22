@@ -854,3 +854,313 @@ SUITE STATUS: 0 FAIL / 94 PASS across fx-audit(7) fx-controls2(32) fx-select(20)
 
 STILL OPEN: identity bootstrap (IDENTITY.md / USER.md / SOUL.md, delete
   BOOTSTRAP.md); docked Layer Effects panel; docs/ is stale (export.ps1 not run).
+
+============================================================
+-- DONE -- Tool-options bar restyled to the selection-toolbar design
+============================================================
+Request: "make the toolbar more similar to this designed from claude:
+selection-toolbar.html"
+
+Reference = raised chrome plate, recessed segmented control with a BLUE active
+pill, split dropdown (cycle + arrow), faint hint, one blue primary action.
+
+NEW PALETTE (layout.css :root)
+  --chrome-hi #2b2e34  --chrome-lo #1a1c20
+  --chrome-bar1 #34383f  --chrome-bar2 #22252a
+  --well #0d0f11  --text-faint #5d626c
+  --accent-glow #3c82ff  --accent-ring #6fd4ff
+Note: FilterSlider.css already used #3a3e45 -> #272a2f, the reference's exact
+button gradient -- the codebase was already drifting to this palette.
+
+CHANGES
+  layout.css
+    .options-strip   gradient plate + grain (blended INTO the background with
+                     background-blend-mode, not a ::after overlay -- an overlay
+                     paints above in-flow content and would sit on the labels)
+    .seg-btn.on      grey -> blue 3-stop gradient + glow   [the signature change]
+    .tb-btn          NEW: raised plate for strip actions
+    .tb-btn.primary  NEW: blue-tinted, ring + glow, for Apply/Finish/Crop
+    .tb-divider      NEW: 24px vertical hairline between groups (8 added)
+    .hint            NEW: --text-faint, a step dimmer than .aa-label
+    .fsl-num         moved into the same --well groove as .seg
+    .tab-tray-overlay pointer-events:none  +  .fltab pointer-events:auto
+  IconSplitButton.css  raised plate, hairline between halves, arrow flips when
+                       open, gradient menu with accent hover
+  ToolOptions.svelte   8 dividers, hints -> .hint, all action buttons -> .tb-btn
+
+DELIBERATELY NOT DONE
+  * .mini-btn was NOT restyled. It is also the Layers panel's + - down arrow
+    icon row; raised gradient plates there would be wrong. The strip moved to
+    .tb-btn instead, .mini-btn stays a ghost button.
+  * No ml-auto on the primary action. The design is flush-right, but
+    .tab-tray-overlay is position:absolute; left:75%; height:64px; z-index:40
+    and spans the menubar AND the strip. Measured: the Crop button landed at
+    x 1262-1393, inside the tray box, and elementFromPoint at its centre
+    returned DIV.fltab-tray -- the click never reached it. Kept the design's
+    look, dropped its right-alignment.
+
+BUG FOUND AND FIXED: the tab tray swallowed clicks
+  The tray is a transparent box that happens to hold tabs and had
+  pointer-events:auto, so its EMPTY area ate clicks aimed at the menubar and
+  options strip underneath (the whole top-right 25% of the window).
+  Fix: pointer-events:none on .tab-tray-overlay, auto on .fltab.
+  Verified: empty tray points resolve to DIV.menubar-strip / DIV.flex now, and
+  a real mouse click still switches tabs (active 1 -> 0).
+  Trade-off: the tray's own horizontal scrollbar is no longer draggable.
+
+VERIFIED
+  tb-look.mjs        strip screenshots + computed styles, 9 tools
+  tb-tray-hits.mjs   0 blocked controls, click-through proven, tabs clickable
+  tb-other-segs.mjs  the 2 other .seg consumers (Resize Image dialog, colour
+                     panel) still correct with the blue pill
+  tsc clean; svelte-check 0 errors / 55 warnings (baseline held)
+
+PRE-EXISTING, NOT FROM THIS CHANGE: the effect-dialog probe suite is stale
+  fx-audit / fx-controls2 / fx-select / fx-shadow-color / fx-outline-premul
+  crash or mis-enumerate; fx-layer-effect 13/14.
+  PROVEN pre-existing by stashing my 4 files and re-running fx-audit -> same
+  "discovered 13 candidate entries" and same "no dialog appeared" lines.
+  Two causes, both from the user's refactors:
+    1. Effects menu is now FilterPopup + EffectBrowserMenu with .fx-add-* --
+       probes enumerating .menu-panel .menu-item see only Adjustments (13 not
+       ~50). The new menu is a FLAT SEARCHABLE list (.fx-add-search filters
+       .fx-add-item), easier to drive than the old nested submenus.
+    2. .fsl-label renamed to .fsl-label-frame -- fx-layer-effect's single FAIL
+       ("renders its sliders: sliders=[]") is a healthy dialog read through a
+       dead selector.
+  Still green: fx-hlsh-verify2 5/5, fsl-center-dot 6/6.
+  TODO: repair the 6 probes' openLeaf to use the .fx-add-search recipe.
+
+-- DONE -- Claude design sweep: Layers header, Effects-menu z-index, palette --
+(2026-09-22)
+
+Three asks, all done and measured.
+
+1. Layers header buttons sat BELOW the "LAYERS" title.
+   Cause: justify-between + align-items:center centres the title's whole BOX, and
+   .panel-title carried padding-bottom 4 + border-bottom 1 + margin-bottom 6, so
+   its text ink rode ~3.25px above the box centre.
+   Fix (structural, not a transform nudge): a new opt-in `.panel-head` class on
+   the row moves the rule to a pseudo-element and shrinks the title's box to
+   exactly its text, so align-items:center aligns the words with the glyphs.
+   Measured over the title's text node: +6.25px -> +0.75px, spread 0.0 across all
+   six buttons. The 0.75px residue is font-metric and matches the History panel.
+
+2. The rule under "LAYERS" stopped at the title; History's spanned the panel.
+   Moved it to .panel-head::after (row bottom), dropped the row's 5px
+   padding-bottom, restored the gap as margin-bottom. Rule 41.06px -> 199px,
+   exactly the row width; History's is 199px too.
+
+3. Effects menu, z-index (the user's report: "the buttons of the dialog have a
+   higher z index than the effects dialog" -- correct).
+   .m-dialog > * { position:relative; z-index:1 } gave EVERY direct child its own
+   stacking context, so the title-bar-anchored switcher menu was capped inside the
+   title bar while the later .m-body/.m-footer siblings painted over it.
+   Fix: .m-dialog > .m-title { z-index: 2 }.
+   Proof by grid-sampling the menu∩dialog intersection with elementFromPoint:
+   before, 5 cells hit DIV.m-footer / BUTTON.btn-primary / BUTTON.btn-secondary;
+   after, 36 menu cells / 0 covered. .fx-add-menu.down also raised 60 -> 62.
+   The menubar-menu-vs-open-dialog case stays AS IS by user decision (dialogs win).
+
+4. Palette unified (user chose full alignment). :root now has ONE ramp; the old
+   neutral tokens are aliases onto it:
+     --stage #111214     --bg var(--well)          --bg-elev var(--chrome-hi)
+     --panel var(--chrome-lo)                      --well #0b0c0e
+     --border rgba(0,0,0,.7)   [a SEAM]            --line rgba(255,255,255,.14)
+     --line-strong rgba(255,255,255,.22)           [a VISIBLE hairline]
+     --text #e7e9ee   --text-dim #8d929c   --text-faint #5d626c
+     --accent #2c6fe0   --accent-soft rgba(44,111,224,.16)
+   TRAP: --border is black now, so it is invisible on dark. Six visible-line sites
+   moved to --line (XYPicker crosshairs, ContextMenu/.tool-sep separators,
+   AnglePicker dial ring, FontDropdown dashed drop zone, status-bar hairline,
+   .zb-btn:hover). One site used --border as a FILL, not an edge -- the Layers fx
+   badge, whose comment demands a SOLID grey -- now #3a3e45.
+   Also swept hardcoded #888/#6b6b6b/#9a9a9a/#bdbdbd/#cfcfcf/#eee -> ink tokens;
+   checkers -> #232629/#15171a (except ToolbarColorPicker's alpha slider, which
+   keeps a mid-grey checker on purpose so a black left end still reads);
+   CurvesDialog's tailwind-gray tabs/buttons -> the shared plate + accent pill;
+   plus PasteDialog, LevelsDialog, StartScreen, StatusBar, ZoomBar, ColorProbeHud,
+   TabBar/LayersPanel thumbnails.
+
+FILES: src/routes/layout.css; components/panels/{LayersPanel.css,EffectPanel.css};
+  components/common/{MovableDialog.css,EffectBrowserMenu.css,ContextMenu.css,
+  XYPicker.css,AnglePicker.css,FontDropdown.css,ColorPicker.css,EffectColorRow.css,
+  PdnSlider.css}; components/dialogs/{CurvesDialog.svelte,LevelsDialog.css,
+  PasteDialog.svelte,ImageSizeDialog.svelte,RasterizeConfirmDialog.svelte,
+  SelectionSizeDialog.svelte}; components/shell/{StatusBar.svelte,ZoomBar.css,
+  TabBar.css,ToolbarColorPicker.svelte}; components/canvas/{ColorProbeHud.svelte,
+  EditorCanvas.svelte}; components/start/StartScreen.svelte; components/App.svelte
+
+VERIFIED: tsc clean; svelte-check 0 errors / 54 warnings (baseline 55 held).
+  verify-popups.mjs -- every popup surface read back real computed values,
+  errors: none. verify-head.mjs -- rule width == row width, delta 0.75px.
+
+FOUND, NOT FIXED: .dialog / .dialog-backdrop / .dialog-title / .dialog-close /
+  .dialog-footer in layout.css are DEAD CSS (0 references -- every modal is a
+  MovableDialog now). Worth deleting in a cleanup pass.
+
+Probe suite still stale (same 6 probes as 2026-09-19). The repair recipe lives in
+  the paint-verify-ui skill, which was updated this session: its recommended URL
+  was the bare root (500s) -- the app is under the /paint.svelte/ base path.
+
+-- DONE 2026-09-22 (D) four chrome-polish fixes -------------------------------
+
+1. resize dialog's text field not restyled
+   .field input[type=number|text] was `background: var(--bg)` +
+   `1px solid var(--border)` -- and --border is a BLACK seam, so on the dialog's
+   chrome plate the fields read as flat black holes with no edge. Moved onto the
+   established recessed-well recipe (the .fsl-well one) in routes/layout.css.
+   Focus now swaps in `0 0 0 2px var(--accent-ring)` and kills the default
+   browser ring. .field is shared by ImageSizeDialog, NewImageDialog and
+   SelectionSizeDialog, so all three are fixed. .preset-chip got the RAISED
+   plate instead (it is a button, not an input).
+
+2. clicking a colour -> "the view is not restyled"
+   "the view" = the fullscreen ColorPickerPanel (toolbar fg/bg swatch), not the
+   compact picker in effect rows. Three instances of the same invisible-border
+   bug:
+     - .cp-num input / .cp-hexfield input -> recessed-well recipe (as #1)
+     - .cp-sv, .cp-strip, .cp-preview-swatch -> `1px solid var(--border)` was an
+       invisible seam, so the SV square and hue/alpha strips floated frameless;
+       now `0 0 0 1px rgba(0,0,0,.8)` + soft drop shadow
+     - .color-mode-head -> border-bottom was --border alone (invisible), so the
+       header band had no bottom edge; now matches .m-title (black hairline +
+       0 1px 0 rgba(255,255,255,.075) inset)
+   ColorPicker.css is shared with the compact embed (EffectColorRow), so those
+   benefit too -- intended, same defect.
+
+3. .m-grip removed from window headers
+   Existed in exactly two places, both deleted: the span at
+   MovableDialog.svelte:92 and its rule at MovableDialog.css:130. A comment now
+   records why. grep -rn m-grip src/ -> only that comment.
+
+4. zoom slider recoloured to fit
+   Was a bare <input type=range> styled only with `accent-color` -- Chrome paints
+   that as a fat rounded pill with a big flat blue circle, the one control that
+   did not speak the app's design language. Now matches .fsl: 6px sunken well,
+   blue accent fill ending under the thumb, knurled metal thumb.
+   `appearance: none` + ::-webkit-slider-* and ::-moz-range-* pseudo-elements.
+   SUBTLE PART: a native range thumb does not travel the full track -- its centre
+   runs from THUMB_W/2 to TRACK_W - THUMB_W/2. Painting the fill to the raw
+   value % left a visible sliver of empty track left of the thumb at 1%. So
+   ZoomBar.svelte computes a compensated `fillPct` -> `--zb-fill`
+   (`((p*(TRACK_W-THUMB_W) + THUMB_W/2)/TRACK_W)*100`, TRACK_W=110, THUMB_W=9).
+   Verified at 1% zoom: --zb-fill 4.09% and no blue beside the thumb.
+
+VERIFIED: tsc clean; svelte-check 0 errors / 54 warnings (baseline);
+  gizmo_imagesize_probe.mjs PASSES (dialog drag +60/+40, X-close,
+  hasBackdrop:false, resize apply 1920->960); errors: none.
+
+ALSO: repaired repo-wide probe rot. gizmo_imagesize_probe failed on
+  `Waiting for selector '.dialog'` -- NOT a regression (no component renders
+  class="dialog" any more). 18 of 22 probes used the dead .dialog class and 20
+  of 22 were missing the /paint.svelte/ base path in BASE and in
+  import('/src/lib/...'). All fixed in one idempotent sed pass; recipe added to
+  the paint-verify-ui skill (whose own example used .dialog -- also fixed).
+
+ALSO: "in the alt menu at the top move the menu ai models to the very right" --
+  done earlier this session: AI Models is now last in MENUS / rightmost on
+  screen. Menubar order IS the MENUS array order.
+
+WARNING -- GIT OBJECT STORE LOST, NOT CAUSED BY AN EDIT:
+  .git/objects (loose AND packed -- no *.pack anywhere) disappeared mid-session,
+  along with refs/heads/main, refs/remotes/* and refs/stash. git now says "not a
+  git repository". HEAD, config, the full reflog and FETCH_HEAD survive, and the
+  WORKING TREE IS COMPLETELY INTACT. An early `git status` succeeded, then
+  `git stash push` aborted with "545ca8cb... is not a valid object" -- i.e. it
+  detected the damage, created no stash ref, changed nothing. The loss happened
+  in between, when I ran only read-only ops, tsc, svelte-check and the probes.
+  Most likely a concurrent git op by another tool: .git/refs/agents,
+  .git/refs/codex, .git/cursor and .git/opencode show Cursor/Codex/opencode all
+  have git integrations in this working copy (.git/opencode touched 09:28).
+  A racing/interrupted `git gc` matches the damage shape. NOT PROVEN.
+  Recovery NOT performed (needs consent): remote reachable, refs/heads/main =
+  cf9806c4dc0fc8798fc344159077541b7f0760e5. Last local commit was 0c961729
+  ("added ai model downloader") -- one ahead of the remote, so its message is
+  lost but its content is safe in the working tree. Path: git init ->
+  git fetch origin -> git reset --mixed origin/main (NOT --hard).
+  RULE: read-only git only in this repo.
+
+-- DONE 2026-09-22: GIT RECOVERED --------------------------------------------
+
+Repo is healthy again: git fsck -> 0 errors / 0 missing objects; history restored
+  to cf9806c; git write-tree works (committing is possible again). The working
+  tree was verified BYTE-IDENTICAL throughout (md5 manifest over 303 files in
+  src/ scripts/ docs/ static/ = f80a99f391fb0184c48868d0e1b04253 before and after).
+
+Steps, in the order that was actually forced (each was blocked by the previous):
+  1. mkdir -p .git/objects -- this alone cleared "not a git repository"
+  2. removed ONE dangling ref (refs/agents/.../checkpoints/turn/0 -> 98d39ffe...,
+     object destroyed with the rest); a single dangling ref blocks EVERY fetch,
+     and an explicit refspec does not avoid it
+  3. git fetch origin -> full pack, 2477 objects (1381 blobs / 955 trees / 125 commits)
+  4. the fetch's ref write silently did not land -- git could not create the
+     missing parent dir; mkdir -p .git/refs/heads .git/refs/remotes/origin first
+  5. the INDEX was unusable: 97 missing blobs, all referenced by .git/index (30 of
+     them real source files), and git write-tree failed so no commit was possible.
+     git reset alone also failed reading it -> rm .git/index THEN git reset --mixed HEAD
+  6. reflog had one corrupt line (the move TO the destroyed commit) -> grep -v just
+     that SHA out of .git/logs/HEAD and .git/logs/refs/heads/main. Deliberately NOT
+     git reflog expire, which would have wiped 126 valid history entries.
+
+Backups kept: /tmp/paint-tree-backup.tgz, /tmp/paint-index-broken.bak,
+  /tmp/paint-logs-backup.tgz, /tmp/dangling-ref-record.txt.
+
+CONSEQUENCES: refs/heads/main now = cf9806c (= origin/main). The last local commit
+  0c961729 ("added ai model downloader") is gone AS A COMMIT -- its message is lost,
+  its content is intact in the working tree and shows as ordinary modifications.
+  The index staging state was necessarily discarded (it was unusable anyway): 67
+  modified + 116 untracked files are all still present, just unstaged. The
+  refs/agents checkpoint ref for that AI tool is gone (already dangling).
+  NOTHING HAS BEEN COMMITTED -- that is the user's call.
+
+Git is now usable for normal work, but the concurrency caution stands: several AI
+  tools operate on this same .git, so prefer read-only git and avoid stash/gc/reset.
+
+-- DONE 2026-09-22: .color-mode-head follow-up ---------------------------------
+
+User: "and this color-mode-head". The D2 pass had fixed the head's bottom edge
+  (border-bottom was var(--border) alone) but left three inconsistencies, all
+  confirmed by computed-style diff against a dialog title:
+
+  |                  | .m-title (dialog)                | .color-mode-head (before)   |
+  | background       | linear-gradient(52,56,63 -> 34,37,42) | FLAT rgb(43,46,52)     |
+  | title font       | 12.5px/600 + 0.02em              | 14px/600                    |
+  | primary button   | .m-footer .btn-primary navy plate | flat var(--accent) + white |
+  | secondary button | raised plate                     | bare transparent text       |
+
+  So the rule + inset highlight were already right -- ONLY the gradient was
+  missing, which is why the bar still read as flat beside a dialog.
+
+FIXED in layout.css:
+  - .color-mode-head  -> linear-gradient(180deg, #34383f, #22252a), now identical
+    to .m-title
+  - .color-mode-title -> 12.5px/600 + letter-spacing .02em, matching .m-title
+  - .color-mode-head .mini-btn -> raised secondary plate (.fsl-step recipe).
+    SCOPED on purpose: the bare transparent .mini-btn is correct where it is an
+    icon-only affordance (panel headers); only as a LABELLED action in a chrome
+    bar did it read as an unstyled link.
+  - .color-mode-head .color-mode-done -> the .m-footer .btn-primary plate (navy
+    gradient + --accent-ring text + blue ring). A view-level commit action belongs
+    to the dialog-footer context, not the tool strip (whose flat-blue primary is
+    .mini-btn.accent).
+
+SPECIFICITY TRAP: the scoped rules must be `.color-mode-head .color-mode-done`
+  and `...:hover` -- TWO classes, so they tie (0,3,0) with the global
+  `.btn-primary:hover:not(:disabled)` and win by source order (:not() contributes
+  its argument's specificity). A single-class `.color-mode-done:hover` (0,2,0)
+  would LOSE and the global `filter: brightness(1.1)` would stack on top of the
+  hover gradient -- hence the explicit `filter: none` in the hover rule.
+
+VERIFIED (scripts/d2_head.mjs): head bg == .m-title bg; title 12.5px/600; Done
+  rest rgb(38,49,74)->rgb(26,35,52) + filter:none + text rgb(111,212,255); Done
+  hover rgb(44,58,88)->rgb(31,43,64) + filter:none; Copy hover brightness(1.18)
+  with matches(':hover')===true; "hover OK: true"; errors: none; tsc clean;
+  svelte-check 0 errors / 54 warnings (baseline held).
+
+PROBE GOTCHA: a `filter` transition means a 300ms wait can read the un-settled
+  brightness(1). Wait >=700ms and assert el.matches(':hover') before concluding a
+  hover rule did not apply.
+
+FOUND, STILL NOT FIXED: the dead .dialog / .dialog-backdrop / .dialog-title /
+  .dialog-close / .dialog-footer CSS in layout.css (0 references).

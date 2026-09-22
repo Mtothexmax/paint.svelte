@@ -5,7 +5,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const log = (...a) => console.log(...a);
 
@@ -43,12 +43,12 @@ async function main() {
 	await clickText('.menubar-btn', 'File');
 	await sleep(200);
 	await clickText('.menu-item', 'New…');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 	for (let i = 0; i < 60; i++) {
 		const ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { hasEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -56,8 +56,8 @@ async function main() {
 	}
 	await sleep(800);
 	const setup = await page.evaluate(async () => {
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
-		const { sampleSurfacePixels } = await import('/src/lib/render/readback.ts');
+		const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
+		const { sampleSurfacePixels } = await import('/paint.svelte/src/lib/render/readback.ts');
 		const doc = window.__REGISTRY__.active;
 		if (!doc) return { err: 'no doc' };
 		const r = getEditorRenderer();
@@ -70,8 +70,8 @@ async function main() {
 
 	// Make the canvas fully opaque so the effect has something to show.
 	await page.evaluate(async () => {
-		const { applyFill, reapplyLastFill } = await import('/src/lib/services/fillService.ts');
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+		const { applyFill, reapplyLastFill } = await import('/paint.svelte/src/lib/services/fillService.ts');
+		const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 		const doc = window.__REGISTRY__.active;
 		let res = applyFill(50, 50, { r: 255, g: 80, b: 40, a: 255 });
 		if (res !== 'ok') {
@@ -86,8 +86,8 @@ async function main() {
 	// Adds an effect, then reads the LIVE layer-effect texture pixels directly.
 	const probe = (effId, setts) =>
 		page.evaluate(async (id, st) => {
-			const { addLayerEffect, removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
-			const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { addLayerEffect, removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
+			const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			const doc = window.__REGISTRY__.active;
 			const effs = doc.activeLayer.effects || [];
 			for (let i = effs.length - 1; i >= 0; i--) removeLayerEffect(doc.activeLayer.id, i);

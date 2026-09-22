@@ -2152,7 +2152,7 @@ function onPointerDown(e: PointerEvent) {
 	{/if}
 	{#each visibleTransformPoints() as point}
 		<div
-			class="pointer-events-none absolute z-20 box-border border border-white bg-blue-500 shadow-[0_0_0_1px_#1e3a8a]"
+			class="pointer-events-none absolute z-20 box-border border border-white bg-blue-500 shadow-[0_0_0_1px_#1e4e9d]"
 			class:rounded-full={point.handle === 'pivot' || point.handle === 'rotate'}
 			style="left:{point.sx - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; top:{point.sy - (point.handle === 'pivot' || point.handle === 'rotate' ? 5 : 4)}px; width:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px; height:{point.handle === 'pivot' || point.handle === 'rotate' ? 10 : 8}px;"
 		></div>

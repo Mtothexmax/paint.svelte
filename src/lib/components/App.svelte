@@ -78,7 +78,7 @@
 
 	<div class="status-strip">
 		<div class="flex h-full items-center"><ColorBar /></div>
-		<div class="flex h-full flex-1 items-stretch border-l" style="border-color:#3a3a3a;">
+		<div class="flex h-full flex-1 items-stretch border-l" style="border-color:var(--line);">
 			<StatusBar />
 		</div>
 		<ZoomBar />

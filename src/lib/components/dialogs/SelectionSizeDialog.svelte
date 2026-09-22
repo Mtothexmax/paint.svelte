@@ -120,7 +120,7 @@
 	.ss-hint {
 		margin: 10px 0 0;
 		font-size: 12px;
-		color: #9a9a9a;
+		color: var(--text-dim);
 	}
 	/* A typed number was pulled back to keep the selection on the canvas —
 	   worth flagging, since the applied size then differs from what was typed. */
@@ -130,6 +130,6 @@
 	.ss-empty {
 		margin: 0;
 		font-size: 13px;
-		color: #9a9a9a;
+		color: var(--text-dim);
 	}
 </style>

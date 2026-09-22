@@ -5,7 +5,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 async function main() {
@@ -19,8 +19,8 @@ async function main() {
 	await sleep(2000);
 
 	const results = await page.evaluate(async () => {
-		const { makeGlFilter } = await import('/src/lib/effects/shaders.ts');
-		const { effects } = await import('/src/lib/effects/index.ts');
+		const { makeGlFilter } = await import('/paint.svelte/src/lib/effects/shaders.ts');
+		const { effects } = await import('/paint.svelte/src/lib/effects/index.ts');
 		const gl2 = document.createElement('canvas').getContext('webgl2');
 		const link = (vertexSrc, fragSrc) => {
 			const prog = gl2.createProgram();

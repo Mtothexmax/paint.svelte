@@ -18,7 +18,7 @@
 	import MouseIcon from '@material-symbols/svg-400/rounded/mouse.svg?raw';
 </script>
 
-	<div class="flex h-full w-full items-center gap-4 overflow-hidden px-3 text-xs select-none" style="color:#bdbdbd;">
+	<div class="flex h-full w-full items-center gap-4 overflow-hidden px-3 text-xs select-none" style="color:var(--text-dim);">
 	{#if $notice}
 		<span class="notice" class:error={$notice.kind === 'error'}>{$notice.text}</span>
 	{/if}

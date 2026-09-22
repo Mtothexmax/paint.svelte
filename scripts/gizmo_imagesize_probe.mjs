@@ -7,7 +7,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const log = (...a) => console.log(...a);
@@ -48,14 +48,14 @@ async function main() {
 	await clickText('.menubar-btn', 'File');
 	await sleep(200);
 	await clickText('.menu-item', 'New');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 
 	let ready = false;
 	for (let i = 0; i < 60; i++) {
 		ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { hasEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -66,9 +66,9 @@ async function main() {
 
 	// --- [A] flat rotate gizmo -------------------------------------------
 	const gizmo = await page.evaluate(async () => {
-		const { setRectSelection } = await import('/src/lib/services/selectionService.ts');
-		const { activeToolId, moveToolMode } = await import('/src/lib/state/ui.ts');
-		const { rotateRingsFor, pickRing, ringTangent, gizmoRadiusFor } = await import('/src/lib/render/move/gizmo3d.ts');
+		const { setRectSelection } = await import('/paint.svelte/src/lib/services/selectionService.ts');
+		const { activeToolId, moveToolMode } = await import('/paint.svelte/src/lib/state/ui.ts');
+		const { rotateRingsFor, pickRing, ringTangent, gizmoRadiusFor } = await import('/paint.svelte/src/lib/render/move/gizmo3d.ts');
 		setRectSelection('rect', { x: 20, y: 20 }, { x: 220, y: 140 });
 		activeToolId.set('move-pixels');
 		moveToolMode.set('rotate');
@@ -129,9 +129,9 @@ async function main() {
 
 	// --- [A2] spin past 360°: circling the red handle accumulates ---------
 	const spin = await page.evaluate(async () => {
-		const { MoveEngine } = await import('/src/lib/render/MoveEngine.ts');
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
-		const { gizmoRadiusFor } = await import('/src/lib/render/move/gizmo3d.ts');
+		const { MoveEngine } = await import('/paint.svelte/src/lib/render/MoveEngine.ts');
+		const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
+		const { gizmoRadiusFor } = await import('/paint.svelte/src/lib/render/move/gizmo3d.ts');
 		const doc = window.__REGISTRY__.active;
 		const sel = doc.selection.bounds;
 		const cx = sel.x + sel.width / 2;
@@ -185,9 +185,9 @@ async function main() {
 
 	// --- [A3] infinite turn (blue) + tip (green) + mirrored commit -----
 	const revolve = await page.evaluate(async () => {
-		const { MoveEngine } = await import('/src/lib/render/MoveEngine.ts');
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
-		const { gizmoRadiusFor } = await import('/src/lib/render/move/gizmo3d.ts');
+		const { MoveEngine } = await import('/paint.svelte/src/lib/render/MoveEngine.ts');
+		const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
+		const { gizmoRadiusFor } = await import('/paint.svelte/src/lib/render/move/gizmo3d.ts');
 		const doc = window.__REGISTRY__.active;
 		const sel = doc.selection.bounds;
 		const cx = sel.x + sel.width / 2;

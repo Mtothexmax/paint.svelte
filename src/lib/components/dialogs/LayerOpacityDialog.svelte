@@ -529,7 +529,6 @@
 		filter: brightness(1.18);
 	}
 	.lo-step:active {
-		transform: translateY(1px);
 		background: linear-gradient(180deg, #202327, #2b2f35);
 		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) inset;
 	}

@@ -1,0 +1,120 @@
+/* ---- AI background-removal dialog ---- */
+.ai-body {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	font-size: 12.5px;
+	color: #e7e9ee;
+}
+.ai-body p {
+	margin: 0;
+}
+.ai-source {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ai-source strong {
+	color: #fff;
+	font-weight: 600;
+}
+.ai-note,
+.ai-detail {
+	color: #8d929c;
+	font-size: 11.5px;
+	line-height: 1.45;
+}
+.ai-quality {
+	align-self: stretch;
+}
+.ai-quality .seg-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+.ai-backend {
+	color: #8d929c;
+	font-size: 11.5px;
+}
+/* Progress well + fill reuse the slider groove language (sunken well,
+   accent fill, sheen) so AI progress reads as the same control family. */
+.ai-progress {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+.ai-progress-label {
+	font-weight: 600;
+	color: #eef1f6;
+}
+.ai-progress-well {
+	position: relative;
+	height: 14px;
+	border-radius: 7px;
+	background: linear-gradient(to bottom, #0b0c0e, #131519);
+	overflow: hidden;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 -1px 0 rgba(255, 255, 255, 0.075),
+		0 0 0 1px rgba(0, 0, 0, 0.8);
+}
+.ai-progress-fill {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 0;
+	background: linear-gradient(to bottom, var(--accent), #1e54b6);
+	box-shadow: 0 0 12px rgba(60, 130, 255, 0.35);
+}
+.ai-progress-fill::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 46%;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), transparent);
+}
+/* Indeterminate: a sliding pulse while sessions compile / inference runs. */
+.ai-progress-fill.indeterminate {
+	width: 35%;
+	animation: ai-progress-slide 1.1s ease-in-out infinite alternate;
+}
+@keyframes ai-progress-slide {
+	from {
+		left: 0;
+	}
+	to {
+		left: 65%;
+	}
+}
+.ai-progress-bytes {
+	color: #8d929c;
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+.ai-error {
+	color: #ff9d9d;
+	background: rgba(255, 80, 80, 0.08);
+	border: 1px solid rgba(255, 80, 80, 0.35);
+	border-radius: 6px;
+	padding: 6px 8px;
+	line-height: 1.45;
+}
+/* First-run download question: accent-tinted so it reads as the decision
+   point of the dialog, not as an error. */
+.ai-consent {
+	color: #eef1f6;
+	background: rgba(60, 130, 255, 0.1);
+	border: 1px solid rgba(111, 212, 255, 0.4);
+	border-radius: 6px;
+	padding: 6px 8px;
+	line-height: 1.45;
+}
+@media (prefers-reduced-motion: reduce) {
+	.ai-progress-fill.indeterminate {
+		animation: none;
+		width: 100%;
+		opacity: 0.6;
+	}
+}

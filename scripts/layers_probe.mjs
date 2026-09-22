@@ -10,7 +10,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const log = (...a) => console.log(...a);
@@ -51,14 +51,14 @@ async function main() {
 	await clickText('.menubar-btn', 'File');
 	await sleep(200);
 	await clickText('.menu-item', 'New');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 
 	let ready = false;
 	for (let i = 0; i < 60; i++) {
 		ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { hasEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -100,7 +100,7 @@ async function main() {
 
 	// --- [2] fx badge position + hover-only visibility ----------------------
 	const badge = await page.evaluate(async () => {
-		const { addLayerEffect, removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
+		const { addLayerEffect, removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
 		const doc = window.__REGISTRY__.active;
 		const layer = doc.activeLayer;
 		const clean = async () => {
@@ -137,7 +137,7 @@ async function main() {
 		const doc = window.__REGISTRY__.active;
 		const layer = doc.activeLayer;
 		const effs = layer.effects ?? [];
-		const { removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
+		const { removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
 		for (let i = effs.length - 1; i >= 0; i--) removeLayerEffect(layer.id, i);
 		await new Promise((r) => setTimeout(r, 300));
 	});
@@ -175,9 +175,9 @@ async function main() {
 
 	// --- [4] text layers do not rename -------------------------------------
 	const text = await page.evaluate(async () => {
-		const { createTextLayer } = await import('/src/lib/core/layers/Layer.ts');
-		const { documentRegistry } = await import('/src/lib/core/document/registry.ts');
-		const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+		const { createTextLayer } = await import('/paint.svelte/src/lib/core/layers/Layer.ts');
+		const { documentRegistry } = await import('/paint.svelte/src/lib/core/document/registry.ts');
+		const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 		const doc = window.__REGISTRY__.active;
 		const renderer = getEditorRenderer();
 		// Real (blank) surface so session serialisation + thumbnails stay happy.

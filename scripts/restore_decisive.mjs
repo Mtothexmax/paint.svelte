@@ -6,7 +6,7 @@ import { PNG } from 'pngjs';
 import fs from 'node:fs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 async function clickByText(page, sel, t) {
@@ -43,15 +43,15 @@ async function newWhiteDoc(page) {
 	await clickByText(page, '.menubar-btn', 'File');
 	await sleep(250);
 	await clickByText(page, '.menu-item', 'New…');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
 	// Choose the White background radio, then Create
 	await page.evaluate(() => {
-		const radios = [...document.querySelectorAll('.dialog input[type=radio]')];
+		const radios = [...document.querySelectorAll('.m-dialog input[type=radio]')];
 		const white = radios.find((r) => r.value === 'white');
 		white && white.click();
 	});
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 	await sleep(600);
 }
 

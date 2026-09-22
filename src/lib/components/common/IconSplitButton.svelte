@@ -1,14 +1,16 @@
 <script lang="ts">
 	import './IconSplitButton.css';
-	// Generic split button without text: [ icon | ▾ ]
-	// - Clicking the icon part cycles through the options.
-	// - Clicking ▾ opens a menu listing every option (icon, title, description).
-	interface Option {
-		id: string;
-		icon: string;
-		label: string;
-		description: string;
-	}
+// Generic split button: [ icon + label | ▾ ]
+// - The main part (icon, plus the current option's label when
+//   `titleInButton` is set) is ONE element: shared hover, one click = cycle
+//   through the options.
+// - Only ▾ opens the menu listing every option (icon, title, description).
+interface Option {
+	id: string;
+	icon: string;
+	label: string;
+	description: string;
+}
 	interface Props {
 		options: Option[];
 		value: string;
@@ -71,8 +73,10 @@
 	class:open={open}
 	title={title || (current?.label ?? '')}
 >
-	<span class="isp-icon" onclick={cycle}>{current?.icon ?? ''}</span>
-	{#if titleInButton}<span class="isp-label-inline" onclick={toggleMenu}>{current?.label ?? ''}</span>{/if}
+	<span class="isp-main" onclick={cycle}>
+		<span class="isp-icon">{current?.icon ?? ''}</span>
+		{#if titleInButton}<span class="isp-label-inline">{current?.label ?? ''}</span>{/if}
+	</span>
 	<span class="isp-arrow" onclick={toggleMenu}>▾</span>
 </button>
 

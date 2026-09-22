@@ -34,12 +34,12 @@
 		margin: 0;
 		font-size: 13px;
 		font-weight: 600;
-		color: #e8e8e8;
+		color: var(--text);
 	}
 	.rd-hint {
 		margin: 8px 0 0;
 		font-size: 12px;
-		color: #9a9a9a;
+		color: var(--text-dim);
 		line-height: 1.4;
 	}
 </style>

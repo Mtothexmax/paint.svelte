@@ -30,6 +30,23 @@
 	const zoomPct = $derived($statusBar.zoomPct ?? 100);
 	const sliderPos = $derived(Math.round(toT(zoomPct) * 1000));
 
+	// Geometry of the styled track (see .zb-slider in ZoomBar.css — the two
+	// must stay in sync).
+	const TRACK_W = 110;
+	const THUMB_W = 9;
+	/**
+	 * Blue fill-bar width as a % of the track, handed to CSS as `--zb-fill`.
+	 * A native range thumb does not travel the full track — its CENTRE runs
+	 * from `THUMB_W/2` to `TRACK_W − THUMB_W/2`. Painting the fill to the raw
+	 * value percentage would leave a sliver of empty track left of the thumb
+	 * at 1% and overshoot it at 3200%, so the fill is squeezed into the very
+	 * same span: its right edge always lands exactly under the thumb.
+	 */
+	const fillPct = $derived.by(() => {
+		const pct = (((sliderPos / 1000) * (TRACK_W - THUMB_W) + THUMB_W / 2) / TRACK_W) * 100;
+		return Math.round(pct * 100) / 100;
+	});
+
 	function applyZoom(pct: number): void {
 		const doc = documentRegistry.active;
 		if (!doc || !hasEditorRenderer()) return;
@@ -87,6 +104,7 @@
 		max="1000"
 		step="1"
 		value={sliderPos}
+		style="--zb-fill:{fillPct}%;"
 		disabled={!hasDoc}
 		title="Double-click to reset to 100%"
 		oninput={onSliderInput}

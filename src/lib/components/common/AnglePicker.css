@@ -22,17 +22,18 @@
 	cursor: pointer;
 }
 .ang-ring {
-	fill: var(--bg-elev, #1e1e1e);
-	stroke: var(--border);
+	fill: var(--bg-elev, #2b2e34);
+	/* A visible ring on the dial face — `--line-strong`, not black `--border`. */
+	stroke: var(--line-strong);
 	stroke-width: 2;
 }
 .ang-line {
-	stroke: var(--accent, #4f8cff);
+	stroke: var(--accent, #2c6fe0);
 	stroke-width: 3;
 	stroke-linecap: round;
 }
 .ang-handle {
-	fill: var(--accent, #4f8cff);
+	fill: var(--accent, #2c6fe0);
 	stroke: #fff;
 	stroke-width: 2;
 }
@@ -43,7 +44,7 @@
 }
 .ang-num {
 	width: 56px;
-	background: var(--bg-elev, #1e1e1e);
+	background: var(--bg-elev, #2b2e34);
 	border: 1px solid var(--border);
 	border-radius: 4px;
 	color: var(--text);
@@ -51,7 +52,7 @@
 	padding: 2px 4px;
 }
 .ang-num:focus {
-	outline: 1px solid var(--accent, #4f8cff);
+	outline: 1px solid var(--accent, #2c6fe0);
 }
 .ang-reset {
 	flex: 0 0 auto;

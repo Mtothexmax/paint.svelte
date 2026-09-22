@@ -45,6 +45,14 @@
 	position: relative;
 	z-index: 1;
 }
+/* The title bar OWNS the popups anchored in it (the filter switcher's effect
+   browser). Because every direct child above is z-index 1, the menu's own
+   z-index is trapped inside the title bar's stacking context — and the body
+   and footer are later siblings at the same level, so they painted straight
+   over an open menu. The title bar has to outrank them. */
+.m-dialog > .m-title {
+	z-index: 2;
+}
 
 .m-title {
 	display: flex;
@@ -117,6 +125,12 @@
 	pointer-events: none;
 }
 
+/* NOTE: the title bar used to end in a decorative `.m-grip` drag hint (a
+   stack of hairline rules). It read as a "resize handle" affordance but
+   the entire bar is the drag surface, so it only misled people — removed.
+   The bar is still obviously draggable: `cursor: move` + it is the only
+   raised chrome band in the dialog. */
+
 .m-body {
 	padding: 13px 14px 14px;
 	display: flex;
@@ -144,41 +158,73 @@
 	align-items: center;
 }
 
-/* Primary/secondary buttons in the footer — raised chrome plate look. */
-.m-footer :global(.btn-primary) {
-	border: 1px solid rgba(0, 0, 0, 0.65);
-	background: linear-gradient(180deg, #2c6fe0, #1e54b6);
-	color: #fff;
+/* Footer buttons mirror the strip controls: primary = the "Crop to
+   Selection" plate (.tb-btn.primary), secondary = the slider step button
+   (.fsl-step) — same tokens, only the text size/padding stay dialog-sized. */
+.m-footer .btn-primary {
+	border: 1px solid rgba(0, 0, 0, 0.6);
+	border-radius: 6px;
+	background: linear-gradient(180deg, #26314a, #1a2334);
+	color: var(--accent-ring);
+	font-size: 12.5px;
 	font-weight: 600;
 	padding: 5px 14px;
-	border-radius: 5px;
-	box-shadow:
-		0 1px 0 rgba(255, 255, 255, 0.25) inset,
-		0 1px 2px rgba(0, 0, 0, 0.5);
+	white-space: nowrap;
 	cursor: pointer;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.18) inset,
+		0 1px 3px rgba(0, 0, 0, 0.5),
+		0 0 0 1px rgba(60, 130, 255, 0.35);
+	transition:
+		filter 100ms ease-out,
+		transform 100ms ease-out;
 }
-.m-footer :global(.btn-primary:hover:not(:disabled)) {
-	filter: brightness(1.12);
+.m-footer .btn-primary:hover:not(:disabled) {
+	background: linear-gradient(180deg, #2c3a58, #1f2b40);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.22) inset,
+		0 1px 4px rgba(0, 0, 0, 0.55),
+		0 0 0 1px rgba(111, 212, 255, 0.55),
+		0 0 10px rgba(60, 130, 255, 0.25);
+	filter: none;
 }
-.m-footer :global(.btn-primary:disabled) {
-	opacity: 0.45;
+.m-footer .btn-primary:active:not(:disabled) {
+	transform: translateY(1px);
+	box-shadow:
+		0 2px 6px rgba(0, 0, 0, 0.6) inset,
+		0 0 0 1px rgba(60, 130, 255, 0.4);
+	filter: brightness(0.9);
+}
+.m-footer .btn-primary:disabled {
+	filter: none;
+	opacity: 0.4;
 	cursor: default;
+	transform: none;
+	color: var(--text-dim);
+	background: linear-gradient(180deg, #2a2e34, #202329);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
 }
-.m-footer :global(.btn-secondary) {
+.m-footer .btn-secondary {
 	border: 1px solid rgba(0, 0, 0, 0.65);
-	background: linear-gradient(180deg, #3a3e45, #272a2f);
-	color: #e7e9ee;
+	border-radius: 5px;
+	background: linear-gradient(to bottom, #3a3e45, #272a2f);
+	color: var(--text);
+	font-size: 12.5px;
 	font-weight: 500;
 	padding: 5px 14px;
-	border-radius: 5px;
+	white-space: nowrap;
+	cursor: pointer;
 	box-shadow:
 		0 1px 0 rgba(255, 255, 255, 0.13) inset,
-		0 1px 2px rgba(0, 0, 0, 0.4);
-	cursor: pointer;
+		0 1px 2px rgba(0, 0, 0, 0.5);
+	transition:
+		filter 100ms ease-out,
+		transform 100ms ease-out;
 }
-.m-footer :global(.btn-secondary:hover) {
+.m-footer .btn-secondary:hover {
 	filter: brightness(1.18);
 }
-.m-footer :global(.btn-secondary:active) {
+.m-footer .btn-secondary:active {
+	transform: translateY(1px);
 	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) inset;
 }

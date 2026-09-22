@@ -17,7 +17,7 @@
 .lv-hist {
 	width: 120px;
 	height: 190px;
-	background: #141414;
+	background: var(--well);
 	border: 1px solid var(--border);
 	border-radius: 4px;
 }

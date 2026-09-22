@@ -13,10 +13,14 @@ export default defineConfig({
 			},
 			// GitHub Pages project site -> app lives under the repo base path.
 			paths: { base: '/paint.svelte' },
-			adapter: adapter({ pages: 'build', assets: 'build', fallback: null, precompress: false, strict: false })
+			// `fallback` is optional in adapter-static 3.x (`fallback?: string`);
+			// passing `null` fails the type check. Omitting it means the same
+			// thing — no SPA fallback page is generated.
+			adapter: adapter({ pages: 'build', assets: 'build', precompress: false, strict: false })
 		})
 	]
 });
+
 
 
 

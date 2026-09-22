@@ -227,6 +227,17 @@ export function registerBuiltinCommands(): void {
 			label: 'Flatten',
 			run: () => void flattenImage(),
 			isEnabled: () => (documentRegistry.active?.layers.length ?? 0) > 1
+		},
+		{
+			id: 'ai.removeBackground',
+			label: 'Remove Background…',
+			run: () => {
+				const doc = documentRegistry.active;
+				const layer = doc?.activeLayer;
+				if (!doc || !layer) return;
+				openDialog('aiBackgroundRemoval', { layerId: layer.id });
+			},
+			isEnabled: () => !!documentRegistry.active?.activeLayer
 		}
 	]);
 

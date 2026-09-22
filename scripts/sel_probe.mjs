@@ -5,7 +5,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const log = (...a) => console.log(...a);
 
@@ -36,16 +36,16 @@ async function main() {
 	await clickText('.menubar-btn', 'File');
 	await sleep(200);
 	await clickText('.menu-item', 'New…');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 	await sleep(600);
 
 	const readAt = (pts) =>
 		page.evaluate(async (points) => {
 			const doc = window.__REGISTRY__.active;
-			const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
-			const { sampleSurfacePixels } = await import('/src/lib/render/readback.ts');
+			const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
+			const { sampleSurfacePixels } = await import('/paint.svelte/src/lib/render/readback.ts');
 			const samples = sampleSurfacePixels(
 				getEditorRenderer(),
 				doc.activeLayer.surfaceId,
@@ -61,7 +61,7 @@ async function main() {
 	// the preview scoping can be checked before Apply is pressed.
 	const previewAt = (pts) =>
 		page.evaluate(async (points) => {
-			const { getEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { getEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			const r = getEditorRenderer();
 			const doc = window.__REGISTRY__.active;
 			const stack = [r.app.stage];
@@ -88,7 +88,7 @@ async function main() {
 
 	log('[2] select a 30x30 rect at (10,10)');
 	await page.evaluate(async () => {
-		const { setRectSelection } = await import('/src/lib/services/selectionService.ts');
+		const { setRectSelection } = await import('/paint.svelte/src/lib/services/selectionService.ts');
 		return setRectSelection('rect', { x: 10, y: 10 }, { x: 40, y: 40 });
 	});
 	await sleep(300);
@@ -100,7 +100,7 @@ async function main() {
 
 	log('[4] open Clouds dialog at max Grainyness (400) and check the LIVE preview');
 	await page.evaluate(async () => {
-		const { commands } = await import('/src/lib/services/commandRegistry.ts');
+		const { commands } = await import('/paint.svelte/src/lib/services/commandRegistry.ts');
 		commands.run('effects.clouds');
 		await new Promise((r) => setTimeout(r, 400));
 		const sliders = [...document.querySelectorAll('.m-dialog input.fsl-range')];

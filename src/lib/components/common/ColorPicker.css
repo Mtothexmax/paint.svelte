@@ -21,7 +21,13 @@
 	touch-action: none;
 	user-select: none;
 	border-radius: 10px;
-	border: 1px solid var(--border);
+	/* Was `1px solid var(--border)` — a BLACK seam, i.e. no visible frame at
+	   all, so the surface floated frameless on the view. A hard 1px black
+	   outline + a soft drop shadow instead (same edge recipe as .fsl-well). */
+	border: none;
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.8),
+		0 2px 10px rgba(0, 0, 0, 0.5);
 	cursor: crosshair;
 	background-color: var(--hue-css, #f00);
 	background-image:
@@ -51,7 +57,11 @@
 	user-select: none;
 	cursor: pointer;
 	border-radius: 8px;
-	border: 1px solid var(--border);
+	/* Same invisible-`--border` problem as .cp-sv above. */
+	border: none;
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.8),
+		0 2px 6px rgba(0, 0, 0, 0.45);
 }
 .cp-hue {
 	background: linear-gradient(to top,
@@ -60,7 +70,7 @@
 .cp-alpha {
 	background-image:
 		linear-gradient(to top, rgba(0, 0, 0, 0), var(--opaque, #fff)),
-		repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+		repeating-conic-gradient(#232629 0% 25%, #15171a 0% 50%);
 	background-size: 100% 100%, 10px 10px;
 }
 .cp-handle {
@@ -112,8 +122,13 @@
 	width: 40px;
 	height: 40px;
 	border-radius: 8px;
-	border: 1px solid var(--border);
-	background-image: repeating-conic-gradient(#3a3a3a 0% 25%, #262626 0% 50%);
+	/* Invisible `--border` → a real ring, so the swatch reads as a well
+	   instead of a coloured smear on the flat view background. */
+	border: none;
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.8),
+		0 1px 3px rgba(0, 0, 0, 0.5);
+	background-image: repeating-conic-gradient(#232629 0% 25%, #15171a 0% 50%);
 	background-size: 10px 10px;
 	position: relative;
 	overflow: hidden;
@@ -145,14 +160,28 @@
 	font-size: 11px;
 	color: var(--text-dim);
 }
+/* Same recessed-well recipe as `.field input` (routes/layout.css) and
+   `.fsl-well` (FilterSlider.css). `background: var(--bg)` + a black
+   `--border` made these read as flat holes in the Colour view. */
 .cp-num input {
 	width: 100%;
 	padding: 5px 4px;
-	background: var(--bg);
-	border: 1px solid var(--border);
-	border-radius: 5px;
+	background: linear-gradient(to bottom, #0b0c0e, #131519);
+	border: none;
+	border-radius: 6px;
 	color: var(--text);
 	font-size: 12px;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 -1px 0 rgba(255, 255, 255, 0.075),
+		0 0 0 1px rgba(0, 0, 0, 0.8);
+}
+.cp-num input:focus,
+.cp-hexfield input:focus {
+	outline: none;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 0 0 2px var(--accent-ring);
 }
 .cp-hexfield {
 	display: flex;
@@ -164,11 +193,15 @@
 .cp-hexfield input {
 	flex: 1;
 	padding: 5px 8px;
-	background: var(--bg);
-	border: 1px solid var(--border);
-	border-radius: 5px;
+	background: linear-gradient(to bottom, #0b0c0e, #131519);
+	border: none;
+	border-radius: 6px;
 	color: var(--text);
 	font-family: ui-monospace, Menlo, Consolas, monospace;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 -1px 0 rgba(255, 255, 255, 0.075),
+		0 0 0 1px rgba(0, 0, 0, 0.8);
 }
 .cp-quick {
 	display: grid;

@@ -2,21 +2,47 @@
 
 :root {
 	color-scheme: dark;
-	--bg: #1e1e1e;
-	--bg-elev: #2b2b2b;
-	--panel: #262626;
-	--border: #3a3a3a;
-	--text: #e0e0e0;
-	--text-dim: #9a9a9a;
-	--accent: #3b82f6;
-	--accent-soft: rgba(59, 130, 246, 0.16);
+	/* Single palette, taken from the Claude reference (opacity-slider.html).
+	   The app used to carry two ramps that disagreed: an older neutral one
+	   (--bg / --bg-elev / --border / --text / --text-dim — flat greys) and
+	   the chrome one added later for the options bar. Text written against
+	   the old ramp was pure grey sitting on a blue-tinted chrome plate, and
+	   its `#3a3a3a` borders read warm next to a `#1a1c20` panel. The legacy
+	   names are now aliases onto the chrome ramp, so a component written
+	   against either one lands on the same palette. */
+	--stage: #111214; /* app backdrop — the reference's dark page */
+	--chrome-hi: #2b2e34;
+	--chrome-lo: #1a1c20;
+	--chrome-bar1: #34383f;
+	--chrome-bar2: #22252a;
+	--well: #0b0c0e; /* the recessed groove controls sit in */
+	--bg: var(--well); /* legacy alias — "field surface" grey */
+	--bg-elev: var(--chrome-hi); /* legacy alias — raised plate */
+	--panel: var(--chrome-lo); /* legacy alias — panel body */
+	--border: rgba(0, 0, 0, 0.7); /* panel/edge hairline (was #3a3a3a) */
+	/* `--border` is a SEAM, not a line: black on chrome, matching the
+	   reference's `border-black/70`. Anything that has to draw a visible
+	   line on a dark surface — crosshairs, menu separators, drop-zone
+	   dashes, the angle dial — needs a light hairline instead. That is
+	   what these two are for. */
+	--line: rgba(255, 255, 255, 0.14);
+	--line-strong: rgba(255, 255, 255, 0.22);
+	--text: #e7e9ee; /* ink */
+	--text-dim: #8d929c; /* ink-dim */
+	--text-faint: #5d626c; /* ink-faint */
+	--accent: #2c6fe0;
+	--accent-soft: rgba(44, 111, 224, 0.16);
+	--accent-glow: #3c82ff;
+	--accent-ring: #6fd4ff;
 }
 
 html,
 body {
 	height: 100%;
 	margin: 0;
-	background: var(--bg);
+	/* The stage, not `--bg`: `--bg` is now the recessed-field surface, which
+	   is darker than the backdrop the chrome strips sit on. */
+	background: var(--stage);
 	color: var(--text);
 	font-family: ui-sans-serif, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 	font-size: 14px;
@@ -32,7 +58,7 @@ body {
 	height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-	background: #4a4a4a;
+	background: var(--text-faint);
 	border-radius: 5px;
 }
 ::-webkit-scrollbar-track {
@@ -43,20 +69,77 @@ body {
 .menubar-strip {
 	height: 30px;
 	flex: 0 0 auto;
-	background: var(--bg);
-	border-bottom: 1px solid var(--border);
+	background-color: var(--chrome-bar2);
+	/* Same raised chrome plate as the options / toolbar / status strips:
+	   vertical ramp + grain blended IN (not over), lit from above. The
+	   menu sits "flush" against the bottom edge, so the inset highlight on
+	   the top + inset shadow on the bottom carry the chrome-vibe without
+	   a heavy drop-shadow the strip can't afford to have. */
+	background-image:
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E"),
+		linear-gradient(180deg, var(--chrome-bar1), var(--chrome-bar2));
+	background-blend-mode: overlay, normal;
+	background-size:
+		160px 160px,
+		auto;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.6);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.09) inset,
+		0 -1px 0 rgba(0, 0, 0, 0.5) inset;
 	display: flex;
+	align-items: center;
 }
 .options-strip {
 	height: 34px;
 	flex: 0 0 auto;
-	background: var(--bg-elev);
-	border-bottom: 1px solid var(--border);
+	position: relative;
+	background-color: var(--chrome-bar2);
+	/* The bar is a raised plate, not a flat fill: a vertical ramp plus a
+	   faint grain. The grain is blended INTO the plate (background-blend-mode)
+	   rather than overlaid on top of it, so labels and controls stay crisp. */
+	background-image:
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E"),
+		linear-gradient(180deg, var(--chrome-bar1), var(--chrome-bar2));
+	background-blend-mode: overlay, normal;
+	background-size:
+		160px 160px,
+		auto;
+	/* Lit from above, seated on the canvas below. */
+	border-bottom: 1px solid rgba(0, 0, 0, 0.6);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.09) inset,
+		0 -1px 0 rgba(0, 0, 0, 0.5) inset,
+		0 8px 18px -12px rgba(0, 0, 0, 0.65);
 	display: flex;
 	align-items: center;
 }
 .tooloptions-placeholder {
-	opacity: 0.55;
+	color: var(--text-faint);
+	opacity: 1;
+}
+/* Hairline between control groups inside the strip — the vertical rule that
+   separates "Mode" from "Ratio" in the design. */
+.tb-divider {
+	flex: 0 0 auto;
+	width: 1px;
+	height: 20px;
+	align-self: center;
+	background: linear-gradient(
+		180deg,
+		transparent,
+		rgba(255, 255, 255, 0.12) 30%,
+		rgba(255, 255, 255, 0.12) 70%,
+		transparent
+	);
+}
+/* Secondary hint text ("Shift: square") — a step dimmer than the labels, so
+   the eye reads controls first and hints second. */
+.hint {
+	font-size: 11px;
+	line-height: 1;
+	font-weight: 400;
+	color: var(--text-faint);
+	white-space: nowrap;
 }
 /* options strip: uniform, small labels across the PdnSlider groups (e.g.
    "Spacing:") and the anti-alias toggle — same size and same colour. */
@@ -64,6 +147,7 @@ body {
 .options-strip .aa-label {
 	font-size: 11px;
 	line-height: 1;
+	font-weight: 500;
 	color: var(--text-dim);
 	opacity: 1;
 	white-space: nowrap;
@@ -71,8 +155,20 @@ body {
 .toolbar-col {
 	width: 92px;
 	flex: 0 0 auto;
-	background: var(--panel);
-	border-right: 1px solid var(--border);
+	background-color: var(--chrome-bar2);
+	/* Same raised plate as the options strip: vertical ramp + grain
+	   blended in, lit from the left, dark seam toward the canvas. */
+	background-image:
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E"),
+		linear-gradient(180deg, var(--chrome-bar1), var(--chrome-bar2));
+	background-blend-mode: overlay, normal;
+	background-size:
+		160px 160px,
+		auto;
+	border-right: 1px solid rgba(0, 0, 0, 0.6);
+	box-shadow:
+		1px 0 0 rgba(255, 255, 255, 0.09) inset,
+		-1px 0 0 rgba(0, 0, 0, 0.5) inset;
 	overflow-y: hidden;
 	overflow-x: hidden;
 	display: flex;
@@ -90,19 +186,39 @@ body {
 .sidebar-col {
 	width: 230px;
 	flex: 0 0 auto;
-	background: var(--panel);
-	border-left: 1px solid var(--border);
+	background-color: var(--chrome-lo);
+	background-image: linear-gradient(180deg, var(--chrome-hi), var(--chrome-lo));
+	/* Inset highlight on the left (chrome edge), dark seam toward the canvas,
+	   soft drop-shadow. The two child panels inside sit on top of this. */
+	border-left: 1px solid rgba(0, 0, 0, 0.6);
+	box-shadow:
+		1px 0 0 rgba(255, 255, 255, 0.05) inset,
+		-1px 0 0 rgba(0, 0, 0, 0.5) inset,
+		0 8px 24px -12px rgba(0, 0, 0, 0.55);
 	overflow-y: auto;
 	/* `overflow-y: auto` alone makes `overflow-x` compute to `auto` as well,
 	   so any 1px of overflow inside a panel popped a horizontal scrollbar
 	   into the sidebar. It only ever scrolls vertically. */
 	overflow-x: hidden;
+	padding: 6px;
 }
 .status-strip {
 	height: 25px;
 	flex: 0 0 auto;
-	background: var(--bg-elev);
-	border-top: 1px solid var(--border);
+	background-color: var(--chrome-bar2);
+	/* Same raised plate as the options strip, seated on the window bottom:
+	   vertical ramp + grain, lit top edge, dark seam toward the canvas. */
+	background-image:
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.3'/%3E%3C/svg%3E"),
+		linear-gradient(180deg, var(--chrome-bar1), var(--chrome-bar2));
+	background-blend-mode: overlay, normal;
+	background-size:
+		160px 160px,
+		auto;
+	border-top: 1px solid rgba(0, 0, 0, 0.6);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.09) inset,
+		0 -1px 0 rgba(0, 0, 0, 0.5) inset;
 	display: flex;
 	align-items: stretch;
 }
@@ -110,28 +226,47 @@ body {
 /* ---- menus ---- */
 .menubar-btn {
 	height: 100%;
-	padding: 0 10px;
-	font-size: 13px;
+	padding: 0 12px;
+	font-family: inherit;
+	font-size: 12.5px;
+	font-weight: 500;
 	color: var(--text);
 	background: transparent;
 	border: none;
 	cursor: default;
+	transition: color 100ms ease;
 }
 .menubar-btn:hover,
 .menubar-btn.open {
-	background: var(--bg-elev);
+	/* Claude design: an open menu button gets an active blue gradient like
+	   a segmented-control "on" state. Same gradient as `.seg-btn.on` so the
+	   whole app shares the same accent ramp. */
+	background: linear-gradient(180deg, #3f82f2, #2c6fe0 55%, #2158b8);
+	color: #fff;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.28) inset,
+		0 1px 3px rgba(0, 0, 0, 0.5),
+		0 0 10px rgba(60, 130, 255, 0.28);
 }
 .menu-panel {
 	position: absolute;
 	left: 0;
-	top: 100%;
+	top: calc(100% + 4px);
 	z-index: 60;
-	min-width: 200px;
-	padding: 4px;
-	background: var(--bg-elev);
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+	min-width: 220px;
+	padding: 6px;
+	border-radius: 8px;
+	border: 1px solid rgba(0, 0, 0, 0.7);
+	color: var(--text);
+	background-color: var(--chrome-lo);
+	background-image: linear-gradient(180deg, var(--chrome-hi), var(--chrome-lo));
+	/* Inset top highlight (chrome edge) + soft drop-shadow below. */
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.1) inset,
+		0 16px 32px -8px rgba(0, 0, 0, 0.7),
+		0 2px 6px rgba(0, 0, 0, 0.5);
+	font-family: inherit;
+	font-size: 12.5px;
 }
 .menu-item {
 	display: flex;
@@ -139,27 +274,28 @@ body {
 	align-items: center;
 	justify-content: space-between;
 	gap: 10px;
-	padding: 5px 10px;
-	font-size: 13px;
+	padding: 6px 10px;
+	font-size: 12.5px;
 	text-align: left;
 	background: transparent;
 	border: none;
-	border-radius: 4px;
+	border-radius: 5px;
 	color: var(--text);
+	transition: background-color 80ms ease, color 80ms ease;
 }
 .menu-item:not(.disabled):hover {
-	background: var(--accent);
+	background: rgba(60, 130, 255, 0.25);
 	color: #fff;
 }
 .menu-item.disabled {
-	color: #6b6b6b;
+	color: var(--text-faint);
 }
 .menu-shortcut {
-	color: #888;
+	color: var(--text-faint);
 	font-size: 11px;
 }
 .menu-chevron {
-	color: #888;
+	color: var(--text-faint);
 	font-size: 11px;
 	margin-left: auto;
 	padding-left: 14px;
@@ -168,18 +304,24 @@ body {
 	position: relative;
 }
 .sub-holder > .menu-item.open {
-	background: var(--accent);
+	background: rgba(60, 130, 255, 0.3);
 	color: #fff;
 }
 .sub-panel {
-	left: 100%;
-	top: -4px;
+	left: calc(100% + 2px);
+	top: -6px;
 	z-index: 61;
 }
 .menu-separator {
 	height: 1px;
-	margin: 4px 6px;
-	background: var(--border);
+	margin: 6px 8px;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.14) 20%,
+		rgba(255, 255, 255, 0.14) 80%,
+		transparent
+	);
 }
 
 /* ---- floating tab tray (over the menu + options rows, right 50%) ----
@@ -194,6 +336,10 @@ body {
 	z-index: 40;
 	display: flex;
 	align-items: stretch;
+	/* The tray is a transparent box that happens to hold tabs, so it must not
+	   swallow clicks aimed at the menubar / options strip underneath it. Only
+	   the tabs themselves are interactive (see .fltab). */
+	pointer-events: none;
 }
 
 /* ---- toolbar ---- */
@@ -263,7 +409,7 @@ body {
 	top: 50%;
 	transform: translateY(-50%);
 /* transparency checkerboard that shows through the (semi-transparent) colour */
-background-image: repeating-conic-gradient(#383838 0% 25%, #1d1d1d 0% 50%);
+background-image: repeating-conic-gradient(#232629 0% 25%, #15171a 0% 50%);
 background-size: 6px 6px;
 }
 .cs-fill {
@@ -301,14 +447,14 @@ background-size: 6px 6px;
 	justify-content: center;
 	font-size: 13px;
 	line-height: 1;
-	color: #9a9a9a;
+	color: var(--text-dim);
 	background: transparent;
 	border: none;
 	border-radius: 4px;
 	cursor: pointer;
 }
 .cs-swap:hover {
-	color: #e6e6e6;
+	color: var(--text);
 	background: rgba(255, 255, 255, 0.08);
 }
 /* Reset: a miniature of the default colour pair — white behind, black in
@@ -391,24 +537,153 @@ background-size: 6px 6px;
 	filter: none;
 }
 
-/* ---- panels ---- */
-.panel-card {
-	padding: 8px;
-	background: var(--bg-elev);
-	border: 1px solid var(--border);
+/* ---- tool-options bar action buttons -------------------------------------
+   Anything you press in the options strip is a raised plate, not a ghost:
+   a lit top edge, a seated bottom edge. Deliberately NOT .mini-btn, which
+   stays flat for panel headers (the Layers panel's icon row). */
+.tb-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	flex: 0 0 auto;
+	height: 24px;
+	padding: 3px 10px;
+	border: 1px solid rgba(0, 0, 0, 0.6);
 	border-radius: 6px;
+	background: linear-gradient(180deg, #3a3e45, #272a2f);
+	color: var(--text);
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.25;
+	white-space: nowrap;
+	cursor: pointer;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.1) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5);
+	transition: filter 100ms;
+}
+.tb-btn:hover {
+	filter: brightness(1.15);
+}
+.tb-btn:active {
+	box-shadow:
+		0 2px 6px rgba(0, 0, 0, 0.6) inset,
+		0 1px 0 rgba(255, 255, 255, 0.04) inset;
+	filter: brightness(0.9);
+}
+/* The strip's primary action (Apply, Finish, Crop to Selection): blue-tinted
+   plate, ring and a soft glow — it sits at the far end of the bar. */
+.tb-btn.primary {
+	color: var(--accent-ring);
+	font-weight: 600;
+	background: linear-gradient(180deg, #26314a, #1a2334);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.18) inset,
+		0 1px 3px rgba(0, 0, 0, 0.5),
+		0 0 0 1px rgba(60, 130, 255, 0.35);
+}
+.tb-btn.primary:hover {
+	background: linear-gradient(180deg, #2c3a58, #1f2b40);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.22) inset,
+		0 1px 4px rgba(0, 0, 0, 0.55),
+		0 0 0 1px rgba(111, 212, 255, 0.55),
+		0 0 10px rgba(60, 130, 255, 0.25);
+	filter: none;
+}
+.tb-btn.primary:active {
+	box-shadow:
+		0 2px 6px rgba(0, 0, 0, 0.6) inset,
+		0 0 0 1px rgba(60, 130, 255, 0.4);
+	filter: brightness(0.9);
+}
+/* Disabled after every hover/primary rule so it wins the cascade. */
+.tb-btn:disabled,
+.tb-btn:hover:disabled,
+.tb-btn.primary:disabled,
+.tb-btn.primary:hover:disabled {
+	filter: none;
+	opacity: 0.4;
+	cursor: default;
+	transform: none;
+	color: var(--text-dim);
+	background: linear-gradient(180deg, #2a2e34, #202329);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+/* ---- panels (History, Layers) inside the sidebar ----
+   Each panel is its own chrome card: chrome-hi/lo gradient, dark canvas bg
+   for the list area underneath, top inset highlight + bottom seam + soft
+   drop-shadow. Matches the menu popup chrome so the whole app reads as
+   one connected design. */
+.panel-card {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: 6px 8px 8px;
+	background-color: var(--chrome-lo);
+	background-image: linear-gradient(180deg, var(--chrome-hi), var(--chrome-lo));
+	border: 1px solid rgba(0, 0, 0, 0.7);
+	border-radius: 7px;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.09) inset,
+		0 -1px 0 rgba(0, 0, 0, 0.5) inset,
+		0 6px 18px -8px rgba(0, 0, 0, 0.55);
+	color: var(--text);
 }
 .panel-title {
-	font-size: 12px;
+	font-size: 11px;
 	font-weight: 600;
 	text-transform: uppercase;
-	letter-spacing: 0.04em;
-	color: var(--text-dim);
-	margin-bottom: 6px;
+	letter-spacing: 0.06em;
+	color: #8d929c;
+	margin: 0 0 6px;
+	padding-bottom: 4px;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.4);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+/* Panel header row (title on the left, icon buttons on the right).
+   `.panel-title`'s rule + trailing margin exist to separate it from content
+   BELOW. Sitting beside an icon row, they instead tilt the words upward: the
+   row centres the title's whole box (text + 4px padding + 1px rule + 6px
+   margin), so an 11px title's ink lands ~6px above the icons. Here the rule
+   moves to a pseudo-element hanging below the text box and the title's box
+   becomes exactly its text, so `align-items: center` lines the icons up with
+   the words. Scoped, so the standalone `.panel-title` (History) is unchanged. */
+.panel-head .panel-title {
+	position: relative;
+	margin: 0;
+	padding: 0;
+	border-bottom: none;
+	box-shadow: none;
+}
+/* The rule spans the whole header ROW, not just the words. The reference's
+   title bar draws its border across the full bar — under the grip as well —
+   and History's standalone `.panel-title` already runs full width. Hung off
+   the title it would stop at the title's own box, which ends well before the
+   icon row, so the two panels disagreed. */
+.panel-head {
+	position: relative;
+	/* No bottom padding: it would push the row's box past its content, and the
+	   rule is pinned to the row's bottom edge. The gap down to the list comes
+	   from the margin instead, which keeps the rule exactly one hairline below
+	   the words. */
+	padding-bottom: 0;
+	margin-bottom: 5px;
+}
+.panel-head::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 1px;
+	background: rgba(0, 0, 0, 0.4);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .panel-empty {
 	font-size: 12px;
-	color: #6b6b6b;
+	color: var(--text-faint);
 }
 
 /* ---- buttons / dialogs ---- */
@@ -437,7 +712,9 @@ background-size: 6px 6px;
 	border-color: var(--border);
 }
 .btn-secondary:hover {
-	background: #333;
+	/* Match every other secondary plate (`.tb-btn`, `.m-footer .btn-secondary`):
+	   brighten the existing gradient rather than swapping in a flat grey. */
+	filter: brightness(1.18);
 }
 
 .dialog-backdrop {
@@ -518,26 +795,56 @@ background-size: 6px 6px;
 	font-size: 12px;
 	color: var(--text-dim);
 }
+/* Editable fields in dialogs (Resize/Canvas Size, New Image, Selection Size).
+   These were `background: var(--bg)` + `1px solid var(--border)` — and
+   `--border` is a BLACK seam, so on the dialog's chrome plate they read as
+   flat black holes with no edge at all (the reported "text field is not
+   restyled"). Reuse the slider-track recipe (.fsl-well in
+   components/common/FilterSlider.css) so a text box looks recessed INTO the
+   plate rather than pasted on top of it: sunken gradient + hard inset
+   shadow + a hairline outline that supplies the missing edge. */
 .field input[type='number'],
 .field input[type='text'] {
 	width: 100%;
 	padding: 6px 8px;
-	background: var(--bg);
-	border: 1px solid var(--border);
-	border-radius: 5px;
+	background: linear-gradient(to bottom, #0b0c0e, #131519);
+	border: none;
+	border-radius: 6px;
 	color: var(--text);
 	font-size: 13px;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 -1px 0 rgba(255, 255, 255, 0.075),
+		0 0 0 1px rgba(0, 0, 0, 0.8);
 }
+.field input[type='number']:focus,
+.field input[type='text']:focus {
+	/* Replace the browser's default focus ring with the app's cyan ring. */
+	outline: none;
+	box-shadow:
+		0 3px 7px rgba(0, 0, 0, 0.85) inset,
+		0 0 0 2px var(--accent-ring);
+}
+/* Preset buttons are BUTTONS, so they get the raised plate (.fsl-step)
+   rather than the well — same reason as above: `--bg` + a black border made
+   them look like empty holes next to the real fields. */
 .preset-chip {
 	padding: 4px 9px;
 	font-size: 12px;
-	background: var(--bg);
-	border: 1px solid var(--border);
+	background: linear-gradient(to bottom, #3a3e45, #272a2f);
+	border: 1px solid rgba(0, 0, 0, 0.65);
 	border-radius: 999px;
 	color: var(--text-dim);
 	cursor: pointer;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.13) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5);
+	transition:
+		filter 100ms ease-out,
+		border-color 100ms ease-out;
 }
 .preset-chip:hover {
+	filter: brightness(1.18);
 	border-color: var(--accent);
 	color: var(--text);
 }
@@ -575,7 +882,7 @@ background-size: 6px 6px;
 	background: transparent;
 	border: 1px solid transparent;
 	border-radius: 4px;
-	color: #bdbdbd;
+	color: var(--text-dim);
 	font: inherit;
 	font-weight: 600;
 	cursor: pointer;
@@ -583,8 +890,8 @@ background-size: 6px 6px;
 }
 .status-dim:hover {
 	background: rgba(255, 255, 255, 0.08);
-	border-color: var(--border);
-	color: #eee;
+	border-color: var(--line);
+	color: var(--text);
 }
 
 /* Read-outs that are not buttons (selection size, pointer position). */
@@ -606,7 +913,7 @@ background-size: 6px 6px;
 	flex: 0 0 auto;
 	width: 14px;
 	height: 14px;
-	color: #9a9a9a;
+	color: var(--text-faint);
 }
 .sb-ic svg {
 	width: 14px;
@@ -616,7 +923,7 @@ background-size: 6px 6px;
 /* The one read-out that is a button brightens its label on hover — keep the
    glyph in step instead of leaving it stranded at the resting grey. */
 .status-dim:hover .sb-ic {
-	color: #cfcfcf;
+	color: var(--text-dim);
 }
 
 /* ---- Paint.NET-style brush preview ring (canvas cursor) ---- */
@@ -650,15 +957,15 @@ background-size: 6px 6px;
 }
 .text-draft:focus {
 	outline-style: solid;
-	outline-color: var(--accent, #3b82f6);
+	outline-color: var(--accent, #2c6fe0);
 }
 /* drag handle (nub) for the uncommitted text draft */
 .text-nub {
 	width: 10px;
 	height: 10px;
-	background: var(--accent, #3b82f6);
+	background: var(--accent, #2c6fe0);
 	border: 1px solid #fff;
-	box-shadow: 0 0 0 1px #1e3a8a;
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, black);
 	border-radius: 2px;
 	cursor: move;
 	touch-action: none;
@@ -667,9 +974,9 @@ background-size: 6px 6px;
 .line-nub {
 	width: 14px;
 	height: 14px;
-	background: var(--accent, #3b82f6);
+	background: var(--accent, #2c6fe0);
 	border: 1px solid #fff;
-	box-shadow: 0 0 0 1px #1e3a8a;
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, black);
 	border-radius: 2px;
 	cursor: move;
 	touch-action: none;
@@ -697,27 +1004,104 @@ background-size: 6px 6px;
 	background: var(--bg);
 	overflow: hidden;
 }
+/* The bar is the same chrome plate as a dialog title (.m-title in
+   components/common/MovableDialog.css): a vertical gradient, a black hairline
+   underneath, a white hairline highlight inside. It used to be a FLAT
+   `var(--bg-elev)` band — the rule and the inset highlight were already
+   correct, only the gradient was missing, which is exactly why the view still
+   read as unstyled next to a dialog. */
 .color-mode-head {
 	display: flex;
 	align-items: center;
 	gap: 14px;
 	padding: 10px 16px;
-	border-bottom: 1px solid var(--border);
-	background: var(--bg-elev);
+	background: linear-gradient(180deg, #34383f, #22252a);
+	border-bottom: 1px solid rgba(0, 0, 0, 0.55);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.075) inset;
 	flex: 0 0 auto;
 }
 .color-mode-title {
-	font-size: 14px;
+	/* Matches the dialog-title metric (12.5px/600 + tracking) so the two
+	   chrome bars read as the same component. */
+	font-size: 12.5px;
 	font-weight: 600;
+	letter-spacing: 0.02em;
 	color: var(--text);
 	margin-right: auto;
 }
-.color-mode-done {
+/* Secondary action in the bar — a raised plate, like `.m-footer .btn-secondary`
+   and `.fsl-step`. Deliberately scoped: the bare transparent `.mini-btn` look
+   is right where it is an icon-only affordance (panel headers), but as a
+   *labelled* action in a chrome bar it read as an unstyled text link. */
+.color-mode-head .mini-btn {
+	padding: 5px 12px;
+	font-size: 12.5px;
+	font-weight: 500;
+	background: linear-gradient(to bottom, #3a3e45, #272a2f);
+	border: 1px solid rgba(0, 0, 0, 0.65);
+	border-radius: 5px;
+	color: var(--text);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.13) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5);
+	transition:
+		filter 100ms ease-out,
+		transform 100ms ease-out;
+}
+.color-mode-head .mini-btn:hover {
+	background: linear-gradient(to bottom, #3a3e45, #272a2f);
+	filter: brightness(1.18);
+	color: var(--text);
+}
+.color-mode-head .mini-btn:active {
+	transform: translateY(1px);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) inset;
+}
+/* Primary action — the dialog-footer plate (.m-footer .btn-primary), NOT the
+   flat saturated `var(--accent)` this inherited from `.btn-primary`. A
+   view-level commit action lives in the same visual context as a dialog
+   footer, not the tool strip (whose flat-blue primary is `.mini-btn.accent`).
+   Two classes so it also outranks `.btn-primary:hover:not(:disabled)`. */
+.color-mode-head .color-mode-done {
 	flex: 0 0 auto;
+	border: 1px solid rgba(0, 0, 0, 0.6);
+	border-radius: 6px;
+	background: linear-gradient(180deg, #26314a, #1a2334);
+	color: var(--accent-ring);
+	font-size: 12.5px;
+	font-weight: 600;
+	padding: 5px 14px;
+	white-space: nowrap;
+	cursor: pointer;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.18) inset,
+		0 1px 3px rgba(0, 0, 0, 0.5),
+		0 0 0 1px rgba(60, 130, 255, 0.35);
+	transition:
+		filter 100ms ease-out,
+		transform 100ms ease-out;
+}
+.color-mode-head .color-mode-done:hover {
+	background: linear-gradient(180deg, #2c3a58, #1f2b40);
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.22) inset,
+		0 1px 4px rgba(0, 0, 0, 0.55),
+		0 0 0 1px rgba(111, 212, 255, 0.55),
+		0 0 10px rgba(60, 130, 255, 0.25);
+	/* Cancel `.btn-primary:hover:not(:disabled)`'s brightness(1.1) — the
+	   gradient above is already the hover state. */
+	filter: none;
+}
+.color-mode-head .color-mode-done:active {
+	transform: translateY(1px);
+	box-shadow:
+		0 2px 6px rgba(0, 0, 0, 0.6) inset,
+		0 0 0 1px rgba(60, 130, 255, 0.4);
+	filter: brightness(0.9);
 }
 .seg {
 	display: inline-flex;
-	background: #0d0f11;
+	background: var(--well);
 	border-radius: 7px;
 	padding: 2px;
 	gap: 2px;
@@ -730,7 +1114,7 @@ background-size: 6px 6px;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	padding: 4px 10px;
+	padding: 2px 10px;
 	border: none;
 	border-radius: 6px;
 	background: transparent;
@@ -739,23 +1123,29 @@ background-size: 6px 6px;
 	line-height: 1.25;
 	font-weight: 500;
 	cursor: pointer;
-	transition: color 100ms;
+	transition:
+		color 100ms,
+		background 100ms,
+		box-shadow 100ms;
 }
 .seg-btn:hover {
 	color: var(--text);
 }
+/* The selected segment is lit from the accent, not the chrome: it reads as
+   "this is on" at a glance instead of merely "this is slightly lighter". */
 .seg-btn.on {
-	background: linear-gradient(180deg, #3d434c, #2c3138);
+	background: linear-gradient(180deg, #3f82f2, #2c6fe0 55%, #2158b8);
 	box-shadow:
-		0 1px 0 rgba(255, 255, 255, 0.13) inset,
-		0 1px 3px rgba(0, 0, 0, 0.5);
+		0 1px 0 rgba(255, 255, 255, 0.28) inset,
+		0 1px 3px rgba(0, 0, 0, 0.5),
+		0 0 10px rgba(60, 130, 255, 0.28);
 	color: #fff;
 }
 .seg-btn.on:hover {
 	color: #fff;
 }
 .seg-btn:focus-visible {
-	outline: 2px solid #6fd4ff;
+	outline: 2px solid var(--accent-ring);
 	outline-offset: 1px;
 }
 .seg-icon {
@@ -783,7 +1173,7 @@ background-size: 6px 6px;
 	text-align: center;
 	font-size: 13px;
 	line-height: 1;
-	color: var(--accent, #3b82f6);
+	color: var(--accent, #2c6fe0);
 	font-weight: bold;
 }
 .menu-text {
@@ -802,22 +1192,36 @@ background-size: 6px 6px;
 .menu-svg svg {
 	width: 16px;
 	height: 16px;
-	fill: #e3e3e3;
+	fill: var(--text);
 }
 
+/* Number field in the options bar — the same recessed well as .seg, so the
+   strip has one idea of "input" rather than a lighter box floating on it. */
 .fsl-num {
 	width: 60px;
-	padding: 4px 6px;
-	background: var(--bg);
-	border: 1px solid var(--border);
+	height: 24px;
+	padding: 2px 6px;
+	background: var(--well);
+	border: 1px solid rgba(0, 0, 0, 0.7);
 	border-radius: 5px;
 	color: var(--text);
 	font-size: 12px;
 	text-align: right;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) inset;
 }
 .fsl-num:focus {
 	outline: none;
-	border-color: var(--accent);
+	border-color: var(--accent-ring);
+	box-shadow:
+		0 1px 2px rgba(0, 0, 0, 0.5) inset,
+		0 0 0 1px rgba(60, 130, 255, 0.35);
+}
+/* Checkbox row in the strip keeps the strip's type scale. Scoped: .radio is
+   also the checkbox label inside the dialogs, which stay at 13px. */
+.options-strip .radio {
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--text-dim);
 }
 /* Material Symbols are black glyphs — lighten them for the dark strips. */
 .shape-kind-ic {

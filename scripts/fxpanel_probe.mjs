@@ -9,7 +9,7 @@
 import puppeteer from 'puppeteer-core';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BASE = 'http://localhost:5173/';
+const BASE = 'http://localhost:5173/paint.svelte/';
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const log = (...a) => console.log(...a);
@@ -51,14 +51,14 @@ async function main() {
 	await clickText('.menubar-btn', 'File');
 	await sleep(200);
 	await clickText('.menu-item', 'New');
-	await page.waitForSelector('.dialog', { timeout: 8000 });
+	await page.waitForSelector('.m-dialog', { timeout: 8000 });
 	await sleep(120);
-	await page.evaluate(() => document.querySelector('.dialog .btn-primary').click());
+	await page.evaluate(() => document.querySelector('.m-dialog .btn-primary').click());
 
 	let ready = false;
 	for (let i = 0; i < 60; i++) {
 		ready = await page.evaluate(async () => {
-			const { hasEditorRenderer } = await import('/src/lib/render/EditorRenderer.ts');
+			const { hasEditorRenderer } = await import('/paint.svelte/src/lib/render/EditorRenderer.ts');
 			return hasEditorRenderer();
 		});
 		if (ready) break;
@@ -87,9 +87,9 @@ async function main() {
 
 	// --- via service: add, toggle, copy, second layer, paste ---------------
 	const serviceStep = await page.evaluate(async () => {
-		const { addLayer, selectLayer } = await import('/src/lib/services/layersService.ts');
+		const { addLayer, selectLayer } = await import('/paint.svelte/src/lib/services/layersService.ts');
 		const { addLayerEffect, toggleLayerEffect, copyLayerEffects, pasteLayerEffects, removeLayerEffect } =
-			await import('/src/lib/services/layerEffectsService.ts');
+			await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
 		const doc = window.__REGISTRY__.active;
 		const l1 = doc.activeLayer.id;
 		// clean slate: drop any effects left from the previous run
@@ -133,8 +133,8 @@ async function main() {
 	log('[3] DOM: add via flyout');
 	// clean slate again (re-select l1 and clear)
 	await page.evaluate(async () => {
-		const { selectLayer } = await import('/src/lib/services/layersService.ts');
-		const { removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
+		const { selectLayer } = await import('/paint.svelte/src/lib/services/layersService.ts');
+		const { removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
 		const doc = window.__REGISTRY__.active;
 		const all = doc.layers;
 		for (const l of all) {
@@ -191,7 +191,7 @@ async function main() {
 	});
 	await sleep(300);
 	await page.evaluate(async () => {
-		const { addLayer } = await import('/src/lib/services/layersService.ts');
+		const { addLayer } = await import('/paint.svelte/src/lib/services/layersService.ts');
 		addLayer();
 	});
 	await sleep(300);
@@ -237,10 +237,10 @@ async function main() {
 
 	// --- outline color row: fg/bg buttons, stored swatch, persistence -----
 	const colorRow = await page.evaluate(async () => {
-		const { addLayerEffect, removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
-		const { effectById } = await import('/src/lib/effects/index.ts');
-		const { getSettings } = await import('/src/lib/services/settingsService.ts');
-		const { foregroundColor, backgroundColor } = await import('/src/lib/state/ui.ts');
+		const { addLayerEffect, removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
+		const { effectById } = await import('/paint.svelte/src/lib/effects/index.ts');
+		const { getSettings } = await import('/paint.svelte/src/lib/services/settingsService.ts');
+		const { foregroundColor, backgroundColor } = await import('/paint.svelte/src/lib/state/ui.ts');
 		const doc = window.__REGISTRY__.active;
 		const layer = doc.activeLayer;
 		const effs = layer.effects ?? [];
@@ -295,7 +295,7 @@ async function main() {
 
 	// --- [5] fx badge: blue with effects, gray without; color row is 1 line
 	const badge = await page.evaluate(async () => {
-		const { removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
+		const { removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
 		const doc = window.__REGISTRY__.active;
 		const withFx = !!document.querySelector('.layer-fx.hasFx');
 		const ringWith = getComputedStyle(document.querySelector('.layer-fx')).boxShadow;
@@ -318,7 +318,7 @@ async function main() {
 
 	// --- [6] drag & drop reorder via synthetic DragEvents -------------------
 	const reorder = await page.evaluate(async () => {
-		const { addLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
+		const { addLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
 		const doc = window.__REGISTRY__.active;
 		const layer = doc.activeLayer;
 		addLayerEffect(layer.id, 'bevel', { depth: 25, angle: 135 });
@@ -380,9 +380,9 @@ async function main() {
 
 	// --- [8] feather shrink slider + noise link-to-alpha checkbox in panel
 	const widgets = await page.evaluate(async () => {
-		const { addLayerEffect, removeLayerEffect } = await import('/src/lib/services/layerEffectsService.ts');
-		const { effectById } = await import('/src/lib/effects/index.ts');
-		const { getSettings } = await import('/src/lib/services/settingsService.ts');
+		const { addLayerEffect, removeLayerEffect } = await import('/paint.svelte/src/lib/services/layerEffectsService.ts');
+		const { effectById } = await import('/paint.svelte/src/lib/effects/index.ts');
+		const { getSettings } = await import('/paint.svelte/src/lib/services/settingsService.ts');
 		const doc = window.__REGISTRY__.active;
 		const layer = doc.activeLayer;
 		const clear = async () => {
