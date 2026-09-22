@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	import { takeDialogRightAnchor } from './dialogPosition';
 	// Last dialog position, shared across mounts. Replacing a filter
 	// remounts the popup (DialogHost keys by effect id) — restoring the
 	// saved position keeps it where the user put it instead of
@@ -59,6 +60,18 @@
 
 	$effect(() => {
 		if (typeof window === 'undefined') return;
+		// Dialog replacement (‹ › steppers / ▾ switcher): pin the TOP-RIGHT
+		// corner — where the steppers live — instead of the top-left, so
+		// the arrows stay put when the new window is wider/narrower.
+		const anchorRight = takeDialogRightAnchor();
+		if (anchorRight !== null && Number.isFinite(anchorRight)) {
+			pos.x = Math.max(0, Math.min(anchorRight - width, window.innerWidth - 60));
+			pos.y = savedPos
+				? Math.max(0, Math.min(savedPos.y, window.innerHeight - 40))
+				: Math.max(24, Math.round((window.innerHeight - 420) / 2));
+			savedPos = { x: pos.x, y: pos.y };
+			return;
+		}
 		if (!savedPos) {
 			pos.x = Math.round((window.innerWidth - width) / 2);
 			pos.y = Math.max(24, Math.round((window.innerHeight - 420) / 2));

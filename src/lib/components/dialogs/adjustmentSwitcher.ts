@@ -9,6 +9,7 @@ import { adjustmentEffects, effectById } from '../../effects';
 import type { ResolvedEffect } from '../../effects';
 import { openDialog } from '../../services/dialogService';
 import type { DialogKind } from '../../services/dialogService';
+import { anchorDialogRight } from '../common/dialogPosition';
 
 /** Adjustments that open a dialog, label-sorted like the Adjustments menu. */
 export const adjustmentDialogs: ResolvedEffect[] = adjustmentEffects.filter(
@@ -39,11 +40,20 @@ export function nextAdjustmentId(id: string): string {
  * current preview, then open the picked adjustment's dialog. Honours custom
  * `dialog` overrides (e.g. Curves, Levels) exactly like the command routing
  * in services/commands.ts — the DialogHost remounts on kind/effect change,
- * and MovableDialog restores the saved position. */
+ * and MovableDialog restores the saved position. The current window's RIGHT
+ * edge is anchored first, so the remount keeps the top-right corner (with
+ * the ‹ › steppers) fixed instead of the top-left. */
 export function switchAdjustment(id: string): void {
 	const target = effectById(id);
 	if (!target) return;
+	// Viewport x of the outgoing window's right edge (NaN-guarded by the
+	// anchor consumer). Queried BEFORE openDialog unmounts this window.
+	const right =
+		typeof document !== 'undefined'
+			? document.querySelector('.m-dialog')?.getBoundingClientRect().right ?? null
+			: null;
 	getEditorRenderer().setActiveLayerFilterPreview(null);
+	if (right !== null) anchorDialogRight(right);
 	openDialog(
 		(target.dialog ?? 'effect') as NonNullable<DialogKind>,
 		target.dialog ? undefined : { effectId: id }
