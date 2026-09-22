@@ -42,6 +42,10 @@
 	let unsubHist: (() => void) | null = null;
 	/** Row currently hovered — reveals the blend-mode dropdown when its mode is Normal. */
 	let hoveredId: string | null = $state(null);
+	/** Row whose blend-mode dropdown has keyboard focus — the dropdown stays
+	 * mounted while focused so arrow-key stepping isn't cut off when the
+	 * pointer leaves the row mid-toggle. */
+	let focusedBlendId: string | null = $state(null);
 	/** Inline layer-name editor state. */
 	let editingId: string | null = $state(null);
 	let editingName = $state('');
@@ -426,13 +430,17 @@
 							{/if}
 						</div>
 						<div class="layer-line">
-							{#if row.blendMode !== 'normal' || hoveredId === row.id}
+							{#if row.blendMode !== 'normal' || hoveredId === row.id || focusedBlendId === row.id}
 								<select
 									class="layer-blend"
 									value={row.blendMode}
 									title="Blend mode"
 									onclick={(e) => e.stopPropagation()}
 									onpointerdown={(e) => e.stopPropagation()}
+									onfocus={() => (focusedBlendId = row.id)}
+									onblur={() => {
+										if (focusedBlendId === row.id) focusedBlendId = null;
+									}}
 									onchange={(e) => setLayerBlendMode(row.id, (e.currentTarget as HTMLSelectElement).value)}
 								>
 									{#each BLEND_MODE_OPTIONS as b (b.id)}

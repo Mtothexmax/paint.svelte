@@ -4,6 +4,7 @@
 import { Container, Sprite } from 'pixi.js';
 import { createSurfaceTexture, createU8Texture } from './surfaceTexture';
 import { SPRITE_BLENDS } from '../render/SurfaceStore';
+import { advancedBlendModeIndex } from './layerBlend';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { EditorRenderer } from './EditorRenderer';
 import { extractStraightCanvas } from './readback';
@@ -47,6 +48,31 @@ export function compositeDocumentToCanvas(
 	renderer: EditorRenderer,
 	doc: ImageDocument
 ): { canvas: HTMLCanvasElement; container: Container; rt: ReturnType<typeof createSurfaceTexture> } {
+	// Advanced blend modes (difference, exclusion, overlay, …) cannot render
+	// into a surface via `sprite.blendMode` — Pixi's backdrop sampling only
+	// works on the screen target. With any such layer visible, composite
+	// sequentially through SurfaceStore (native modes batch identically one
+	// by one, advanced modes blend against an explicit snapshot).
+	const sequential = doc.layers.some(
+		(layer) => layer.visible && advancedBlendModeIndex(layer.blendMode) !== null
+	);
+	if (sequential) {
+		const rt = createSurfaceTexture(doc.width, doc.height);
+		const rtId = renderer.surfaces.adopt(rt);
+		renderer.surfaces.clear(rtId);
+		for (const layer of doc.layers) {
+			if (!layer.visible) continue;
+			const tex =
+				renderer.exportTextureFor(layer) ?? renderer.surfaces.getTexture(layer.surfaceId);
+			renderer.surfaces.compositeTexture(tex, rtId, layer.opacity, layer.blendMode);
+		}
+		renderer.surfaces.release(rtId);
+		// Straight-alpha encode (see extractStraightCanvas): extract.canvas would
+		// bake premultiplied RGB into the PNG, darkening translucent edges.
+		const canvas = extractStraightCanvas(renderer, rt);
+		return { canvas, container: new Container(), rt };
+	}
+
 	const container = new Container();
 	for (const layer of doc.layers) {
 		if (!layer.visible) continue;

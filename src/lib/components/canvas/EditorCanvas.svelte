@@ -427,6 +427,11 @@ let zoomRightHeld = $state(false);
 	/** Selection mode captured from the FIRST click of the polygon being built
 	 * (ctrl/shift = add, alt / right button = subtract, else options strip). */
 	let polyMode: 'replace' | 'add' | 'subtract' = 'replace';
+	/** Last pointer position (client px) while polygon-building, for the
+	 * edge auto-pan below. Cleared when the pointer leaves the host. */
+	let polyLastClient: { x: number; y: number } | null = null;
+	/** Interval handle for the polygon edge auto-pan (null when inactive). */
+	let polyEdgeTimer: number | null = null;
 
 	// Paint.NET-style brush preview: an outline circle of the brush size (scaled
 	// with the current zoom) follows the pointer. While it is shown the OS
@@ -1467,6 +1472,69 @@ let zoomRightHeld = $state(false);
 		getEditorRenderer().previewSelectionOutline(pts.length >= 2 ? [pts] : null, false);
 	}
 
+	// --- polygon edge auto-pan (select-poly ONLY, never freehand) ---------
+	// While a polygon is being built, holding the pointer near a viewport
+	// edge wanders the view toward that edge so vertices can be placed
+	// beyond the current view. Timer-driven (not move-driven) so the view
+	// keeps wandering while the pointer is held still at the edge. The
+	// committed vertices are image-space, so panning never invalidates them.
+	/** Edge zone width in screen px. */
+	const POLY_EDGE_MARGIN = 28;
+	/** Pan step per tick in screen px (tick = 50 ms → ~160 px/s). */
+	const POLY_EDGE_STEP = 8;
+	const POLY_EDGE_TICK_MS = 50;
+
+	function startPolyEdgePan(): void {
+		if (polyEdgeTimer !== null) return;
+		polyEdgeTimer = window.setInterval(polyEdgeTick, POLY_EDGE_TICK_MS);
+	}
+
+	function stopPolyEdgePan(): void {
+		if (polyEdgeTimer !== null) {
+			window.clearInterval(polyEdgeTimer);
+			polyEdgeTimer = null;
+		}
+		polyLastClient = null;
+	}
+
+	function polyEdgeTick(): void {
+		const doc = documentRegistry.active;
+		if (!polyBuilding || !isPolyTool() || panning || !polyLastClient || !doc || !ready) {
+			if (!polyBuilding) stopPolyEdgePan();
+			if (panning) polyLastClient = null;
+			return;
+		}
+		const rect = host.getBoundingClientRect();
+		const { x, y } = polyLastClient;
+		let dx = 0;
+		let dy = 0;
+		if (x >= rect.left && x < rect.right) {
+			if (x - rect.left < POLY_EDGE_MARGIN) dx = POLY_EDGE_STEP;
+			else if (rect.right - x < POLY_EDGE_MARGIN) dx = -POLY_EDGE_STEP;
+		}
+		if (y >= rect.top && y < rect.bottom) {
+			if (y - rect.top < POLY_EDGE_MARGIN) dy = POLY_EDGE_STEP;
+			else if (rect.bottom - y < POLY_EDGE_MARGIN) dy = -POLY_EDGE_STEP;
+		}
+		if (dx === 0 && dy === 0) return;
+		// Near the right/bottom edge the view wanders right/down (the image
+		// shifts left/up under the fixed pointer, revealing new territory).
+		doc.view.panX += dx;
+		doc.view.panY += dy;
+		getEditorRenderer().refreshActiveView();
+		syncTransformUi();
+		// The pointer didn't move, but the image under it did — refresh the
+		// rubber-band preview and the cursor readout for the new position.
+		const sp = screenPoint({ clientX: polyLastClient.x, clientY: polyLastClient.y });
+		showPolyOutline(imageFromScreen(sp));
+		const image = screenToImage(doc.view, sp.x, sp.y);
+		if (image.x >= 0 && image.y >= 0 && image.x < doc.width && image.y < doc.height) {
+			updateStatus(doc, { x: image.x, y: image.y });
+		} else {
+			updateStatus(doc);
+		}
+	}
+
 	/** Adds a vertex on a (single) click. A double-click (two quick clicks at
 	 * ~the same point) finishes the polygon. `e.detail` is deliberately NOT
 	 * used — pointer events do not carry a reliable click count in all
@@ -1484,6 +1552,7 @@ let zoomRightHeld = $state(false);
 		if (!polyBuilding) {
 			polyPts = [];
 			polyBuilding = true;
+			startPolyEdgePan();
 			// the mode of the FIRST click applies to the whole polygon gesture
 			polyMode = e.button === 2 || e.altKey ? 'subtract' : e.ctrlKey || e.shiftKey ? 'add' : get(selectionMode);
 			getEditorRenderer().previewSelectionOutline(null, false);
@@ -1507,6 +1576,7 @@ let zoomRightHeld = $state(false);
 		const mode = polyMode;
 		polyPts = [];
 		polyBuilding = false;
+		stopPolyEdgePan();
 		if (pts.length >= 2) applySelectionMode(mode, 'lasso', pts[0], pts[0], pts);
 		if (ready) getEditorRenderer().refreshActiveSelection();
 	}
@@ -1515,6 +1585,7 @@ let zoomRightHeld = $state(false);
 	function cancelPolygon(): void {
 		polyPts = [];
 		polyBuilding = false;
+		stopPolyEdgePan();
 		if (ready) getEditorRenderer().refreshActiveSelection();
 	}
 
@@ -1702,6 +1773,7 @@ function onPointerDown(e: PointerEvent) {
 		if (ready && doc) {
 			logTransformCursor(imageFromScreen(sp));
 			if (polyBuilding && isPolyTool() && !panning) {
+				polyLastClient = { x: e.clientX, y: e.clientY };
 				showPolyOutline(imageFromScreen(sp)); // live polygon preview follows the pointer
 			}
 			if (panning && e.pointerId === panPointerId) {
@@ -1987,6 +2059,7 @@ function onPointerDown(e: PointerEvent) {
 			const onLeave = () => {
 				pointerInside = false;
 				zoomRightHeld = false;
+				polyLastClient = null;
 				clearProbe();
 				// Drop the stale pointer position, otherwise the "mouse" read-out
 				// keeps claiming the pointer sits on the last pixel it touched.
@@ -2039,6 +2112,7 @@ function onPointerDown(e: PointerEvent) {
 
 		return () => {
 			alive = false;
+			stopPolyEdgePan();
 			sessionHandle?.stop();
 			for (const d of disposers) d();
 		};

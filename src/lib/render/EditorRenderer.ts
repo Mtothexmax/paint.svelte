@@ -48,6 +48,11 @@ export class EditorRenderer {
 			backgroundAlpha: 0,
 			antialias: false,
 			autoDensity: true,
+			// Required for the advanced blend modes (difference, exclusion,
+			// …): their filter samples the backdrop, which the WebGL
+			// renderer only keeps with the back buffer enabled. Without it
+			// Pixi warns and the layer silently composites as `normal`.
+			useBackBuffer: true,
 			resolution: Math.max(window.devicePixelRatio || 1, 1)
 		});
 		this.app = app;

@@ -66,6 +66,19 @@ export function isTextTarget(target: EventTarget | null): boolean {
 	return target.isContentEditable;
 }
 
+/**
+ * Controls that consume arrow keys themselves: a focused <select> steps its
+ * options (e.g. the layer blend-mode dropdown), FilterSlider's track
+ * ([role="slider"]) handles its own arrows, native range inputs adjust.
+ * The canvas listener runs in the capture phase on window — without this
+ * guard the arrows never reach the control: they get preventDefaulted into
+ * a selection nudge instead. Text inputs are covered by isTextTarget above.
+ */
+function isArrowControl(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+	return !!target.closest('select, input[type="range"], [role="slider"]');
+}
+
 /** Escape cancels an in-progress selection drag AND clears an active selection
  * (Paint.NET behaviour). Order matters: gradient -> line -> shape -> polygon ->
  * selection drag, then the floating-selection move, then the drop. */
@@ -162,7 +175,7 @@ export function handleKeyDown(e: KeyboardEvent, a: KeyApi): void {
 		ArrowDown: [0, 1]
 	};
 	const arrow = ARROW_STEP[e.key];
-	if (arrow && !typing && !modal && !a.selecting() && documentRegistry.active) {
+	if (arrow && !typing && !modal && !isArrowControl(e.target) && !a.selecting() && documentRegistry.active) {
 		e.preventDefault();
 		e.stopPropagation();
 		const step = e.ctrlKey || e.metaKey ? 10 : 1;

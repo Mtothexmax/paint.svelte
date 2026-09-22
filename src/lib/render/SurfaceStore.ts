@@ -3,7 +3,17 @@
 // render targets in this slice.
 
 import { Container, Graphics, Mesh, PerspectivePlaneGeometry, RenderTexture, Sprite, Texture, type Application } from 'pixi.js';
+// Pixi v8 keeps every non-trivial blend mode (difference, exclusion,
+// overlay, darken, …) in the opt-in `advanced-blend-modes` extension: the
+// names type-check without it, but silently render as `normal` (verified:
+// difference/exclusion composited as a plain copy). This side-effect import
+// registers the real implementations for the LIVE canvas (which renders to
+// the screen, where the backdrop-sampling filter works). Off-screen
+// compositing (merge, export) goes through layerBlend.ts instead — the
+// WebGL backbuffer only exists for the screen target.
+import 'pixi.js/advanced-blend-modes';
 import { createSurfaceTexture } from './surfaceTexture';
+import { LayerBlendFilter, advancedBlendModeIndex } from './layerBlend';
 import { newId } from '../core/id';
 import { type Point, type Rect } from '../core/geometry';
 import type { SurfaceId } from '../core/layers/Layer';
@@ -82,6 +92,12 @@ export class SurfaceStore {
 		return id;
 	}
 
+	/** Forgets an adopted texture WITHOUT destroying it (ownership returns
+	 * to the caller, e.g. the export composite that destroys it itself). */
+	release(id: SurfaceId): void {
+		this.surfaces.delete(id);
+	}
+
 	has(id: SurfaceId): boolean {
 		return this.surfaces.has(id);
 	}
@@ -144,13 +160,45 @@ export class SurfaceStore {
 	 * fall back to normal). Both surfaces stay owned by the caller.
 	 */
 	compositeLayer(srcId: SurfaceId, destId: SurfaceId, alpha: number, blendMode: string): void {
-		const sprite = new Sprite(this.getTexture(srcId));
-		sprite.alpha = Math.max(0, Math.min(1, alpha));
-		sprite.blendMode = SPRITE_BLENDS[blendMode] ?? 'normal';
+		this.compositeTexture(this.getTexture(srcId), destId, alpha, blendMode);
+	}
+
+	/**
+	 * Texture-level composite: draws `src` (not necessarily owned) onto an
+	 * owned surface with an opacity and blend-mode id. Native modes go
+	 * through `sprite.blendMode`; advanced modes (difference, exclusion,
+	 * overlay, …) go through LayerBlendFilter with an explicit snapshot of
+	 * the destination as its backdrop — Pixi's own backdrop sampling only
+	 * works when rendering to the screen, never into a surface.
+	 */
+	compositeTexture(src: Texture, destId: SurfaceId, alpha: number, blendMode: string): void {
+		const dest = this.getTexture(destId);
+		const clamped = Math.max(0, Math.min(1, alpha));
+		const modeIndex = advancedBlendModeIndex(blendMode);
+		if (modeIndex === null) {
+			const sprite = new Sprite(src);
+			sprite.alpha = clamped;
+			sprite.blendMode = SPRITE_BLENDS[blendMode] ?? 'normal';
+			const holder = new Container();
+			holder.addChild(sprite);
+			this.render(holder, dest, false);
+			holder.destroy({ children: true });
+			return;
+		}
+		// Snapshot BEFORE drawing (sampling a target while rendering into it
+		// is undefined). Same size at the origin: all callers composite
+		// full-size surfaces, so vTextureCoord addresses both 1:1.
+		const backId = this.copyRegion(destId, { x: 0, y: 0, width: dest.width, height: dest.height });
+		const sprite = new Sprite(src);
+		sprite.alpha = clamped;
+		const filter = new LayerBlendFilter(modeIndex, this.getTexture(backId));
+		sprite.filters = [filter];
 		const holder = new Container();
 		holder.addChild(sprite);
-		this.render(holder, this.getTexture(destId), false);
+		this.render(holder, dest, false);
 		holder.destroy({ children: true });
+		filter.destroy();
+		this.dispose(backId);
 	}
 
 	/**
