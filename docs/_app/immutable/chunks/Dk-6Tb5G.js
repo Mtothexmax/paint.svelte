@@ -1,0 +1,1 @@
+import{r as e}from"../nodes/2.BuRKi-y6.js";export{e as createNewDocument};
