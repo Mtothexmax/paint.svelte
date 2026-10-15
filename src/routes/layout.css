@@ -360,16 +360,11 @@ body {
 	box-shadow: none;
 	-webkit-focus-ring-color: transparent;
 }
-.tool-btn.active:focus,
-.tool-btn.active:focus-visible {
-	box-shadow: inset 0 0 0 2px var(--accent);
-}
 .tool-btn:hover {
 	background: rgba(255, 255, 255, 0.08);
 }
 .tool-btn.active {
-	background: var(--accent-soft);
-	box-shadow: inset 0 0 0 2px var(--accent);
+	background: rgba(80, 150, 255, 0.35);
 }
 /* Wide tools (Shapes) span both toolbar columns (needs width:auto — the
    base rule fixes every button to one column width). */

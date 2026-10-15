@@ -8,12 +8,24 @@
 	let labels = $state<string[]>([]);
 	let cursor = $state(-1);
 	let unsubHist: (() => void) | null = null;
+	let listEl: HTMLDivElement;
 
 	function refresh() {
 		const doc = documentRegistry.active;
 		labels = doc ? doc.history.labels() : [];
 		cursor = doc ? doc.history.cursor : -1;
 	}
+
+	// Auto-scroll to bottom when labels change (new items added)
+	$effect(() => {
+		const _ = labels.length;
+		if (listEl) {
+			requestAnimationFrame(() => {
+				listEl.scrollTop = listEl.scrollHeight;
+			});
+		}
+	});
+
 	function attach() {
 		unsubHist?.();
 		const doc = documentRegistry.active;
@@ -47,7 +59,7 @@
 <div class="panel-card flex h-[20vh] shrink-0 flex-col">
     <div class="panel-title">History</div>
 
-    <div class="history-list flex-1 min-h-0 overflow-y-auto">
+    <div class="history-list flex-1 min-h-0 overflow-y-auto" bind:this={listEl}>
         {#if labels.length > 0}
             <button class="history-row history-baseline" class:on={cursor === -1} onclick={() => travel(-1)}>
                 Initial

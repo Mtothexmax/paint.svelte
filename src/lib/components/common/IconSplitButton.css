@@ -10,7 +10,7 @@
 	background: linear-gradient(180deg, #3a3e45, #272a2f);
 	border: 1px solid rgba(0, 0, 0, 0.6);
 	border-radius: 6px;
-	overflow: visible;
+	overflow: hidden;
 	padding: 0;
 	box-shadow:
 		0 1px 0 rgba(255, 255, 255, 0.1) inset,
@@ -28,14 +28,15 @@
 	align-items: center;
 	justify-content: center;
 	width: 24px;
-	font-size: 15px;
+	font-size: 14px;
 	border-radius: 5px 0 0 5px;
 }
 /* Main part (icon + optional label): one element, one shared hover. Only
    the ▾ arrow opens the menu. */
 .isp-main {
 	display: flex;
-	align-items: center;
+	align-items: stretch;
+	flex: 1 1 auto;
 	border-radius: 5px 0 0 5px;
 	cursor: pointer;
 }
@@ -58,6 +59,7 @@
 	transition:
 		color 100ms,
 		transform 150ms;
+	line-height: 1;
 }
 /* Inset hairline between the two hit areas. */
 .isp-arrow::before {
@@ -89,6 +91,7 @@
 	font-weight: 500;
 	color: var(--text);
 	white-space: nowrap;
+	line-height: 1;
 }
 .isp-menu {
 	position: fixed;

@@ -77,4 +77,5 @@
 	color: var(--text);
 	width: 28px;
 	text-align: right;
+	cursor: default;
 }

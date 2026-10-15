@@ -25,6 +25,8 @@
 
 	import { activeToolId, showNotice } from '../../state/ui';
 	import ToolbarColorPicker from './ToolbarColorPicker.svelte';
+	import SelectRectIcon from '../../assets/SelectRect.svg';
+	import SelectEllipseIcon from '../../assets/SelectEllipse.svg';
 
 	interface ToolConfig {
 		id: string;
@@ -41,13 +43,13 @@
 	// The 2-column CSS grid fills in this order so the layout falls out automatically.
 	const tools: ToolConfig[] = [
 		// Row 1
-		{ id: 'select-rect', label: 'Rectangle Select', glyph: '▭' },
+		{ id: 'select-rect', label: 'Rectangle Select', src: SelectRectIcon },
 		{ id: 'move-pixels', label: 'Move Selected Pixels', src: moveSvg },
 		// Row 2
 		{ id: 'lasso', label: 'Lasso Select', src: lassoIcon },
 		{ id: 'move-selection', label: 'Move Selection', src: moveSelectionIcon },
 		// Row 3
-		{ id: 'select-ellipse', label: 'Ellipse Select', glyph: '◯' },
+		{ id: 'select-ellipse', label: 'Ellipse Select', src: SelectEllipseIcon },
 		{ id: 'zoom', label: 'Zoom', src: zoomSvg },
 		// Row 4
 		{ id: 'wand', label: 'Magic Wand', src: wandSvg },
