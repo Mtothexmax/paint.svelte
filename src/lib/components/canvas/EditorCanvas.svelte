@@ -4,8 +4,8 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { documentRegistry, RegistryEvents } from '../../core/document/registry';
-import type { Point, Rect } from '../../core/geometry';
-import { pointInPolygon, rectFromCorners, squareCornerFromDrag, framePointsFromLoops, framePointsFromRect, type FramePoints } from '../../core/geometry';
+	import type { Point, Rect } from '../../core/geometry';
+	import { pointInPolygon, rectFromCorners, squareCornerFromDrag, framePointsFromLoops, framePointsFromRect, type FramePoints } from '../../core/geometry';
 	import { screenToImage, imageToScreen, zoomBy } from '../../render/Viewport';
 	import { getEditorRenderer, initEditorRenderer } from '../../render/EditorRenderer';
 	import { BrushEngine } from '../../render/BrushEngine';

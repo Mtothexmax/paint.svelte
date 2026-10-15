@@ -4,16 +4,18 @@
 	import type { EffectDialogPayload, LayerEffectDialogPayload } from '../../services/dialogService';
 	import type { AiBackgroundRemovalPayload } from '../../services/dialogService';
 	import NewImageDialog from './NewImageDialog.svelte';
-	import AiBackgroundRemovalDialog from './AiBackgroundRemovalDialog.svelte';
 	import FilterPopup from './FilterPopup.svelte';
 	import LayerEffectDialog from './LayerEffectDialog.svelte';
 	import RasterizeConfirmDialog from './RasterizeConfirmDialog.svelte';
 	import ImageSizeDialog from './ImageSizeDialog.svelte';
 	import LayerOpacityDialog from './LayerOpacityDialog.svelte';
 	import SelectionSizeDialog from './SelectionSizeDialog.svelte';
-	import CurvesDialog from './CurvesDialog.svelte';
-	import LevelsDialog from './LevelsDialog.svelte';
 	import PasteDialog from './PasteDialog.svelte';
+
+	// Lazy-loaded heavy dialogs (loaded only when opened)
+	const CurvesDialog = () => import('./CurvesDialog.svelte');
+	const LevelsDialog = () => import('./LevelsDialog.svelte');
+	const AiBackgroundRemovalDialog = () => import('./AiBackgroundRemovalDialog.svelte');
 </script>
 
 {#if $dialog.kind === 'newImage'}
@@ -33,11 +35,17 @@
 {:else if $dialog.kind === 'selectionSize'}
 	<SelectionSizeDialog />
 {:else if $dialog.kind === 'curves'}
-	<CurvesDialog />
+	{#await CurvesDialog() then m}
+		<m.default />
+	{/await}
 {:else if $dialog.kind === 'levels'}
-	<LevelsDialog />
+	{#await LevelsDialog() then m}
+		<m.default />
+	{/await}
 {:else if $dialog.kind === 'paste'}
 	<PasteDialog />
 {:else if $dialog.kind === 'aiBackgroundRemoval'}
-	<AiBackgroundRemovalDialog payload={$dialog.payload as AiBackgroundRemovalPayload} />
+	{#await AiBackgroundRemovalDialog() then m}
+		<m.default payload={$dialog.payload as AiBackgroundRemovalPayload} />
+	{/await}
 {/if}
