@@ -114,6 +114,14 @@ on top of your hover gradient. Override with a **two-class** selector
 
 ## Architecture notes
 
+- **ONNX Runtime assets must be pinned as URLs, not as a directory.**
+  `ort.env.wasm.wasmPaths = { mjs, wasm }` with `?url` imports of
+  `ort-wasm-simd-threaded.jsep.{mjs,wasm}`. A directory prefix breaks because
+  Vite hashes the filenames while ORT hardcodes `…jsep.mjs` → 404 on Pages.
+  Only the jsep pair is needed (default entry = JSEP build).
+- **Never focus the paste-catcher while a dialog owns the gesture.** It
+  collapses the document selection (that is why dialog text was unselectable).
+  `EditorCanvas` gates `focusPasteCatcher()` on the pointerdown origin.
 - Effects: `src/lib/effects/<menu>/<id>.ts` default-exports an `EffectDefinition`;
   `import.meta.glob` auto-registers; `registry.ts` derives defaults from `params`.
 - `EffectDialog.svelte` and `LayerEffectDialog.svelte` each carry their **own copy**

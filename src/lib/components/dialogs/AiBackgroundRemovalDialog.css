@@ -93,13 +93,66 @@
 	font-size: 11px;
 	font-variant-numeric: tabular-nums;
 }
+/* Error block. The message is raw runtime text — backend names, ORT internals,
+   full URLs — i.e. exactly what someone needs to paste into a bug report, so
+   it is EXPLICITLY selectable (`user-select: text` + a text cursor) and long
+   unbroken URLs wrap instead of running out of the 380px dialog body. The
+   Copy button is the belt-and-braces path: selection inside a chrome panel is
+   fiddly with a trackpad, one click is not. */
 .ai-error {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
 	color: #ff9d9d;
 	background: rgba(255, 80, 80, 0.08);
 	border: 1px solid rgba(255, 80, 80, 0.35);
 	border-radius: 6px;
 	padding: 6px 8px;
 	line-height: 1.45;
+	cursor: text;
+	user-select: text;
+	-webkit-user-select: text;
+}
+.ai-error-text {
+	flex: 1 1 auto;
+	/* Without this the flex item refuses to shrink below its longest word and
+	   the message overflows the rounded box instead of wrapping. */
+	min-width: 0;
+	margin: 0;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+	user-select: text;
+	-webkit-user-select: text;
+}
+.ai-error-copy {
+	flex: 0 0 auto;
+	align-self: flex-start;
+	padding: 2px 7px;
+	background: linear-gradient(to bottom, #3a3e45, #272a2f);
+	border: 1px solid rgba(0, 0, 0, 0.65);
+	border-radius: 4px;
+	color: #e7e9ee;
+	font: inherit;
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	cursor: pointer;
+	user-select: none;
+	-webkit-user-select: none;
+	box-shadow:
+		0 1px 0 rgba(255, 255, 255, 0.13) inset,
+		0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.ai-error-copy:hover {
+	filter: brightness(1.18);
+}
+.ai-error-copy:active {
+	transform: translateY(1px);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6) inset;
+}
+.ai-error-copy:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--accent-ring);
 }
 /* First-run download question: accent-tinted so it reads as the decision
    point of the dialog, not as an error. */

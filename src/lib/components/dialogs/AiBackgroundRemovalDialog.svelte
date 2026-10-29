@@ -59,6 +59,42 @@
 	let adapterHighOk = $state(false);
 	let progress = $state<BackgroundRemovalProgress | null>(null);
 	let error = $state<string | null>(null);
+	/** Transient "Copied" confirmation on the error block's copy button. */
+	let copied = $state(false);
+	let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/** Copies the raw error text. Runtime messages carry URLs and ORT
+	 * internals, so people paste them into bug reports — the button exists
+	 * because dragging a selection inside a chrome panel is fiddly. */
+	async function copyError(): Promise<void> {
+		if (!error) return;
+		try {
+			await navigator.clipboard.writeText(error);
+		} catch {
+			// Clipboard API unavailable (permissions / insecure context):
+			// fall back to the classic hidden-textarea copy.
+			const ta = document.createElement('textarea');
+			ta.value = error;
+			ta.setAttribute('readonly', '');
+			ta.style.position = 'fixed';
+			ta.style.top = '-1000px';
+			ta.style.opacity = '0';
+			document.body.appendChild(ta);
+			ta.select();
+			try {
+				document.execCommand('copy');
+			} catch {
+				/* nothing else to try */
+			}
+			ta.remove();
+		}
+		copied = true;
+		if (copiedTimer) clearTimeout(copiedTimer);
+		copiedTimer = setTimeout(() => (copied = false), 1400);
+	}
+	$effect(() => () => {
+		if (copiedTimer) clearTimeout(copiedTimer);
+	});
 	let sourceLabel = $state('…');
 	let runToken = 0;
 	let aborter: AbortController | null = null;
@@ -162,6 +198,7 @@
 		}
 		status = 'working';
 		error = null;
+		copied = false;
 		progress = null;
 		const token = ++runToken;
 		aborter = new AbortController();
@@ -308,7 +345,12 @@
 		{/if}
 
 		{#if status === 'error' && error}
-			<p class="ai-error" role="alert">{error}</p>
+			<div class="ai-error" role="alert">
+				<p class="ai-error-text">{error}</p>
+				<button class="ai-error-copy" onclick={copyError} title="Copy this message to the clipboard">
+					{copied ? 'Copied' : 'Copy'}
+				</button>
+			</div>
 		{/if}
 	</div>
 

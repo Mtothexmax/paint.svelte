@@ -1,6 +1,6 @@
 // Layer: render (pixi). One scene graph per open document.
 
-import { Container, Filter, Graphics, Mesh, PerspectivePlaneGeometry, RenderTexture, Sprite, Texture, TilingSprite } from 'pixi.js';
+import { Container, Filter, Graphics, Mesh, PerspectivePlaneGeometry, RenderTexture, Sprite, Texture, TilingSprite, Ticker } from 'pixi.js';
 import type { ImageDocument } from '../core/document/ImageDocument';
 import type { Point } from '../core/geometry';
 import type { Layer, LayerEffect, SurfaceId } from '../core/layers/Layer';
@@ -20,6 +20,7 @@ const ANT_HALO_SCREEN = 2.6; // outer (white) pass width on screen
 const ANT_CORE_SCREEN = 1.2; // inner (dark) pass width on screen
 const ANT_DASH_ON_SCREEN = 6;
 const ANT_DASH_OFF_SCREEN = 4;
+const ANT_ANIM_SPEED = 0.15; // dash scroll speed in image px per frame
 
 /** Adds a closed polyline (all loop points + back to the first). */
 function addClosedLoop(g: Graphics, pts: Point[]): void {
@@ -32,31 +33,39 @@ function addClosedLoop(g: Graphics, pts: Point[]): void {
 /**
  * Adds a dashed version of a closed polyline. Each edge carries its own dash
  * pattern (phase restarts per edge) so short edges — dense lasso points, small
- * rects — never produce corner-cutting diagonals. Cosmetic only.
+ * rects — never produce corner-cutting diagonals. The `offset` parameter shifts
+ * the dash phase for marching-ants animation.
  */
-function addDashedLoop(g: Graphics, pts: Point[], onImg: number, offImg: number): void {
+function addDashedLoop(g: Graphics, pts: Point[], onImg: number, offImg: number, offset = 0): void {
 	const n = pts.length;
 	if (n < 2 || !(onImg > 0)) return;
+	const dashLen = onImg + offImg;
+	// Normalize offset to [0, dashLen)
+	const phase = ((offset % dashLen) + dashLen) % dashLen;
 	for (let i = 0; i < n; i++) {
 		const a = pts[i];
 		const b = pts[(i + 1) % n];
 		const len = Math.hypot(b.x - a.x, b.y - a.y);
 		if (!(len > 0)) continue;
-		let travelled = 0;
-		let on = true;
-		let remaining = onImg;
+		// Start with remaining = phase to offset the pattern
+		let travelled = -phase;
+		let on = phase < onImg;
+		let remaining = on ? onImg - phase : dashLen - phase;
 		while (travelled < len) {
-			const step = Math.min(remaining, len - travelled);
-			const t0 = travelled / len;
-			const t1 = (travelled + step) / len;
-			g.moveTo(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0);
-			if (on) g.lineTo(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1);
-			travelled += step;
-			remaining -= step;
-			if (remaining <= 0) {
-				on = !on;
-				remaining = on ? onImg : offImg;
+			if (travelled >= 0) {
+				const t0 = travelled / len;
+				g.moveTo(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0);
 			}
+			travelled += remaining;
+			if (travelled >= len) {
+				const t1 = 1;
+				if (on) g.lineTo(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1);
+				break;
+			}
+			const t1 = travelled / len;
+			if (on) g.lineTo(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1);
+			on = !on;
+			remaining = on ? onImg : offImg;
 		}
 	}
 }
@@ -117,6 +126,14 @@ export class DocScene {
 	 * through the layer's enabled effects off-screen; the sprite shows this cache
 	 * instead of the raw surface so effects are live and non-destructive. */
 	private layerEffectTextures = new Map<string, RenderTexture>();
+	/** Marching ants animation offset (image px). */
+	private antsOffset = 0;
+	/** Bound ticker callback — stored so it can be removed on destroy. */
+	private readonly antsTick = (dt: number) => {
+		this.antsOffset += ANT_ANIM_SPEED * dt;
+		if (this.outlineLoops && this.outlineDashed) this.strokeOutline();
+	};
+	private antsTickerBound = false;
 
 	constructor(doc: ImageDocument, surfaces: SurfaceStore, darkChecker = false) {
 		this.doc = doc;
@@ -136,6 +153,9 @@ this.root.addChild(this.checker);
 		this.root.addChild(this.top);
 		this.raiseTop();
 		this.applyView(doc.view.zoom, doc.view.panX, doc.view.panY);
+		// Start marching ants animation
+		Ticker.shared.add(this.antsTick);
+		this.antsTickerBound = true;
 	}
 
 	/** Keeps the selection-overlay group the last child of `root`, i.e. above

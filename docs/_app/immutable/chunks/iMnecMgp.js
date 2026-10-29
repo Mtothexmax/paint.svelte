@@ -1,0 +1,1 @@
+import"./8DwXHSKP.js";import{r as e}from"../nodes/2.BI7n-HFm.js";export{e as createNewDocument};

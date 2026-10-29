@@ -3,10 +3,10 @@
 // out through callbacks; all errors surface as BackgroundRemovalError.
 //
 // Static-deployment notes:
-// - The ORT WASM binaries ship inside the `onnxruntime-web` npm package (NOT
-//   in git) and are bundled via `?url` imports, so they land in the build
-//   output with correct base paths. `ort.env.wasm.wasmPaths` is pointed at
-//   that directory — otherwise ORT would fetch them from a CDN at runtime.
+// - The ORT WASM runtime ships inside the `onnxruntime-web` npm package (NOT
+//   in git) and is bundled via `?url` imports, so it lands in the build output
+//   with correct base paths and `ort.env.wasm.wasmPaths` points at the exact
+//   bundled URLs — otherwise ORT would fetch them from a CDN at runtime.
 // - WASM multi-threading needs SharedArrayBuffer (COOP/COEP headers), which a
 //   static host cannot guarantee. Without `crossOriginIsolated` we pin
 //   `numThreads = 1` and skip the proxy worker.
@@ -20,26 +20,27 @@ import { BackgroundRemovalError, type BackgroundRemovalQuality, type InferenceBa
 
 // WASM runtimes bundled from the npm package (emitted into the build output,
 // never committed to git, never fetched from a CDN at runtime).
-import wasmThreadedUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
-import wasmJsepUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url';
-import wasmJspiUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jspi.wasm?url';
-import wasmAsyncifyUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
-
-function wasmPaths(): string {
-	// All four artifacts live in the same output directory; any one derives it.
-	const i = wasmThreadedUrl.lastIndexOf('/');
-	return i >= 0 ? wasmThreadedUrl.slice(0, i + 1) : './';
-}
-
-// Reference every bundled artifact so Vite emits all of them (ORT fetches
-// only what the active execution provider needs).
-const BUNDLED_WASM = [wasmThreadedUrl, wasmJsepUrl, wasmJspiUrl, wasmAsyncifyUrl];
+//
+// ORT resolves TWO runtime URLs SEPARATELY: the ESM glue module
+// (`ort-wasm-simd-threaded.jsep.mjs`, dynamically imported by ORT) and the
+// `.wasm` payload it fetches through `locateFile`. A directory PREFIX is not
+// enough here — Vite emits content-hashed asset names, so ORT's hardcoded
+// `…jsep.mjs` sitting next to `…jsep.<hash>.wasm` never existed and every
+// backend died with "Failed to fetch dynamically imported module" (404 on
+// GitHub Pages, which serves the committed `docs/` folder verbatim).
+// The object form pins BOTH URLs to exactly what Vite bundled.
+//
+// Only the `jsep` pair is needed: the default `onnxruntime-web` entry point
+// IS the JSEP build (WebGPU + WASM EP) and hardcodes that glue filename —
+// shipping the jspi/asyncify/plain variants only added ~58 MB to the static
+// export without ever being requested.
+import wasmJsepMjsUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.mjs?url';
+import wasmJsepWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url';
 
 let wasmConfigured = false;
 function configureWasm(): void {
 	if (wasmConfigured) return;
 	wasmConfigured = true;
-	void BUNDLED_WASM.length;
 	// Pinned in every debug transcript: exact runtime build matters for
 	// WebGPU shader-compat archaeology (e.g. 1.30.0 vs 1.31.0-dev).
 	const ortVersion: string =
@@ -47,7 +48,8 @@ function configureWasm(): void {
 			? (ort.env as { versions: { web: string } }).versions.web
 			: 'unknown';
 	console.debug(`[bg-removal] onnxruntime-web ${ortVersion}`);
-	ort.env.wasm.wasmPaths = wasmPaths();
+	console.debug(`[bg-removal] wasm glue ${wasmJsepMjsUrl} · payload ${wasmJsepWasmUrl}`);
+	ort.env.wasm.wasmPaths = { mjs: wasmJsepMjsUrl, wasm: wasmJsepWasmUrl };
 	if (typeof crossOriginIsolated !== 'undefined' && !crossOriginIsolated) {
 		// No SharedArrayBuffer without COOP/COEP (static hosting): run the
 		// WASM backend single-threaded instead of failing or hanging.
@@ -284,11 +286,19 @@ export async function ensureSession(
 				graphOptimizationLevel: 'all'
 			});
 		} catch (err) {
+			const detail = err instanceof Error ? err.message : 'unknown error';
+			// ORT latches a failed `initWasm()` for the lifetime of the tab: every
+			// later attempt — including a manual CPU retry — rethrows this message
+			// instead of initialising again. Say so, otherwise "Retry" looks dead.
+			const latched = /previous call to ['"]?initWasm\(\)['"]? failed/i.test(detail);
+			const hint = latched
+				? ' The WebAssembly runtime already failed to initialise in this tab; reload the page, then try again.'
+				: '';
 			throw new BackgroundRemovalError(
 				'session-failed',
 				ep === 'webgpu'
-					? `Could not start the model on WebGPU (${err instanceof Error ? err.message : 'unknown error'}).`
-					: `Could not start the model on the CPU fallback. The fp16 graph needs WebGPU on this device (${err instanceof Error ? err.message : 'unknown error'}).`
+					? `Could not start the model on WebGPU (${detail}).${hint}`
+					: `Could not start the model on the CPU fallback (${detail}).${hint}`
 			);
 		}
 	};

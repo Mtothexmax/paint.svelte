@@ -1951,14 +1951,32 @@ function onPointerDown(e: PointerEvent) {
 			// real input (text tool, dialogs) keeps it.
 			registerPasteCatcher(pasteCatcherEl);
 			focusPasteCatcher();
-			const idle = () => setTimeout(focusPasteCatcher, 0);
+			// …but NOT while the user is working inside a dialog. Clicking
+			// non-focusable dialog content (an error message, a label) drops
+			// focus to <body>, and re-taking it moves the caret into the paste
+			// catcher — which COLLAPSES the text selection the user is dragging.
+			// That is why no text in any dialog could be selected/copied.
+			// The origin of the gesture decides: inside `.m-dialog` we stand
+			// down for as long as that dialog is open.
+			let pointerInDialog = false;
+			const notePointerOrigin = (e: PointerEvent) => {
+				const el = e.target as Element | null;
+				pointerInDialog = !!el?.closest?.('.m-dialog');
+			};
+			const idle = () =>
+				setTimeout(() => {
+					if (pointerInDialog && document.querySelector('.m-dialog')) return;
+					focusPasteCatcher();
+				}, 0);
 			const onWindowFocus = () => focusPasteCatcher();
+			document.addEventListener('pointerdown', notePointerOrigin, true);
 			document.addEventListener('focusout', idle);
 			// Clicks too: closing a dialog removes the focused node, which
 			// drops focus to <body> without firing 'focusout'.
 			document.addEventListener('click', idle, true);
 			window.addEventListener('focus', onWindowFocus);
 			disposers.push(() => {
+				document.removeEventListener('pointerdown', notePointerOrigin, true);
 				document.removeEventListener('focusout', idle);
 				document.removeEventListener('click', idle, true);
 				window.removeEventListener('focus', onWindowFocus);
